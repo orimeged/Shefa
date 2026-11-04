@@ -1,0 +1,56 @@
+# Render Blueprint: the API and its PostgreSQL. https://render.com/docs/blueprint-spec
+# The frontend deploys to Vercel from frontend/ (see frontend/vercel.json).
+services:
+  - type: web
+    name: shefa-api
+    runtime: python
+    rootDir: backend
+    # Frankfurt is Render's closest region to Israel. The database sits beside it.
+    region: frankfurt
+    # No plan given means Render's smallest paid instance. Not `free`: a free service
+    # sleeps after 15 idle minutes, and the next kiosk or phone waits about a minute.
+    buildCommand: pip install -r requirements.txt
+    # Migrations run as the app starts. Which proxies to trust is FORWARDED_ALLOW_IPS,
+    # below: a bare * on a command line gets expanded into file names by some shells.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      # Tested on 3.13. Render's default for new services is newer.
+      - key: PYTHON_VERSION
+        value: 3.13.1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shefa-db
+          property: connectionString
+      # The managers' dashboard key. Render makes a random one; read it in the dashboard.
+      - key: ADMIN_TOKEN
+        generateValue: true
+      # The frontend's address, such as https://shefa.vercel.app. Asked for at setup.
+      - key: CORS_ORIGINS
+        sync: false
+      # Optional: Vercel preview deployments, such as https://shefa-[a-z0-9-]+\.vercel\.app
+      - key: CORS_ORIGIN_REGEX
+        sync: false
+      # Dictation and photos of lists. Without it the phone says they're off.
+      - key: OPENAI_API_KEY
+        sync: false
+      # Optional: sorting unclear list lines. Without it, the food dictionary does it alone.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: STORE_TIMEZONE
+        value: Asia/Jerusalem
+      # Render's proxy sits in front, so the app trusts its forwarded headers and sees
+      # the shopper's https request rather than the proxy's.
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+
+databases:
+  - name: shefa-db
+    databaseName: shefa
+    user: shefa
+    region: frankfurt
+    # Tested on 17. Can't be changed once the database exists.
+    postgresMajorVersion: "17"
+    # No plan given means Render's smallest paid database. A `free` one is deleted
+    # after 30 days, with every shopper report in it.

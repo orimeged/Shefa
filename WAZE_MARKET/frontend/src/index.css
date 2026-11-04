@@ -1,0 +1,228 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Rubik Variable", system-ui, sans-serif;
+
+  --color-paper: #f6f4ee;
+  --color-surface: #ffffff;
+  --color-line: #e4e0d6;
+  --color-shelf: #dcd7ca;
+  /* 3.3:1 against an aisle, where #dcd7ca is 1.4:1 and fades in glare. */
+  --color-shelf-strong: #958e7d;
+  --color-ink: #16201c;
+  --color-muted: #5f665c;
+  --color-brand: #0b7a5b;
+  --color-brand-strong: #064e3a;
+  --color-brand-soft: #dff1e9;
+  --color-next: #f2a33a;
+  --color-next-soft: #fdf0dc;
+  --color-you: #2563eb;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+}
+
+/* Kiosk item colours. Each carries white text at 5:1 or better, keeps clear of the
+   route's green and the shopper's blue, and the three were checked against each
+   other for colour blindness. Outside @theme because they're picked at run time
+   (zone-1 to zone-3), and Tailwind only writes out theme colours it sees used. */
+:root {
+  --color-zone-1: #c2410c;
+  --color-zone-2: #6d28d9;
+  --color-zone-3: #0369a1;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button:not(:disabled),
+label {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.route-draw {
+  stroke-dasharray: 1;
+  animation: route-draw 0.7s ease-out both;
+}
+
+/* Hidden until a finished leg plays out behind the dot. */
+.route-walked {
+  stroke-dasharray: 1;
+  opacity: 0;
+}
+
+.route-flow {
+  stroke-dasharray: 0.9 1.7;
+  animation: route-flow 1.5s linear infinite;
+}
+
+.pulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+.map-marker {
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Moved every frame along the paths, so a transition would only make it lag. */
+.map-marker.is-live {
+  transition: none;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti 0.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+.confetti-finale {
+  width: 9px;
+  height: 14px;
+  animation-duration: 1.4s;
+}
+
+.check-pop {
+  animation: check-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.zone-pin {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.zone-pin-body {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: zone-pin-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.zone-pin.is-leaving .zone-pin-body {
+  animation: zone-pin-out 0.26s ease-in forwards;
+}
+
+.zone-badge {
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 3px 10px rgb(22 32 28 / 0.28);
+}
+
+.card-in {
+  animation: card-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes zone-pin-in {
+  from {
+    transform: translateY(-1.6px) scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes zone-pin-out {
+  to {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes card-in {
+  from {
+    transform: translateY(8px) scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes confetti {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.5);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), calc(var(--dy) + 36px)) rotate(var(--spin)) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0.4) rotate(-20deg);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes route-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes route-flow {
+  to {
+    stroke-dashoffset: -2.6;
+  }
+}
+
+@keyframes pulse-ring {
+  from {
+    transform: scale(0.7);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-draw,
+  .route-flow,
+  .pulse-ring,
+  .check-pop,
+  .zone-pin-body,
+  .card-in {
+    animation: none;
+  }
+
+  .zone-pin {
+    transition: none;
+  }
+
+  .confetti-piece {
+    display: none;
+  }
+
+  .map-marker {
+    transition: none;
+  }
+}

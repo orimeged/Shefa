@@ -1,0 +1,242 @@
+{
+  "id": "demo",
+  "name": "סניף הדגמה",
+  "width_m": 32,
+  "height_m": 26,
+  "nodes": [
+    { "id": "entrance", "x": 2, "y": 0, "type": "entrance" },
+    { "id": "checkout", "x": 30, "y": 0, "type": "checkout" },
+
+    { "id": "front_0", "x": 2, "y": 4, "type": "junction" },
+    { "id": "front_1", "x": 6, "y": 4, "type": "junction" },
+    { "id": "front_2", "x": 11, "y": 4, "type": "junction" },
+    { "id": "front_3", "x": 16, "y": 4, "type": "junction" },
+    { "id": "front_4", "x": 21, "y": 4, "type": "junction" },
+    { "id": "front_5", "x": 26, "y": 4, "type": "junction" },
+    { "id": "front_6", "x": 30, "y": 4, "type": "junction" },
+
+    { "id": "back_1", "x": 6, "y": 22, "type": "junction" },
+    { "id": "back_2", "x": 11, "y": 22, "type": "junction" },
+    { "id": "back_3", "x": 16, "y": 22, "type": "junction" },
+    { "id": "back_4", "x": 21, "y": 22, "type": "junction" },
+    { "id": "back_5", "x": 26, "y": 22, "type": "junction" },
+
+    { "id": "a1_s1", "x": 6, "y": 8, "type": "section" },
+    { "id": "a1_s2", "x": 6, "y": 13, "type": "section" },
+    { "id": "a1_s3", "x": 6, "y": 18, "type": "section" },
+    { "id": "a2_s1", "x": 11, "y": 8, "type": "section" },
+    { "id": "a2_s2", "x": 11, "y": 13, "type": "section" },
+    { "id": "a2_s3", "x": 11, "y": 18, "type": "section" },
+    { "id": "a3_s1", "x": 16, "y": 8, "type": "section" },
+    { "id": "a3_s2", "x": 16, "y": 13, "type": "section" },
+    { "id": "a3_s3", "x": 16, "y": 18, "type": "section" },
+    { "id": "a4_s1", "x": 21, "y": 8, "type": "section" },
+    { "id": "a4_s2", "x": 21, "y": 13, "type": "section" },
+    { "id": "a4_s3", "x": 21, "y": 18, "type": "section" },
+    { "id": "a5_s1", "x": 26, "y": 8, "type": "section" },
+    { "id": "a5_s2", "x": 26, "y": 13, "type": "section" },
+    { "id": "a5_s3", "x": 26, "y": 18, "type": "section" }
+  ],
+  "edges": [
+    { "from_node": "entrance", "to_node": "front_0", "length_m": 4 },
+    { "from_node": "front_0", "to_node": "front_1", "length_m": 4 },
+    { "from_node": "front_1", "to_node": "front_2", "length_m": 5 },
+    { "from_node": "front_2", "to_node": "front_3", "length_m": 5 },
+    { "from_node": "front_3", "to_node": "front_4", "length_m": 5 },
+    { "from_node": "front_4", "to_node": "front_5", "length_m": 5 },
+    { "from_node": "front_5", "to_node": "front_6", "length_m": 4 },
+    { "from_node": "front_6", "to_node": "checkout", "length_m": 4 },
+
+    { "from_node": "back_1", "to_node": "back_2", "length_m": 5 },
+    { "from_node": "back_2", "to_node": "back_3", "length_m": 5 },
+    { "from_node": "back_3", "to_node": "back_4", "length_m": 5 },
+    { "from_node": "back_4", "to_node": "back_5", "length_m": 5 },
+
+    { "from_node": "front_1", "to_node": "a1_s1", "length_m": 4 },
+    { "from_node": "a1_s1", "to_node": "a1_s2", "length_m": 5 },
+    { "from_node": "a1_s2", "to_node": "a1_s3", "length_m": 5 },
+    { "from_node": "a1_s3", "to_node": "back_1", "length_m": 4 },
+
+    { "from_node": "front_2", "to_node": "a2_s1", "length_m": 4 },
+    { "from_node": "a2_s1", "to_node": "a2_s2", "length_m": 5 },
+    { "from_node": "a2_s2", "to_node": "a2_s3", "length_m": 5 },
+    { "from_node": "a2_s3", "to_node": "back_2", "length_m": 4 },
+
+    { "from_node": "front_3", "to_node": "a3_s1", "length_m": 4 },
+    { "from_node": "a3_s1", "to_node": "a3_s2", "length_m": 5 },
+    { "from_node": "a3_s2", "to_node": "a3_s3", "length_m": 5 },
+    { "from_node": "a3_s3", "to_node": "back_3", "length_m": 4 },
+
+    { "from_node": "front_4", "to_node": "a4_s1", "length_m": 4 },
+    { "from_node": "a4_s1", "to_node": "a4_s2", "length_m": 5 },
+    { "from_node": "a4_s2", "to_node": "a4_s3", "length_m": 5 },
+    { "from_node": "a4_s3", "to_node": "back_4", "length_m": 4 },
+
+    { "from_node": "front_5", "to_node": "a5_s1", "length_m": 4 },
+    { "from_node": "a5_s1", "to_node": "a5_s2", "length_m": 5 },
+    { "from_node": "a5_s2", "to_node": "a5_s3", "length_m": 5 },
+    { "from_node": "a5_s3", "to_node": "back_5", "length_m": 4 }
+  ],
+  "sections": [
+    { "id": "a1-s1-l", "node_id": "a1_s1", "aisle_no": 1, "side": "left" },
+    { "id": "a1-s1-r", "node_id": "a1_s1", "aisle_no": 1, "side": "right" },
+    { "id": "a1-s2-l", "node_id": "a1_s2", "aisle_no": 1, "side": "left" },
+    { "id": "a1-s2-r", "node_id": "a1_s2", "aisle_no": 1, "side": "right" },
+    { "id": "a1-s3-l", "node_id": "a1_s3", "aisle_no": 1, "side": "left" },
+    { "id": "a1-s3-r", "node_id": "a1_s3", "aisle_no": 1, "side": "right" },
+    { "id": "a2-s1-l", "node_id": "a2_s1", "aisle_no": 2, "side": "left" },
+    { "id": "a2-s1-r", "node_id": "a2_s1", "aisle_no": 2, "side": "right" },
+    { "id": "a2-s2-l", "node_id": "a2_s2", "aisle_no": 2, "side": "left" },
+    { "id": "a2-s2-r", "node_id": "a2_s2", "aisle_no": 2, "side": "right" },
+    { "id": "a2-s3-l", "node_id": "a2_s3", "aisle_no": 2, "side": "left" },
+    { "id": "a2-s3-r", "node_id": "a2_s3", "aisle_no": 2, "side": "right" },
+    { "id": "a3-s1-l", "node_id": "a3_s1", "aisle_no": 3, "side": "left" },
+    { "id": "a3-s1-r", "node_id": "a3_s1", "aisle_no": 3, "side": "right" },
+    { "id": "a3-s2-l", "node_id": "a3_s2", "aisle_no": 3, "side": "left" },
+    { "id": "a3-s2-r", "node_id": "a3_s2", "aisle_no": 3, "side": "right" },
+    { "id": "a3-s3-l", "node_id": "a3_s3", "aisle_no": 3, "side": "left" },
+    { "id": "a3-s3-r", "node_id": "a3_s3", "aisle_no": 3, "side": "right" },
+    { "id": "a4-s1-l", "node_id": "a4_s1", "aisle_no": 4, "side": "left" },
+    { "id": "a4-s1-r", "node_id": "a4_s1", "aisle_no": 4, "side": "right" },
+    { "id": "a4-s2-l", "node_id": "a4_s2", "aisle_no": 4, "side": "left" },
+    { "id": "a4-s2-r", "node_id": "a4_s2", "aisle_no": 4, "side": "right" },
+    { "id": "a4-s3-l", "node_id": "a4_s3", "aisle_no": 4, "side": "left" },
+    { "id": "a4-s3-r", "node_id": "a4_s3", "aisle_no": 4, "side": "right" },
+    { "id": "a5-s1-l", "node_id": "a5_s1", "aisle_no": 5, "side": "left" },
+    { "id": "a5-s1-r", "node_id": "a5_s1", "aisle_no": 5, "side": "right" },
+    { "id": "a5-s2-l", "node_id": "a5_s2", "aisle_no": 5, "side": "left" },
+    { "id": "a5-s2-r", "node_id": "a5_s2", "aisle_no": 5, "side": "right" },
+    { "id": "a5-s3-l", "node_id": "a5_s3", "aisle_no": 5, "side": "left" },
+    { "id": "a5-s3-r", "node_id": "a5_s3", "aisle_no": 5, "side": "right" }
+  ],
+  "categories": [
+    {
+      "id": "produce", "name": "ירקות ופירות", "name_en": "Produce", "section_id": "a1-s1-l",
+      "aliases": ["ירקות", "פירות", "vegetables", "fruit"]
+    },
+    {
+      "id": "bakery", "name": "לחם ומאפים", "name_en": "Bakery", "section_id": "a1-s2-r",
+      "aliases": ["לחם", "מאפים", "bread"]
+    },
+    {
+      "id": "cereals", "name": "דגני בוקר", "name_en": "Breakfast Cereals", "section_id": "a1-s3-l",
+      "aliases": ["דגנים", "cereal"]
+    },
+    {
+      "id": "sauces", "name": "רטבים ושמנים", "name_en": "Sauces & Oils", "section_id": "a2-s1-l",
+      "aliases": ["רוטב", "רטבים", "שמן", "sauce", "oil"]
+    },
+    {
+      "id": "pasta", "name": "פסטה ואורז", "name_en": "Pasta & Rice", "section_id": "a2-s1-r",
+      "aliases": ["פסטה", "אורז", "rice", "spaghetti"]
+    },
+    {
+      "id": "canned", "name": "שימורים", "name_en": "Canned Goods", "section_id": "a2-s3-r",
+      "aliases": ["שימורי", "canned"]
+    },
+    {
+      "id": "snacks", "name": "חטיפים וממתקים", "name_en": "Snacks & Sweets", "section_id": "a3-s1-l",
+      "aliases": ["חטיפים", "ממתקים", "sweets", "chocolate"]
+    },
+    {
+      "id": "beverages", "name": "משקאות", "name_en": "Beverages", "section_id": "a3-s2-r",
+      "aliases": ["שתייה", "drinks", "water", "juice"]
+    },
+    {
+      "id": "coffee", "name": "קפה ותה", "name_en": "Coffee & Tea", "section_id": "a3-s3-l",
+      "aliases": ["קפה", "תה", "coffee", "tea"]
+    },
+    {
+      "id": "cleaning", "name": "חומרי ניקוי", "name_en": "Cleaning", "section_id": "a4-s1-r",
+      "aliases": ["ניקיון", "ניקוי", "detergent"]
+    },
+    {
+      "id": "toiletries", "name": "טיפוח ונייר", "name_en": "Toiletries & Paper", "section_id": "a4-s2-l",
+      "aliases": ["טיפוח", "נייר", "toiletries"]
+    },
+    {
+      "id": "baby", "name": "תינוקות", "name_en": "Baby", "section_id": "a4-s3-r",
+      "aliases": ["תינוק", "diapers"]
+    },
+    {
+      "id": "frozen", "name": "קפואים", "name_en": "Frozen", "section_id": "a5-s1-l",
+      "aliases": ["קפוא", "frozen", "ice cream"]
+    },
+    {
+      "id": "dairy", "name": "מוצרי חלב וביצים", "name_en": "Dairy & Eggs", "section_id": "a5-s2-r",
+      "aliases": ["חלב", "גבינה", "ביצים", "milk", "cheese", "eggs"]
+    },
+    {
+      "id": "meat", "name": "בשר ועוף", "name_en": "Meat & Poultry", "section_id": "a5-s3-l",
+      "aliases": ["בשר", "עוף", "meat", "chicken"]
+    }
+  ],
+  "products": [
+    { "barcode": "2000000001001", "name": "עגבניות", "category_id": "produce" },
+    { "barcode": "2000000001002", "name": "מלפפונים", "category_id": "produce" },
+    { "barcode": "2000000001003", "name": "תפוחים", "category_id": "produce" },
+    { "barcode": "2000000001004", "name": "בננות", "category_id": "produce" },
+
+    { "barcode": "2000000002001", "name": "לחם פרוס", "category_id": "bakery" },
+    { "barcode": "2000000002002", "name": "פיתות", "category_id": "bakery" },
+    { "barcode": "2000000002003", "name": "לחמניות", "category_id": "bakery" },
+
+    { "barcode": "2000000003001", "name": "קורנפלקס", "category_id": "cereals" },
+    { "barcode": "2000000003002", "name": "גרנולה", "category_id": "cereals" },
+    { "barcode": "2000000003003", "name": "שיבולת שועל", "category_id": "cereals" },
+
+    { "barcode": "2000000004001", "name": "רוטב עגבניות", "category_id": "sauces" },
+    { "barcode": "2000000004002", "name": "טחינה גולמית", "category_id": "sauces" },
+    { "barcode": "2000000004003", "name": "שמן זית", "category_id": "sauces" },
+    { "barcode": "2000000004004", "name": "קטשופ", "category_id": "sauces" },
+
+    { "barcode": "2000000005001", "name": "ספגטי", "category_id": "pasta" },
+    { "barcode": "2000000005002", "name": "פוזילי", "category_id": "pasta" },
+    { "barcode": "2000000005003", "name": "אורז בסמטי", "category_id": "pasta" },
+    { "barcode": "2000000005004", "name": "קוסקוס", "category_id": "pasta" },
+
+    { "barcode": "2000000006001", "name": "טונה בשמן", "category_id": "canned" },
+    { "barcode": "2000000006002", "name": "תירס", "category_id": "canned" },
+    { "barcode": "2000000006003", "name": "זיתים", "category_id": "canned" },
+
+    { "barcode": "2000000007001", "name": "חטיף בוטנים", "category_id": "snacks" },
+    { "barcode": "2000000007002", "name": "צ'יפס", "category_id": "snacks" },
+    { "barcode": "2000000007003", "name": "שוקולד מריר", "category_id": "snacks" },
+    { "barcode": "2000000007004", "name": "עוגיות", "category_id": "snacks" },
+
+    { "barcode": "2000000008001", "name": "מים מינרליים", "category_id": "beverages" },
+    { "barcode": "2000000008002", "name": "מיץ תפוזים", "category_id": "beverages" },
+    { "barcode": "2000000008003", "name": "משקה קולה", "category_id": "beverages" },
+    { "barcode": "2000000008004", "name": "סודה", "category_id": "beverages" },
+
+    { "barcode": "2000000009001", "name": "קפה נמס", "category_id": "coffee" },
+    { "barcode": "2000000009002", "name": "קפה טורקי", "category_id": "coffee" },
+    { "barcode": "2000000009003", "name": "תה ירוק", "category_id": "coffee" },
+
+    { "barcode": "2000000010001", "name": "נוזל כלים", "category_id": "cleaning" },
+    { "barcode": "2000000010002", "name": "אבקת כביסה", "category_id": "cleaning" },
+    { "barcode": "2000000010003", "name": "אקונומיקה", "category_id": "cleaning" },
+
+    { "barcode": "2000000011001", "name": "שמפו", "category_id": "toiletries" },
+    { "barcode": "2000000011002", "name": "משחת שיניים", "category_id": "toiletries" },
+    { "barcode": "2000000011003", "name": "נייר טואלט", "category_id": "toiletries" },
+
+    { "barcode": "2000000012001", "name": "חיתולים", "category_id": "baby" },
+    { "barcode": "2000000012002", "name": "מגבונים לחים", "category_id": "baby" },
+    { "barcode": "2000000012003", "name": "מזון לתינוקות", "category_id": "baby" },
+
+    { "barcode": "2000000013001", "name": "גלידת וניל", "category_id": "frozen" },
+    { "barcode": "2000000013002", "name": "אפונה קפואה", "category_id": "frozen" },
+    { "barcode": "2000000013003", "name": "פיצה קפואה", "category_id": "frozen" },
+
+    { "barcode": "2000000014001", "name": "חלב 3%", "category_id": "dairy" },
+    { "barcode": "2000000014002", "name": "גבינה לבנה 5%", "category_id": "dairy" },
+    { "barcode": "2000000014003", "name": "קוטג' 5%", "category_id": "dairy" },
+    { "barcode": "2000000014004", "name": "יוגורט", "category_id": "dairy" },
+    { "barcode": "2000000014005", "name": "ביצים L", "category_id": "dairy" },
+
+    { "barcode": "2000000015001", "name": "חזה עוף", "category_id": "meat" },
+    { "barcode": "2000000015002", "name": "בשר טחון", "category_id": "meat" },
+    { "barcode": "2000000015003", "name": "שוקיים", "category_id": "meat" }
+  ]
+}

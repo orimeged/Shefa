@@ -1,0 +1,153 @@
+{
+  "produce": {
+    "description": "fresh fruit, vegetables and fresh herbs",
+    "terms": [
+      "בננה", "בננות", "banana", "bananas", "תפוח", "תפוחי עץ", "apple", "apples", "אגס", "אגסים", "pear",
+      "תפוז", "תפוזים", "orange", "oranges", "קלמנטינה", "קלמנטינות", "לימון", "לימונים", "lemon", "lemons",
+      "ליים", "lime", "אשכולית", "אשכוליות", "grapefruit", "ענבים", "grapes", "תות", "תותים", "strawberry",
+      "strawberries", "אבטיח", "watermelon", "מלון", "melon", "אפרסק", "אפרסקים", "peach", "נקטרינה", "שזיף",
+      "שזיפים", "plum", "משמש", "משמשים", "דובדבן", "דובדבנים", "cherries", "מנגו", "mango", "אננס", "pineapple",
+      "קיווי", "kiwi", "רימון", "רימונים", "pomegranate", "אפרסמון", "אבוקדו", "avocado", "עגבניה", "עגבנייה",
+      "עגבניות שרי", "tomato", "tomatoes", "מלפפון", "cucumber", "cucumbers", "גזר", "carrot", "carrots", "בצל",
+      "בצלים", "onion", "onions", "בצל ירוק", "שום", "garlic", "תפוחי אדמה", "תפוח אדמה", "תפודים", "potato",
+      "potatoes", "בטטה", "בטטות", "sweet potato", "חציל", "חצילים", "eggplant", "קישוא", "קישואים", "zucchini",
+      "פלפל", "פלפלים", "פלפל אדום", "pepper", "peppers", "כרוב", "כרובית", "cabbage", "cauliflower", "ברוקולי",
+      "broccoli", "חסה", "lettuce", "תרד", "spinach", "סלרי", "celery", "סלק", "beet", "דלעת", "pumpkin", "פטריות",
+      "מושרום", "mushrooms", "כוסברה", "cilantro", "פטרוזיליה", "parsley", "נענע", "mint", "שמיר", "dill", "בזיליקום",
+      "basil", "ג'ינג'ר", "ginger", "צנון", "צנונית", "לוביה", "שעועית ירוקה", "green beans"
+    ]
+  },
+  "bakery": {
+    "description": "bread, pita, rolls, cakes and fresh baked goods",
+    "terms": [
+      "פיתה", "פיתה טרייה", "pita", "לחמניה", "לחמנייה", "roll", "rolls", "חלה", "חלות", "challah", "באגט", "baguette",
+      "ג'בטה", "לחם מחמצת", "לחם שיפון", "לחם מלא", "לחם לבן", "sourdough", "טוסט", "toast", "לאפה", "לאפות", "מלוואח",
+      "מלאווח", "ג'חנון", "עוגה", "עוגות", "cake", "מאפה", "בורקס", "burekas", "קרואסון", "קרואסונים", "croissant",
+      "רוגלך", "rugelach", "סופגניה", "סופגניות", "donut", "donuts", "מאפין", "מאפינס", "muffin", "פוקאצ'ה", "bagel",
+      "בייגל טרי", "לחם ללא גלוטן", "פירורי לחם", "פרורי לחם", "breadcrumbs", "פנקו", "panko", "קרקר", "קרקרים", "crackers",
+      "פריכיות", "rice cakes", "מצה", "מצות", "matzah", "matzo"
+    ]
+  },
+  "cereals": {
+    "description": "breakfast cereal, granola, oats and muesli",
+    "terms": [
+      "קורנפלקס", "cornflakes", "corn flakes", "גרנולה", "granola", "שיבולת שועל", "קוואקר", "oatmeal", "oats", "מוזלי", "muesli",
+      "כריות", "כריות נוגט", "צ'יריוס", "cheerios", "ניקוטוב", "דגנים", "דגני בוקר לילדים", "breakfast cereal", "סובין"
+    ]
+  },
+  "sauces": {
+    "description": "sauces, oils, vinegar, spices, salt, sugar, flour and baking supplies",
+    "terms": [
+      "קטשופ", "ketchup", "מיונז", "mayonnaise", "mayo", "חרדל", "mustard", "טחינה", "tahini", "סילאן", "רוטב סויה", "סויה",
+      "soy sauce", "רוטב טריאקי", "teriyaki", "רוטב ברביקיו", "bbq sauce", "רוטב עגבניות", "רסק", "רסק עגבניות", "tomato paste",
+      "ממרח עגבניות", "פסטו", "pesto", "שמן", "שמן קנולה", "שמן חמניות", "שמן זית", "olive oil", "canola oil", "vegetable oil",
+      "חומץ", "חומץ בלסמי", "vinegar", "balsamic", "מלח", "salt", "פלפל שחור", "black pepper", "פפריקה", "paprika", "כמון",
+      "cumin", "כורכום", "turmeric", "קינמון", "cinnamon", "תבלין", "תבלינים", "spices", "סוכר", "sugar", "סוכר חום",
+      "brown sugar", "ממתיק", "סוכרזית", "קמח", "flour", "קמח תופח", "שמרים", "yeast", "אבקת אפיה", "אבקת אפייה", "baking powder",
+      "סודה לשתיה", "סודה לשתייה", "baking soda", "קקאו", "cocoa", "תמצית וניל", "וניל", "vanilla", "סוכר וניל", "קורנפלור",
+      "cornstarch", "מרק עוף אבקה", "אבקת מרק", "אבקת מרק עוף", "soup powder", "שקדי מרק", "שקדי מרק", "croutons"
+    ]
+  },
+  "pasta": {
+    "description": "dry pasta, noodles, rice, couscous, legumes and grains",
+    "terms": [
+      "ספגטי", "spaghetti", "פוזילי", "fusilli", "פנה", "penne", "מקרוני", "macaroni", "לזניה", "lasagna", "ניוקי", "gnocchi",
+      "איטריות", "אטריות", "noodles", "ראמן", "ramen", "נודלס", "אורז", "אורז בסמטי", "אורז פרסי", "אורז מלא", "אורז יסמין",
+      "basmati", "jasmine rice", "קוסקוס", "couscous", "פתיתים", "ptitim", "בורגול", "bulgur", "קינואה", "quinoa", "עדשים", "lentils",
+      "חומוס יבש", "גרגרי חומוס", "שעועית יבשה", "beans", "פירה מוכן", "מקרוני וגבינה", "כוסמת", "buckwheat", "גריסים", "barley",
+      "סולת", "semolina", "מג'דרה"
+    ]
+  },
+  "canned": {
+    "description": "canned and jarred food: tuna, corn, olives, pickles, beans and hummus",
+    "terms": [
+      "טונה", "tuna", "סרדינים", "sardines", "תירס", "corn", "אפונה בפחית", "זיתים", "olives", "מלפפונים חמוצים", "חמוצים", "pickles",
+      "חומוס", "hummus", "פול", "fava beans", "שעועית בפחית", "קונפיטורה", "אננס בפחית", "פטריות בפחית", "ארטישוק", "שימורים", "שימורי ירקות",
+      "עגבניות מרוסקות", "עגבניות מרוסקות בפחית", "crushed tomatoes", "לבבות דקל", "כרוב כבוש", "sauerkraut", "דג מלוח", "הרינג", "herring"
+    ]
+  },
+  "snacks": {
+    "description": "snacks, chips, nuts, sweets, chocolate, cookies and sweet spreads such as Nutella, jam and honey",
+    "terms": [
+      "נוטלה", "nutella", "ממרח שוקולד", "chocolate spread", "שוקולד", "שוקולד חלב", "chocolate", "ממתק", "ממתקים", "candy", "sweets",
+      "סוכריה", "סוכריות", "מסטיק", "gum", "גומי", "חטיף", "חטיפים", "snack", "snacks", "במבה", "bamba", "ביסלי", "bissli", "צ'יפס",
+      "דוריטוס", "doritos", "פרינגלס", "pringles", "chips", "crisps", "פופקורן", "popcorn", "פיצוחים", "גרעינים", "בוטנים", "peanuts",
+      "אגוזים", "אגוזי מלך", "walnuts", "nuts", "שקדים", "almonds", "קשיו", "cashews", "פיסטוק", "pistachio", "תמרים", "dates", "צימוקים",
+      "raisins", "פירות יבשים", "dried fruit", "עוגיה", "עוגיות", "cookie", "cookies", "ופלים", "וופל", "wafers", "חטיף אנרגיה", "granola bar",
+      "חלבה", "halva", "דבש", "honey", "ריבה", "jam", "חמאת בוטנים", "peanut butter", "מרשמלו", "marshmallow", "קליק", "פסק זמן", "קינדר", "kinder"
+    ]
+  },
+  "beverages": {
+    "description": "soft drinks, water, juice, beer, wine and spirits",
+    "terms": [
+      "מים", "מינרלים", "water", "mineral water", "סודה", "soda", "קולה", "קוקה קולה", "coca cola", "coke", "פפסי", "pepsi", "ספרייט", "sprite",
+      "פאנטה", "fanta", "מיץ", "מיץ תפוזים", "מיץ ענבים", "juice", "orange juice", "לימונדה", "lemonade", "פריגת", "תפוזינה", "ספרינג", "נביעות",
+      "משקה אנרגיה", "רד בול", "red bull", "energy drink", "בירה", "beer", "גולדסטאר", "יין", "יין אדום", "יין לבן", "wine", "וודקה", "vodka",
+      "וויסקי", "whiskey", "ערק", "arak", "תירוש", "מיץ ענבים לקידוש", "שוקו בקרטון קר", "סירופ", "syrup", "פטל", "תה קר", "iced tea"
+    ]
+  },
+  "coffee": {
+    "description": "coffee, tea and hot drink mixes",
+    "terms": [
+      "קפה", "קפה שחור", "קפה נמס", "קפה טורקי", "נס", "נסקפה", "nescafe", "coffee", "instant coffee", "קפסולות", "קפסולות קפה", "נספרסו", "nespresso",
+      "coffee pods", "פולי קפה", "coffee beans", "אספרסו", "espresso", "תה", "תה ירוק", "תה שחור", "ויסוצקי", "tea", "green tea", "תה צמחים",
+      "herbal tea", "קמומיל", "chamomile", "חליטה", "שוקו אבקה", "אבקת שוקו", "hot chocolate", "נסקוויק", "nesquik", "מילקשייק אבקה", "סחלב", "sahlab"
+    ]
+  },
+  "cleaning": {
+    "description": "cleaning products, laundry, dishwashing, trash bags, foil and household supplies",
+    "terms": [
+      "סבון כלים", "פיירי", "fairy", "dish soap", "טבליות למדיח", "dishwasher tablets", "אבקת כביסה", "ג'ל כביסה", "מרכך כביסה", "laundry detergent",
+      "fabric softener", "אקונומיקה", "bleach", "מסיר כתמים", "stain remover", "נוזל רצפה", "מנקה רצפות", "floor cleaner", "מנקה חלונות", "glass cleaner",
+      "מנקה אמבטיה", "ספוג", "ספוגים", "sponge", "סקוטש", "מטלית", "מטליות", "סמרטוט", "כפפות גומי", "rubber gloves", "שקיות זבל", "שקיות אשפה",
+      "trash bags", "garbage bags", "נייר אלומיניום", "אלומיניום פויל", "aluminum foil", "נייר אפיה", "נייר אפייה", "baking paper", "ניילון נצמד",
+      "plastic wrap", "שקיות הקפאה", "freezer bags", "כלים חד פעמיים", "צלחות חד פעמיות", "כוסות חד פעמיות", "paper plates", "סוללות", "batteries",
+      "נורה", "נורות", "light bulb", "מטהר אוויר", "air freshener", "חומר ניקוי", "ניקוי", "cleaner"
+    ]
+  },
+  "toiletries": {
+    "description": "shampoo, soap, oral care, deodorant, paper goods and personal care",
+    "terms": [
+      "שמפו", "shampoo", "מרכך שיער", "conditioner", "סבון", "סבון גוף", "סבון ידיים", "soap", "body wash", "אל סבון", "משחת שיניים", "toothpaste",
+      "מברשת שיניים", "toothbrush", "מי פה", "mouthwash", "דאודורנט", "deodorant", "קרם גוף", "קרם ידיים", "קרם לחות", "body lotion", "moisturizer",
+      "קרם הגנה", "sunscreen", "סכיני גילוח", "קצף גילוח", "razors", "shaving cream", "תחבושות", "תחבושות היגייניות", "טמפונים", "tampons", "pads",
+      "נייר טואלט", "toilet paper", "מגבות נייר", "מגבת נייר", "paper towels", "ממחטות", "טישו", "tissues", "מפיות", "napkins", "צמר גפן", "מקלוני אוזניים",
+      "cotton swabs", "פלסטר", "פלסטרים", "band aid", "אקמול", "נורופן", "painkillers", "ג'ל לשיער", "צבע לשיער", "hair dye"
+    ]
+  },
+  "baby": {
+    "description": "diapers, wipes, baby food and baby care",
+    "terms": [
+      "חיתול", "חיתולים", "diapers", "האגיס", "huggies", "פמפרס", "pampers", "מגבונים", "מגבונים לחים", "wipes", "baby wipes", "תמ\"ל", "תמל", "מטרנה", "materna",
+      "סימילאק", "similac", "פורמולה לתינוקות", "baby formula", "מזון לתינוקות", "baby food", "מחית", "מחית תינוקות", "דייסה", "דייסת תינוקות", "משחת החתלה",
+      "diaper cream", "בקבוק לתינוק", "מוצץ", "pacifier", "שמפו לתינוקות", "קרם לתינוק"
+    ]
+  },
+  "frozen": {
+    "description": "frozen food: ice cream, frozen vegetables, frozen pizza, schnitzels and ready meals",
+    "terms": [
+      "גלידה", "גלידות", "ice cream", "ארטיק", "ארטיקים", "popsicle", "שלגון", "שלגונים", "ירקות קפואים", "frozen vegetables", "אפונה קפואה", "שעועית קפואה",
+      "תירס קפוא", "תרד קפוא", "פיצה קפואה", "frozen pizza", "שניצל", "שניצלים", "schnitzel", "נאגטס", "נגטס", "nuggets", "המבורגר", "המבורגרים", "burgers",
+      "קבב קפוא", "ציפס קפוא", "צ'יפס קפוא", "french fries", "כופתאות", "פלמני", "dumplings", "בצק עלים", "בצק פילו", "puff pastry", "דגים קפואים", "אצבעות דג",
+      "fish sticks", "פירות קפואים", "frozen berries", "יוגורט קפוא", "קרח", "ice", "מלאוואח קפוא", "בורקס קפוא"
+    ]
+  },
+  "dairy": {
+    "description": "milk, cheese, yogurt, eggs, butter, cream and chilled spreads",
+    "terms": [
+      "חלב", "חלב סויה", "חלב שקדים", "חלב שיבולת שועל", "חלב ללא לקטוז", "milk", "soy milk", "almond milk", "oat milk", "גבינה", "גבינה לבנה", "גבינה צהובה",
+      "גבינת שמנת", "גבינה בולגרית", "גבינה מלוחה", "גבינת עיזים", "cheese", "cream cheese", "קוטג", "קוטג'", "cottage cheese", "לבנה", "labneh", "פטה", "feta",
+      "מוצרלה", "mozzarella", "פרמזן", "parmesan", "צפתית", "עמק", "יוגורט", "yogurt", "דנונה", "מילקי", "milky", "פודינג", "pudding", "שמנת", "שמנת מתוקה",
+      "שמנת חמוצה", "sour cream", "heavy cream", "חמאה", "butter", "מרגרינה", "margarine", "ביצה", "ביצים", "egg", "eggs", "אשל", "גיל", "ריוויון", "לבן",
+      "שוקו", "chocolate milk", "טופו", "tofu", "קרם קוקוס"
+    ]
+  },
+  "meat": {
+    "description": "fresh meat, poultry, fish and deli meats",
+    "terms": [
+      "בשר", "בשר טחון", "בשר בקר", "meat", "ground beef", "beef", "סטייק", "steak", "אנטריקוט", "entrecote", "צלי", "כבש", "lamb", "עוף", "עוף שלם", "chicken",
+      "חזה עוף", "chicken breast", "כרעיים", "שוקיים", "פרגית", "פרגיות", "כנפיים", "הודו", "turkey", "כבד", "קציצות", "קציצה", "meatballs", "נקניק", "נקניקיות",
+      "נקניקיה", "sausage", "sausages", "hot dog", "פסטרמה", "pastrami", "סלמי", "salami", "דג", "דגים", "fish", "סלמון", "salmon", "אמנון", "דניס", "לברק", "בורי"
+    ]
+  }
+}
