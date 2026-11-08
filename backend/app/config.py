@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -13,6 +14,24 @@ _DEFAULT_EVENTS_DB = Path(__file__).parent.parent / "var" / "events.sqlite3"
 _DEFAULT_DATABASE_URL = f"sqlite:///{(Path(__file__).parent.parent / 'var' / 'inventory.sqlite3').as_posix()}"
 _DEFAULT_CORS_ORIGINS = "http://localhost:5173"
 _DEFAULT_STORE_TIMEZONE = "Asia/Jerusalem"
+
+
+def browser_origin(value: str) -> str:
+    """An address as a browser sends it in its Origin header: scheme and host only.
+
+    CORS compares the two exactly, and people paste the address bar, such as
+    https://shefa.vercel.app/kiosk. The site was then refused while every request
+    still logged 200, because the browser, not the server, throws the answer away.
+    """
+    text = value.strip().strip("\"'")
+    parts = urlsplit(text)
+    if parts.scheme and parts.netloc:
+        return f"{parts.scheme}://{parts.netloc}".lower()
+    return text
+
+
+def parse_origins(value: str) -> tuple[str, ...]:
+    return tuple(origin for origin in map(browser_origin, value.split(",")) if origin)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +63,7 @@ class Settings:
         )
         return cls(
             data_dir=Path(os.environ.get("STORE_DATA_DIR", _DEFAULT_DATA_DIR)),
-            cors_origins=tuple(origin.strip() for origin in origins.split(",") if origin.strip()),
+            cors_origins=parse_origins(origins),
             llm_enabled=os.environ.get("LLM_ENABLED", "1" if has_llm_key else "0") == "1",
             llm_model=os.environ.get("LLM_MODEL") or None,
             stt_engine=os.environ.get(

@@ -94,6 +94,16 @@ def build_speech_engine(
             return None
 
 
+def log_cors(settings: Settings) -> None:
+    """A refused site still gets 200 in this log, so say which sites are allowed."""
+    logger.info("CORS allows: %s", ", ".join(settings.cors_origins) or "no other site")
+    if settings.cors_origin_regex:
+        logger.info("CORS also allows origins matching: %s", settings.cors_origin_regex)
+    for origin in settings.cors_origins:
+        if origin != "*" and "://" not in origin:
+            logger.warning("CORS origin %r lacks https://, so no browser will match it", origin)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     resolved = settings or Settings.from_env()
 
@@ -106,6 +116,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         migrate(database)
         import_legacy_events(database, resolved.events_db)
         logger.info("Database: %s", printable_url(resolved.database_url))
+        log_cors(resolved)
         inventory = SqlInventoryRepository(database)
         for layout in layouts:
             inventory.sync_layout(layout)
@@ -155,4 +166,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+# Uvicorn sets up only its own loggers, so without this the app's INFO lines,
+# such as which sites CORS allows, never reach the host's log.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(message)s")
 app = create_app()

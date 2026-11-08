@@ -38,3 +38,24 @@ def test_the_shell_wins_over_the_file(env_file: Path) -> None:
 
 def test_no_file_leaves_dictation_off(env_file: Path) -> None:
     assert Settings.from_env().stt_engine == "none"
+
+
+def test_cors_origins_are_cut_to_what_a_browser_sends(env_file: Path) -> None:
+    # Copied from the address bar, with a slash, in quotes, in capitals.
+    os.environ["CORS_ORIGINS"] = (
+        "https://shefa-sandy.vercel.app/kiosk, https://Shop.Example.com/ ,"
+        "'https://other.vercel.app', , http://localhost:5173"
+    )
+
+    assert Settings.from_env().cors_origins == (
+        "https://shefa-sandy.vercel.app",
+        "https://shop.example.com",
+        "https://other.vercel.app",
+        "http://localhost:5173",
+    )
+
+
+def test_a_star_or_a_bare_host_passes_through_unchanged(env_file: Path) -> None:
+    os.environ["CORS_ORIGINS"] = "*,shefa.vercel.app"
+
+    assert Settings.from_env().cors_origins == ("*", "shefa.vercel.app")

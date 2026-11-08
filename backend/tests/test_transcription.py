@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from app.config import Settings
+from app.config import Settings, parse_origins
 from app.domain.speech import TranscriptionError
 from app.main import create_app
 from app.services.openai_speech import OpenAISpeechToText
@@ -228,6 +228,20 @@ def test_api_calls_from_the_frontends_domain_get_cors_headers(settings: Settings
             headers={"origin": "https://evil.example", "access-control-request-method": "GET"},
         )
         assert "access-control-allow-origin" not in foreign.headers
+
+
+def test_a_pasted_site_address_still_lets_its_search_through(settings: Settings) -> None:
+    """The live failure: search answered 200 with no CORS header, so the page said unavailable."""
+    pasted = parse_origins("https://shefa-sandy.vercel.app/kiosk")
+    with TestClient(create_app(replace(settings, cors_origins=pasted))) as client:
+        response = client.get(
+            "/api/v1/stores/demo/search",
+            params={"q": "חלב"},
+            headers={"origin": "https://shefa-sandy.vercel.app"},
+        )
+
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "https://shefa-sandy.vercel.app"
 
 
 def test_with_no_engine_the_socket_says_so(settings: Settings) -> None:
