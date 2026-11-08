@@ -4,7 +4,7 @@
 
 ## לפני שמתחילים
 
-1. **מאגר Git משלו.** כרגע `WAZE-MARKET` יושב בתוך המאגר של תיקיית הבית, שמחובר ל-`birthdays`. צריך מאגר חדש ש-`WAZE-MARKET` הוא השורש שלו, כי שם Render מחפש את `render.yaml` ו-Vercel את `frontend/`.
+1. **שורש המאגר הוא `WAZE_MARKET`,** התיקייה שמכילה את `render.yaml`, `backend/` ו-`frontend/`. ב-GitHub הם צריכים להופיע ישר בעמוד הראשי של המאגר, בלי תיקייה עוטפת. אחרת Render לא ימצא את `backend` ויכשל עם "Root directory 'backend' does not exist".
 2. **שום סוד לא נכנס למאגר.** `backend/.env` מוחרג ב-`.gitignore`. מפתחות מוזנים רק בלוחות הבקרה.
 
 ## שלב 1: השרת והמסד ב-Render
