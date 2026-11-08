@@ -1,17 +1,22 @@
 """The inventory schema: what stands where in a store.
 
-The floor plan stays in the store's JSON file and belongs to us. These tables hold
+The routing graph stays in the store's JSON file and belongs to us. These tables hold
 what managers change. `MapNode` is the bridge between the two: it names a zone on
-the drawn map and points at the section that routing walks to.
+the drawn map and points at the section that routing walks to. A tile floor plan a
+manager draws in the dashboard's editor sits on the store's own row.
 """
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, Float, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 _ID_LENGTH = 64
 _NAME_LENGTH = 200
+# JSONB on PostgreSQL, kept parsed and compact; plain JSON text on SQLite.
+_DOCUMENT = JSON().with_variant(JSONB(), "postgresql")
 
 
 class Base(DeclarativeBase):
@@ -24,6 +29,11 @@ class StoreRecord(Base):
     id: Mapped[str] = mapped_column(String(_ID_LENGTH), primary_key=True)
     # Goes up with every inventory change, so a server process can tell its copy is old.
     version: Mapped[int] = mapped_column(default=0)
+    # The editor's payload as saved, and when: the time tells a process its router is old.
+    floor_plan: Mapped[dict[str, Any] | None] = mapped_column(_DOCUMENT, default=None)
+    floor_plan_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
 
 class MapNode(Base):

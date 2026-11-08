@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AdminApi } from "../api/adminClient";
 import { createAdminApi } from "../api/adminClient";
-import type { CatalogCategory, NotFoundReportRow, Zone } from "../api/types";
+import type { CatalogCategory, FloorPlanCheck, NotFoundReportRow, Zone } from "../api/types";
 import { AdminLogin } from "../components/admin/AdminLogin";
+import { FloorGridEditor } from "../components/admin/FloorGridEditor";
 import { KpiRow } from "../components/admin/KpiRow";
 import { LostDemandWidget } from "../components/admin/LostDemandWidget";
 import type { AlertOutcome } from "../components/admin/ShelfStockAlerts";
@@ -18,12 +19,14 @@ import { usePolledReport } from "../hooks/usePolledReport";
 import { useStockAlerts } from "../hooks/useStockAlerts";
 import { useStoreMap } from "../hooks/useStoreMap";
 import { useLanguage } from "../i18n/LanguageProvider";
+import type { FloorGrid } from "../lib/admin/floorGrid";
+import { createGrid, fromPayload } from "../lib/admin/floorGrid";
 import { countAlerts } from "../lib/admin/stockAlerts";
 
 // For this tab only: a shared tablet shouldn't stay signed in overnight.
 const TOKEN_KEY = "admin-token";
 
-type Tab = "dashboard" | "alerts";
+type Tab = "dashboard" | "alerts" | "floor";
 
 export default function AdminView() {
   const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY));
@@ -57,6 +60,8 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   const [attempt, setAttempt] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("dashboard");
+  // The editor loads its plan on first opening, not with every visit to the dashboard.
+  const [hasOpenedFloor, setHasOpenedFloor] = useState(false);
   /** The alert whose item is getting a new shelf, while a manager picks one on the map. */
   const [placing, setPlacing] = useState<NotFoundReportRow | null>(null);
   const [outcome, setOutcome] = useState<AlertOutcome | null>(null);
@@ -90,6 +95,9 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   const openTab = (next: Tab) => {
     setTab(next);
     setPlacing(null);
+    if (next === "floor") {
+      setHasOpenedFloor(true);
+    }
   };
 
   const closeAlert = async (row: NotFoundReportRow) => {
@@ -169,6 +177,9 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
               </span>
             )}
           </TabButton>
+          <TabButton isSelected={tab === "floor"} onSelect={() => openTab("floor")}>
+            {t.adminTabFloorEditor}
+          </TabButton>
         </div>
 
         {/* Stays mounted while hidden, so going to the alerts and back keeps the zoom. */}
@@ -215,6 +226,11 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
           />
         </div>
 
+        {/* Mounted while hidden too, so a drawing and its undo steps survive a look at the alerts. */}
+        <div role="tabpanel" hidden={tab !== "floor"} aria-label={t.adminTabFloorEditor}>
+          {hasOpenedFloor && <FloorEditorPanel api={api} categories={categories} />}
+        </div>
+
         {selectedNodeId !== null && zones && (
           <ZoneManagementModal
             key={selectedNodeId}
@@ -230,6 +246,63 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
         )}
       </div>
     </div>
+  );
+}
+
+function FloorEditorPanel({
+  api,
+  categories,
+}: {
+  api: AdminApi;
+  categories: readonly CatalogCategory[];
+}) {
+  const { t, pick } = useLanguage();
+  const [start, setStart] = useState<{ grid: FloorGrid; check: FloorPlanCheck | null } | null>(
+    null,
+  );
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const suggestions = useMemo(
+    () => [...new Set(categories.map((category) => pick(category.name, category.name_en)))],
+    [categories, pick],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setFailed(false);
+    api
+      .floorPlan(controller.signal)
+      .then((saved) => {
+        const grid = saved ? fromPayload(saved.floor_plan) : null;
+        setStart(grid && saved ? { grid, check: saved.check } : { grid: createGrid(), check: null });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setFailed(true);
+        }
+      });
+    return () => controller.abort();
+  }, [api, attempt]);
+
+  if (failed) {
+    return <Notice message={t.floorLoadFailed} onRetry={() => setAttempt((current) => current + 1)} />;
+  }
+  if (!start) {
+    return <div className="h-[36rem] w-full animate-pulse rounded-2xl bg-slate-200/70" />;
+  }
+  return (
+    <FloorGridEditor
+      initialGrid={start.grid}
+      initialCheck={start.check}
+      suggestions={suggestions}
+      onSave={async (_, json) => {
+        try {
+          return (await api.saveFloorPlan(json)).check;
+        } catch {
+          return null;
+        }
+      }}
+    />
   );
 }
 

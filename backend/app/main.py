@@ -15,6 +15,7 @@ from app.api.admin import inventory_error_response
 from app.api.admin import router as admin_router
 from app.api.analytics import router as analytics_router
 from app.api.events import router as events_router
+from app.api.floor_plan import router as floor_plan_router
 from app.api.list_photo import router as list_photo_router
 from app.api.routes import router
 from app.api.transcription import router as transcription_router
@@ -26,12 +27,14 @@ from app.domain.speech import SpeechToText
 from app.repositories.analytics_store import SqlAnalyticsStore
 from app.repositories.database import create_database_engine, migrate, printable_url
 from app.repositories.event_store import SqlEventStore
+from app.repositories.floor_plan_repository import SqlFloorPlanRepository
 from app.repositories.legacy_events import import_legacy_events
 from app.repositories.inventory_repository import SqlInventoryRepository
 from app.repositories.store_repository import JsonStoreRepository, load_dictionary
 from app.services.claude_classifier import DEFAULT_MODEL as DEFAULT_LLM_MODEL
 from app.services.claude_classifier import ClaudeItemClassifier
 from app.services.claude_inventory import ClaudeInventoryExtractor
+from app.services.floor_plans import FloorPlanRegistry
 from app.services.openai_list_photo import DEFAULT_MODEL as DEFAULT_LIST_PHOTO_MODEL
 from app.services.openai_list_photo import OpenAIListPhotoReader
 from app.services.openai_speech import DEFAULT_MODEL as DEFAULT_STT_MODEL
@@ -126,6 +129,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.stores = StoreRegistry(
             layouts, inventory, dictionary, build_classifier(resolved)
         )
+        app.state.floor_plans = FloorPlanRegistry(SqlFloorPlanRepository(database))
 
         engine = build_speech_engine(resolved)
         app.state.transcription = TranscriptionService(engine) if engine else None
@@ -151,7 +155,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=list(resolved.cors_origins),
         allow_origin_regex=resolved.cors_origin_regex,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        # PUT saves the dashboard's floor plan.
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
     # A full catalog makes the store map tens of kilobytes, on a store's weak signal.
@@ -161,6 +166,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(transcription_router)
     app.include_router(list_photo_router)
     app.include_router(events_router)
+    app.include_router(floor_plan_router)
     app.include_router(admin_router)
     app.include_router(analytics_router)
     return app

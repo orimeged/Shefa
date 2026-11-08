@@ -162,6 +162,40 @@ export interface Strings {
   adminTabDashboard: string;
   mapPanelTitle: string;
   adminTabAlerts: string;
+  adminTabFloorEditor: string;
+  floorEditorTitle: string;
+  floorEditorHint: string;
+  floorTools: string;
+  floorTiles: { aisle: string; shelf: string; wall: string; checkout: string; entrance: string };
+  floorWalkable: string;
+  floorBlocked: string;
+  floorShelfLabel: string;
+  floorShelfLabelPlaceholder: string;
+  floorSize: string;
+  floorUndo: string;
+  floorClear: string;
+  floorSave: string;
+  floorSaved: string;
+  floorSaveFailed: string;
+  floorUnsaved: string;
+  floorDepartments: string;
+  floorNoDepartments: string;
+  floorTileCount: (count: number) => string;
+  floorUnlabelledShelves: (count: number) => string;
+  floorCell: (row: number, col: number) => string;
+  floorGridLabel: string;
+  floorStats: (walkable: number, blocked: number) => string;
+  floorJson: string;
+  floorCopy: string;
+  floorCopied: string;
+  floorShortcuts: string;
+  floorSaving: string;
+  floorLoadFailed: string;
+  floorCheckTitle: string;
+  floorReady: string;
+  floorProblems: { no_entrance: string; no_checkout: string; checkout_unreachable: string };
+  floorUnreachable: (label: string) => string;
+  floorUnlinked: (label: string) => string;
   alertsHint: string;
   alertsSummary: (count: number) => string;
   alertsEmpty: string;
@@ -371,6 +405,46 @@ export const strings: Record<Language, Strings> = {
     adminTabDashboard: "לוח בקרה",
     mapPanelTitle: "מפת הסניף",
     adminTabAlerts: "התראות מלאי על המדף",
+    adminTabFloorEditor: "עורך מפה",
+    floorEditorTitle: "עורך מפת הסניף",
+    floorEditorHint: "בוחרים כלי וצובעים משבצות. גרירה צובעת ברצף, ולחיצה ימנית מוחקת.",
+    floorTools: "כלים",
+    floorTiles: { aisle: "מעבר", shelf: "מדף", wall: "קיר", checkout: "קופה", entrance: "כניסה" },
+    floorWalkable: "אפשר לעבור",
+    floorBlocked: "חוסם מעבר",
+    floorShelfLabel: "המחלקה במדף",
+    floorShelfLabelPlaceholder: "למשל מוצרי חלב",
+    floorSize: "גודל הרשת (שורות × עמודות)",
+    floorUndo: "ביטול",
+    floorClear: "ניקוי המפה",
+    floorSave: "שמירת המפה",
+    floorSaved: "המפה נשמרה",
+    floorSaveFailed: "השמירה נכשלה. נסו שוב.",
+    floorUnsaved: "יש שינויים שלא נשמרו",
+    floorDepartments: "מחלקות במפה",
+    floorNoDepartments: "עוד אין מדפים עם מחלקה.",
+    floorTileCount: (count) => (count === 1 ? "משבצת אחת" : `${count} משבצות`),
+    floorUnlabelledShelves: (count) =>
+      count === 1 ? "משבצת מדף אחת בלי מחלקה" : `${count} משבצות מדף בלי מחלקה`,
+    floorCell: (row, col) => `שורה ${row}, עמודה ${col}`,
+    floorGridLabel: "רשת המפה. החיצים מזיזים, רווח צובע ו-Delete מוחק.",
+    floorStats: (walkable, blocked) => `${walkable} משבצות מעבר · ${blocked} חוסמות`,
+    floorJson: "ה-JSON שנשלח לשרת",
+    floorCopy: "העתקה",
+    floorCopied: "הועתק",
+    floorShortcuts: "1–5 בוחרים כלי · Ctrl+Z מבטל",
+    floorSaving: "שומר…",
+    floorLoadFailed: "לא הצלחנו לטעון את מפת הסניף.",
+    floorCheckTitle: "בדיקת המפה השמורה",
+    floorReady: "המפה מוכנה למסלולים.",
+    floorProblems: {
+      no_entrance: "חסרה כניסה במפה, ובלעדיה אין מאיפה להתחיל מסלול.",
+      no_checkout: "חסרה קופה במפה, ובלעדיה אין איפה לסיים מסלול.",
+      checkout_unreachable: "אין דרך מהכניסה אל הקופות.",
+    },
+    floorUnreachable: (label) => `אין גישה מהכניסה אל "${label}".`,
+    floorUnlinked: (label) =>
+      `"${label}" לא תואם לאף מחלקה בקטלוג, ולכן רשימות של לקוחות לא יובילו אליו.`,
     alertsHint: "מה לקוחות לא מצאו על המדף ב-7 הימים האחרונים.",
     alertsSummary: (count) =>
       count === 1 ? "פריט אחד דווח 3 פעמים או יותר." : `${count} פריטים דווחו 3 פעמים או יותר.`,
@@ -577,6 +651,46 @@ export const strings: Record<Language, Strings> = {
     adminTabDashboard: "Dashboard",
     mapPanelTitle: "Store map",
     adminTabAlerts: "Shelf Stock Alerts",
+    adminTabFloorEditor: "Map Editor",
+    floorEditorTitle: "Store layout editor",
+    floorEditorHint: "Pick a tool and paint tiles. Drag to paint a run; right-click erases.",
+    floorTools: "Tools",
+    floorTiles: { aisle: "Aisle", shelf: "Shelf", wall: "Wall", checkout: "Checkout", entrance: "Entrance" },
+    floorWalkable: "Walkable",
+    floorBlocked: "Blocks the way",
+    floorShelfLabel: "Department on the shelf",
+    floorShelfLabelPlaceholder: "e.g. Dairy",
+    floorSize: "Grid size (rows × columns)",
+    floorUndo: "Undo",
+    floorClear: "Clear map",
+    floorSave: "Save map",
+    floorSaved: "Map saved",
+    floorSaveFailed: "Couldn't save. Try again.",
+    floorUnsaved: "Unsaved changes",
+    floorDepartments: "Departments on the map",
+    floorNoDepartments: "No shelves with a department yet.",
+    floorTileCount: (count) => (count === 1 ? "1 tile" : `${count} tiles`),
+    floorUnlabelledShelves: (count) =>
+      count === 1 ? "1 shelf tile without a department" : `${count} shelf tiles without a department`,
+    floorCell: (row, col) => `Row ${row}, column ${col}`,
+    floorGridLabel: "Map grid. Arrows move, Space paints, Delete erases.",
+    floorStats: (walkable, blocked) => `${walkable} walkable tiles · ${blocked} blocked`,
+    floorJson: "JSON sent to the server",
+    floorCopy: "Copy",
+    floorCopied: "Copied",
+    floorShortcuts: "1–5 pick a tool · Ctrl+Z undoes",
+    floorSaving: "Saving…",
+    floorLoadFailed: "We couldn't load the store layout.",
+    floorCheckTitle: "Saved map check",
+    floorReady: "The map is ready for routes.",
+    floorProblems: {
+      no_entrance: "The map has no entrance, so a route has nowhere to start.",
+      no_checkout: "The map has no checkout, so a route has nowhere to end.",
+      checkout_unreachable: "There's no way from the entrance to the checkouts.",
+    },
+    floorUnreachable: (label) => `"${label}" can't be reached from the entrance.`,
+    floorUnlinked: (label) =>
+      `"${label}" doesn't match a catalog department, so shoppers' lists won't lead there.`,
     alertsHint: "What shoppers couldn't find on the shelf in the last 7 days.",
     alertsSummary: (count) =>
       count === 1 ? "1 item reported 3 times or more." : `${count} items reported 3 times or more.`,

@@ -2,15 +2,23 @@
 
 from collections.abc import Collection
 from itertools import pairwise
-
-from app.domain.graph import StoreGraph
+from typing import Protocol
 
 _EPSILON = 1e-9
 _MAX_MOVED_SEGMENT = 3
 
 
+class Distances(Protocol):
+    """Walking distance between two places, the same both ways.
+
+    The store's node graph is one; a manager's tile floor plan is another.
+    """
+
+    def distance(self, from_node: str, to_node: str) -> float: ...
+
+
 def order_stops(
-    graph: StoreGraph, start: str, stops: Collection[str], end: str
+    graph: Distances, start: str, stops: Collection[str], end: str
 ) -> list[str]:
     """Order `stops` for a short walk from `start` to `end`.
 
@@ -26,7 +34,7 @@ def order_stops(
 
 
 def _improved_tour(
-    graph: StoreGraph, start: str, first: str, stops: Collection[str], end: str
+    graph: Distances, start: str, first: str, stops: Collection[str], end: str
 ) -> list[str]:
     tour = [start, *_nearest_neighbour(graph, first, stops), end]
     while _two_opt_pass(graph, tour) or _or_opt_pass(graph, tour):
@@ -34,11 +42,11 @@ def _improved_tour(
     return tour
 
 
-def _tour_length(graph: StoreGraph, tour: list[str]) -> float:
+def _tour_length(graph: Distances, tour: list[str]) -> float:
     return sum(graph.distance(a, b) for a, b in pairwise(tour))
 
 
-def _nearest_neighbour(graph: StoreGraph, first: str, stops: Collection[str]) -> list[str]:
+def _nearest_neighbour(graph: Distances, first: str, stops: Collection[str]) -> list[str]:
     remaining = set(stops) - {first}
     order = [first]
     while remaining:
@@ -48,7 +56,7 @@ def _nearest_neighbour(graph: StoreGraph, first: str, stops: Collection[str]) ->
     return order
 
 
-def _two_opt_pass(graph: StoreGraph, tour: list[str]) -> bool:
+def _two_opt_pass(graph: Distances, tour: list[str]) -> bool:
     """Reverse segments that shorten `tour`, in place. Its ends stay fixed.
 
     A reversal only changes the two edges around the segment. That holds
@@ -66,7 +74,7 @@ def _two_opt_pass(graph: StoreGraph, tour: list[str]) -> bool:
     return improved
 
 
-def _or_opt_pass(graph: StoreGraph, tour: list[str]) -> bool:
+def _or_opt_pass(graph: Distances, tour: list[str]) -> bool:
     """Move the first short segment that shortens `tour`, in place."""
     distance = graph.distance
     for size in range(1, _MAX_MOVED_SEGMENT + 1):

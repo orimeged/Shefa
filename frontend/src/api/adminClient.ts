@@ -11,6 +11,7 @@ import type {
   LostDemandReport,
   MapAudioResult,
   NotFoundReportRow,
+  SavedFloorPlan,
   StagedItem,
   TrafficReport,
   Zone,
@@ -20,6 +21,7 @@ import type {
 const ROOT = apiUrl("/api/v1/admin");
 const STORE = `${ROOT}/stores/${STORE_ID}`;
 const ANALYTICS = `${ROOT}/analytics`;
+const FLOOR_PLAN = apiUrl(`/api/v1/stores/${STORE_ID}/floor-plan`);
 const STORE_QUERY = new URLSearchParams({ store_id: STORE_ID }).toString();
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -117,6 +119,15 @@ export function createAdminApi(token: string, onUnauthorized: () => void) {
 
     trafficFlow: (signal?: AbortSignal) =>
       json<TrafficReport>(`${ANALYTICS}/traffic-flow?${STORE_QUERY}`, { signal }),
+
+    /** Null until a manager saves the store's first floor plan: the server answers 204. */
+    floorPlan: async (signal?: AbortSignal): Promise<SavedFloorPlan | null> => {
+      const response = await send(FLOOR_PLAN, { signal });
+      return response.status === 204 ? null : ((await response.json()) as SavedFloorPlan);
+    },
+
+    saveFloorPlan: (payloadJson: string) =>
+      json<SavedFloorPlan>(FLOOR_PLAN, { method: "PUT", headers: JSON_HEADERS, body: payloadJson }),
 
     mapAudio: (clip: Blob, language: string) =>
       json<MapAudioResult>(

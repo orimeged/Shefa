@@ -271,3 +271,41 @@ def test_an_old_events_file_moves_into_postgres(database_url: str, tmp_path: Pat
 
 def test_the_health_check_asks_the_database(pg_client: TestClient) -> None:
     assert pg_client.get("/health").json() == {"status": "ok"}
+
+
+# ---- The dashboard's floor plan
+
+
+def test_a_floor_plan_is_kept_as_jsonb_and_routes(pg_client: TestClient, database_url: str) -> None:
+    from tests.floor_plans import plan_payload
+
+    payload = plan_payload(
+        ["E....", ".dd..", ".....", ".kk..", "....C"], {"d": "Dairy & Eggs", "k": "קומבוצה"}
+    )
+    saved = pg_client.put("/api/v1/stores/demo/floor-plan", json=payload, headers=AUTH)
+    assert saved.status_code == 200
+    body = pg_client.get("/api/v1/stores/demo/floor-plan").json()
+    assert body["floor_plan"]["labels"] == payload["labels"]
+    assert body["updated_at"] == saved.json()["updated_at"]
+
+    engine = create_database_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            data_type = connection.scalar(
+                text(
+                    "SELECT data_type FROM information_schema.columns WHERE table_schema ="
+                    " current_schema() AND table_name = 'stores' AND column_name = 'floor_plan'"
+                )
+            )
+            # Stored parsed, so the database itself can look inside it.
+            last_label = connection.scalar(
+                text("SELECT floor_plan -> 'labels' -> -1 ->> 'label' FROM stores WHERE id = 'demo'")
+            )
+    finally:
+        engine.dispose()
+    assert data_type == "jsonb"
+    assert last_label == "קומבוצה"
+
+    route = pg_client.post("/api/v1/stores/demo/floor-plan/routes", json={"category_ids": ["dairy"]})
+    assert route.status_code == 200
+    assert route.json()["stops"][0]["department"] == "Dairy & Eggs"

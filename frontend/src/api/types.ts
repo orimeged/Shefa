@@ -247,3 +247,29 @@ export interface TrafficReport {
   trips: number;
   edges: EdgeFlow[];
 }
+
+export type FloorPlanProblem = "no_entrance" | "no_checkout" | "checkout_unreachable";
+
+export interface FloorPlanDepartment {
+  label: string;
+  tiles: number;
+  /** The catalog department its name matched; null if none did. */
+  category_id: string | null;
+  /** False when no open tile beside it can be reached from the entrance. */
+  reachable: boolean;
+}
+
+/** What the server found in a saved floor plan, for the manager to fix. */
+export interface FloorPlanCheck {
+  routable: boolean;
+  problems: FloorPlanProblem[];
+  departments: FloorPlanDepartment[];
+}
+
+export interface SavedFloorPlan {
+  store_id: string;
+  /** The editor's own payload, checked by the server; read it with `fromPayload`. */
+  floor_plan: unknown;
+  updated_at: string;
+  check: FloorPlanCheck;
+}
