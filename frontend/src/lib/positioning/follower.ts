@@ -16,12 +16,6 @@ import { angleDifference, normalizeDegrees } from "./angles";
 const SMOOTH_TIME_MS = 450;
 /** Above a brisk walk. Catching up on steps, the dot never moves faster than a person. */
 const MAX_WALK_SPEED_M_PER_S = 2.2;
-/**
- * More catching up than a walk builds, so a fix such as Found it. A walk can
- * build up to three steps at once: the step detector holds the first three back
- * until it's sure they're a walk.
- */
-const CORRECTION_M = 3;
 /** A fix is shown as a quick slide to the right spot, there in about a third of a second. */
 const CORRECTION_SMOOTH_TIME_MS = 100;
 const ARRIVED_M = 0.005;
@@ -61,7 +55,7 @@ export class PathFollower {
   private path: Point[];
   /** Metres per second along the path, toward the target. */
   private speed = 0;
-  /** Set by a jump bigger than any walk, until the dot has caught up with it. */
+  /** Set by a fix, such as Found it, until the dot has caught up with it. */
   private correcting = false;
 
   constructor(start: Point) {
@@ -81,10 +75,15 @@ export class PathFollower {
     return lengthOf(this.path);
   }
 
-  /** Queues a walk that starts at the current target. */
-  extend(walk: readonly Point[]): void {
+  /**
+   * Queues a walk that starts at the current target. Only a fix, a spot known for
+   * sure, is slid to quickly. Anything else is walked at a person's pace however
+   * far it is, including the matcher putting the dot back on the route a couple of
+   * metres on: shown fast, that reads as the dot darting across the store.
+   */
+  extend(walk: readonly Point[], { isFix = false }: { isFix?: boolean } = {}): void {
     this.path.push(...walk.slice(1));
-    if (this.backlogM > CORRECTION_M) {
+    if (isFix) {
       this.correcting = true;
     }
   }

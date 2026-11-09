@@ -2,14 +2,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GridRoute, SavedFloorPlan } from "../api/types";
 import { routePlanner } from "../hooks/useShopperStore";
+import { bearingBetween, vectorAlong } from "./positioning/angles";
 import { cellsBetween, createGrid, makeTile, paint, toPayload } from "./admin/floorGrid";
 import {
   buildFloorLayout,
   cellCentre,
   cellId,
+  frameOf,
+  metresToSvg,
   parseCellId,
   readFloorMap,
   routeFromGrid,
+  tileAt,
 } from "./floorPlanMap";
 
 /** A 10 × 6 store: a dairy run, a coffee shelf down a column, a wall, a door and tills. */
@@ -71,13 +75,73 @@ describe("cell ids", () => {
   });
 });
 
+/** The test store: 6 rows of 10 tiles, half a metre each, so 5 m across and 3 m deep. */
+const FRAME = frameOf(store(), 0.5);
+
+describe("the plan's three frames", () => {
+  it("puts a tile's middle in metres from the bottom-left, y up", () => {
+    expect(FRAME).toEqual({ rows: 6, cols: 10, cellSizeM: 0.5 });
+    // Row 5 is the bottom row, so its middle is a quarter metre up.
+    expect(cellCentre({ row: 5, col: 0 }, FRAME)).toEqual({ x: 0.25, y: 0.25 });
+    expect(cellCentre({ row: 0, col: 9 }, FRAME)).toEqual({ x: 4.75, y: 2.75 });
+  });
+
+  it("finds the tile under any point, and the tile's middle is under itself", () => {
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 10; col++) {
+        expect(tileAt(cellCentre({ row, col }, FRAME), FRAME)).toEqual({ row, col });
+      }
+    }
+    // Anywhere inside a tile, not just its middle: a tile is half a metre square.
+    expect(tileAt({ x: 2.01, y: 1.49 }, FRAME)).toEqual({ row: 3, col: 4 });
+    expect(tileAt({ x: 2.49, y: 1.01 }, FRAME)).toEqual({ row: 3, col: 4 });
+    // Off the plan it says so, by a row or column out of range.
+    expect(tileAt({ x: -0.1, y: 3.2 }, FRAME)).toEqual({ row: -1, col: -1 });
+  });
+
+  it("draws metres as tile units, y turned down", () => {
+    expect(metresToSvg({ x: 0, y: 0 }, FRAME)).toEqual({ x: 0, y: 6 });
+    expect(metresToSvg({ x: 5, y: 3 }, FRAME)).toEqual({ x: 10, y: 0 });
+    // A tile's middle lands in the middle of its square on screen.
+    expect(metresToSvg(cellCentre({ row: 2, col: 4 }, FRAME), FRAME)).toEqual({ x: 4.5, y: 2.5 });
+  });
+
+  it("scales a walk by the tile's real size", () => {
+    const metre = metresToSvg({ x: 1, y: 0 }, FRAME).x - metresToSvg({ x: 0, y: 0 }, FRAME).x;
+    expect(metre).toBe(2);
+    const big = frameOf(store(), 0.8);
+    expect(metresToSvg({ x: 0.8, y: 0 }, big).x).toBeCloseTo(1);
+  });
+
+  it("keeps a turn to the right a turn to the right on screen", () => {
+    // Headings are degrees clockwise from +y; on screen 0 must point up and 90 right.
+    const origin = metresToSvg({ x: 2, y: 1.5 }, FRAME);
+    const ahead = vectorAlong(0, 1);
+    const right = vectorAlong(90, 1);
+    const up = metresToSvg({ x: 2 + ahead.x, y: 1.5 + ahead.y }, FRAME);
+    const toRight = metresToSvg({ x: 2 + right.x, y: 1.5 + right.y }, FRAME);
+    expect(up.y).toBeLessThan(origin.y);
+    expect(toRight.x).toBeGreaterThan(origin.x);
+    // Clockwise on screen (y down): the turn from up to right has a positive cross product.
+    const cross = (up.x - origin.x) * (toRight.y - origin.y) - (up.y - origin.y) * (toRight.x - origin.x);
+    expect(cross).toBeGreaterThan(0);
+  });
+
+  it("measures a step between tiles in metres either way round", () => {
+    const from = cellCentre({ row: 4, col: 1 }, FRAME);
+    const to = cellCentre({ row: 4, col: 2 }, FRAME);
+    expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeCloseTo(0.5);
+    // Up the drawing is north-ish: bearing 0.
+    expect(bearingBetween(cellCentre({ row: 4, col: 1 }, FRAME), cellCentre({ row: 3, col: 1 }, FRAME))).toBeCloseTo(0);
+  });
+});
+
 describe("routeFromGrid", () => {
-  const route = routeFromGrid(ROUTE, 0.5);
+  const route = routeFromGrid(ROUTE, FRAME);
 
   it("puts every point in the middle of its tile, in metres", () => {
-    expect(cellCentre({ row: 2, col: 4 }, 0.5)).toEqual({ x: 2.25, y: 1.25 });
-    expect(route.legs[0]!.points[0]).toEqual({ node_id: "cell:5:0", x: 0.25, y: 2.75 });
-    expect(route.stops[0]).toMatchObject({ node_id: "cell:2:4", x: 2.25, y: 1.25, department: "מוצרי חלב" });
+    expect(route.legs[0]!.points[0]).toEqual({ node_id: "cell:5:0", x: 0.25, y: 0.25 });
+    expect(route.stops[0]).toMatchObject({ node_id: "cell:2:4", x: 2.25, y: 1.75, department: "מוצרי חלב" });
   });
 
   it("keeps the graph route's shape, so ticking and re-planning work as before", () => {
@@ -97,13 +161,13 @@ describe("buildFloorLayout", () => {
   it("draws a tile as one unit and turns metres into tiles", () => {
     expect(layout.kind).toBe("floor");
     expect(layout.floor).toEqual({ x: 0, y: 0, width: 10, height: 6 });
-    expect(layout.toSvg({ x: 2.25, y: 1.25 })).toEqual({ x: 4.5, y: 2.5 });
+    expect(layout.toSvg({ x: 2.25, y: 1.75 })).toEqual({ x: 4.5, y: 2.5 });
   });
 
-  it("merges each row's stretch of shelf into one rectangle", () => {
+  it("draws each shelf as one block, across or down the map", () => {
     expect(layout.shelves).toContainEqual({ x: 2, y: 1, width: 5, height: 1 });
-    // The coffee shelf runs down a column: one tile per row.
-    expect(layout.shelves.filter((shelf) => shelf.x === 8)).toHaveLength(3);
+    // The coffee shelf runs down a column for three rows: one block, no seams.
+    expect(layout.shelves.filter((shelf) => shelf.x === 8)).toEqual([{ x: 8, y: 2, width: 1, height: 3 }]);
     expect(layout.walls).toEqual([{ x: 0, y: 0, width: 10, height: 1 }]);
     expect(layout.counters).toEqual([{ x: 6, y: 5, width: 2, height: 1 }]);
     expect(layout.doors).toEqual([{ x: 0, y: 5, width: 1, height: 1 }]);
@@ -195,5 +259,20 @@ describe("routePlanner on a drawn plan", () => {
     const fetch = answering(json({ ...ROUTE, stops: [], legs: [] }));
     await routePlanner(null)({ category_ids: ["dairy"] });
     expect(String(fetch.mock.calls[0]![0])).toMatch(/\/stores\/demo\/routes$/);
+  });
+});
+
+describe("blocks", () => {
+  it("keeps two departments side by side apart, and a gap in a shelf a gap", () => {
+    let grid = createGrid(6, 6);
+    grid = paint(grid, cellsBetween({ row: 0, col: 1 }, { row: 2, col: 1 }), makeTile("shelf", "קפה"));
+    grid = paint(grid, cellsBetween({ row: 0, col: 2 }, { row: 2, col: 2 }), makeTile("shelf", "תה"));
+    grid = paint(grid, cellsBetween({ row: 4, col: 1 }, { row: 5, col: 1 }), makeTile("shelf", "קפה"));
+    const { shelves } = buildFloorLayout(grid, 1);
+    expect(shelves).toEqual([
+      { x: 1, y: 0, width: 1, height: 3 },
+      { x: 2, y: 0, width: 1, height: 3 },
+      { x: 1, y: 4, width: 1, height: 2 },
+    ]);
   });
 });

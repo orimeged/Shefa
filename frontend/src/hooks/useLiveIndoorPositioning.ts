@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Point } from "../lib/mapGeometry";
 import { angleDifference } from "../lib/positioning/angles";
-import type { LivePosition } from "../lib/positioning/engine";
+import type { EngineOptions, LivePosition } from "../lib/positioning/engine";
 import { DEFAULT_STEP_LENGTH_M, PositioningEngine } from "../lib/positioning/engine";
 import type { ObstacleField } from "../lib/positioning/obstacles";
 import type { WalkableEdge } from "../lib/positioning/walkGraph";
@@ -26,6 +26,10 @@ interface Options {
   /** Shelves and walls, which steps can't pass through. */
   obstacles?: ObstacleField;
   stepLengthM?: number;
+  /** The way in from the entrance, and the map's own tuning. */
+  engineOptions?: EngineOptions;
+  /** The route being walked, as its legs' node ids: the dot keeps to it. Null for none. */
+  route?: readonly (readonly string[])[] | null;
 }
 
 const NO_DATA_TIMEOUT_MS = 3000;
@@ -94,9 +98,12 @@ export function useLiveIndoorPositioning({
   edges,
   obstacles,
   stepLengthM = DEFAULT_STEP_LENGTH_M,
+  engineOptions,
+  route = null,
 }: Options) {
   const [status, setStatus] = useState<PositioningStatus>("idle");
   const [position, setPosition] = useState<LivePosition>({ ...startNode, heading: 0 });
+  const [fixes, setFixes] = useState(0);
   const engineRef = useRef<PositioningEngine | null>(null);
   const teardownRef = useRef<(() => void) | null>(null);
 
@@ -108,6 +115,13 @@ export function useLiveIndoorPositioning({
   }, []);
 
   useEffect(() => () => teardownRef.current?.(), []);
+
+  // A re-planned route, or a tick that moves on to the next leg, re-aims the pull.
+  const routeRef = useRef(route);
+  useEffect(() => {
+    routeRef.current = route;
+    engineRef.current?.followRoute(route);
+  }, [route]);
 
   const start = useCallback(async () => {
     if (engineRef.current) {
@@ -128,7 +142,8 @@ export function useLiveIndoorPositioning({
       return;
     }
 
-    const engine = new PositioningEngine(startNode, edges, stepLengthM, obstacles);
+    const engine = new PositioningEngine(startNode, edges, stepLengthM, obstacles, engineOptions);
+    engine.followRoute(routeRef.current);
     engineRef.current = engine;
     setPosition(engine.snapshot);
     setStatus("calibrating");
@@ -197,15 +212,16 @@ export function useLiveIndoorPositioning({
         setStatus("no-data");
       }
     }, NO_DATA_TIMEOUT_MS);
-  }, [startNode, edges, obstacles, stepLengthM]);
+  }, [startNode, edges, obstacles, stepLengthM, engineOptions]);
 
   const anchorTo = useCallback((point: Point) => {
     const engine = engineRef.current;
     if (engine) {
       engine.anchorTo(point);
       setPosition(engine.snapshot);
+      setFixes((count) => count + 1);
     }
   }, []);
 
-  return { ...position, status, start, stop, anchorTo };
+  return { ...position, fixes, status, start, stop, anchorTo };
 }

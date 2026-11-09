@@ -29,7 +29,8 @@ import { useLanguage } from "../i18n/LanguageProvider";
 import { buzz, FOUND_BUZZ, LIST_DONE_BUZZ } from "../lib/haptics";
 import type { ListItem } from "../lib/list/shoppingItems";
 import type { Point } from "../lib/mapGeometry";
-import { nearestNodeId, toWalkableEdges, WalkGraph } from "../lib/positioning/walkGraph";
+import { graphWalkingMap, gridWalkingMap } from "../lib/positioning/gridWalking";
+import { WalkGraph } from "../lib/positioning/walkGraph";
 import { completesList, currentPoint, distanceToNextStop } from "../lib/routeProgress";
 import { parseCategoryIds } from "../lib/shareUrl";
 
@@ -41,7 +42,7 @@ export default function MobileView() {
   const [params] = useSearchParams();
   const seedIds = useMemo(() => parseCategoryIds(params.get("categories")), [params]);
 
-  const { map, floor, planRoute, failed: mapFailed, retry: retryMap } = useShopperStore();
+  const { map, floor, layout, planRoute, failed: mapFailed, retry: retryMap } = useShopperStore();
   const list = useShoppingList(map, seedIds);
   const { addText, categoryIds, found, groups, markUnplaced, rememberPosition, setMissing } = list;
   const isBuilding = list.phase === "building";
@@ -50,15 +51,15 @@ export default function MobileView() {
   const stickyTop = useRef<HTMLDivElement>(null);
   // Also kept as state: the target card counts down the metres as the dot moves.
   const [livePoint, setLivePoint] = useState<Point | null>(null);
-  // Live location walks the graph's paths, so a drawn plan goes without it for now.
-  const graph = useMemo(
-    () => (map && !floor ? new WalkGraph(toWalkableEdges(map)) : null),
-    [map, floor],
+  // What live location walks on: the drawn plan's tiles when there is one, the graph's aisles otherwise.
+  const walking = useMemo(
+    () => (floor ? gridWalkingMap(floor.grid, floor.frame) : map ? graphWalkingMap(map) : null),
+    [floor, map],
   );
+  const graph = useMemo(() => (walking ? new WalkGraph(walking.edges) : null), [walking]);
   const liveNodeId = useCallback(
-    () =>
-      map && !floor && livePosition.current ? nearestNodeId(map, livePosition.current) : null,
-    [map, floor],
+    () => (graph && livePosition.current ? graph.nearestNodeId(livePosition.current) : null),
+    [graph],
   );
 
   // While the list is being built there's nothing to route, whatever is added to it.
@@ -258,17 +259,21 @@ export default function MobileView() {
 
         {!isBuilding && categoryIds.length > 0 && (
           <div className="relative">
-            {floor && hasRoute ? (
-              <StoreMapView layout={floor.layout} route={route} found={found} />
-            ) : map && hasRoute ? (
+            {layout && walking && graph && hasRoute ? (
               <LiveStoreMap
-                map={map}
+                layout={layout}
+                walking={walking}
+                graph={graph}
                 route={route}
                 found={found}
+                followsRoute={floor !== null}
                 fix={fix}
                 livePosition={livePosition}
                 onLiveMove={setLivePoint}
               />
+            ) : layout && hasRoute ? (
+              // A drawn plan with no entrance has nowhere to start live location from.
+              <StoreMapView layout={layout} route={route} found={found} />
             ) : (
               !failed &&
               !mapFailed && (

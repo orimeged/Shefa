@@ -31,17 +31,47 @@ const SWITCH_COST_M = 0.3;
 const STALLED_PROGRESS_M = 0.2;
 /** Share of a step a wall may absorb and still count as grazing it. */
 const GRAZING_SHARE = 0.3;
+/**
+ * Metres of cost for a spot off the active route. A shopper mostly walks the
+ * route they were given, so a dot near it belongs on it; one who turns off
+ * still leaves it, once their track is this much nearer somewhere else.
+ */
+export const OFF_ROUTE_COST_M = 0.9;
+
+/** What differs between maps. The defaults are the graph's, tuned on its long aisles. */
+export interface MatcherTuning {
+  /** Metres of cost for leaving the current edge. */
+  switchCostM?: number;
+  /** Metres of cost for a spot off the active route. */
+  offRouteCostM?: number;
+  /** How far along the paths one step may carry the dot beyond its own length. */
+  catchUpM?: number;
+  /** How far that may grow while the dot is stuck, looking for the turn it missed. */
+  maxCatchUpM?: number;
+}
 
 export class MapMatcher {
   private position: GraphPosition;
   private raw: Point;
   private stalledSteps = 0;
+  /** The stretches of floor the active route runs along, by `WalkGraph.keyOf`. */
+  private route: ReadonlySet<string> | null = null;
+
+  private readonly switchCostM: number;
+  private readonly offRouteCostM: number;
+  private readonly catchUpM: number;
+  private readonly maxCatchUpM: number;
 
   constructor(
     private readonly graph: WalkGraph,
     start: Point,
     private readonly obstacles?: ObstacleField,
+    tuning: MatcherTuning = {},
   ) {
+    this.switchCostM = tuning.switchCostM ?? SWITCH_COST_M;
+    this.offRouteCostM = tuning.offRouteCostM ?? OFF_ROUTE_COST_M;
+    this.catchUpM = tuning.catchUpM ?? CATCH_UP_M;
+    this.maxCatchUpM = tuning.maxCatchUpM ?? MAX_CATCH_UP_M;
     this.position = graph.nearest(start);
     this.raw = graph.pointAt(this.position);
   }
@@ -53,6 +83,16 @@ export class MapMatcher {
   /** The current edge's axis. A walker can go along it either way. */
   get edgeBearing(): number {
     return this.graph.bearingOf(this.position.edge);
+  }
+
+  /** Whether the dot is walking beside a shelf, where the way it faces can be trusted. */
+  get edgeGuides(): boolean {
+    return this.graph.guides(this.position.edge);
+  }
+
+  /** Pulls the dot towards these stretches of floor; null lets it go anywhere alike. */
+  followRoute(edgeKeys: ReadonlySet<string> | null): void {
+    this.route = edgeKeys && edgeKeys.size > 0 ? edgeKeys : null;
   }
 
   /** Accepts a known position, such as the shelf of an item the shopper just found. */
@@ -93,7 +133,7 @@ export class MapMatcher {
   private bestCandidate(bearing: number, length: number): GraphPosition {
     // A step that keeps getting nowhere means the shopper turned off a junction
     // the dot has not reached yet, so the search widens until it finds it.
-    const catchUp = Math.min(MAX_CATCH_UP_M, CATCH_UP_M + this.stalledSteps * length);
+    const catchUp = Math.min(this.maxCatchUpM, this.catchUpM + this.stalledSteps * length);
     const spans = this.graph.reachable(this.position, length + catchUp);
 
     let best = this.position;
@@ -113,9 +153,11 @@ export class MapMatcher {
     const spot = this.graph.pointAt(candidate);
     const offPath = Math.hypot(this.raw.x - spot.x, this.raw.y - spot.y);
     const turn = (angleDifference(this.graph.bearingOf(candidate.edge), bearing) * Math.PI) / 180;
-    const switched = candidate.edge === this.position.edge ? 0 : SWITCH_COST_M;
+    const switched = candidate.edge === this.position.edge ? 0 : this.switchCostM;
     const crosswise = CROSSWISE_COST_M + this.stalledSteps * STALLED_COST_M;
-    return offPath + crosswise * Math.abs(Math.sin(turn)) + switched;
+    const offRoute =
+      this.route && !this.route.has(this.graph.keyOf(candidate.edge)) ? this.offRouteCostM : 0;
+    return offPath + crosswise * Math.abs(Math.sin(turn)) + switched + offRoute;
   }
 }
 

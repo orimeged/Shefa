@@ -28,7 +28,8 @@ export function useFollowedDot(
   const follower = useRef<PathFollower | null>(null);
   const heading = useRef({ shown: 0, target: 0 });
   const isLive = live !== null;
-  const { x, y, heading: liveHeading } = live ?? {};
+  const { x, y, heading: liveHeading, fixes = 0 } = live ?? {};
+  const fixesSeen = useRef(fixes);
 
   // Each new estimate is queued as the walk to it along the paths.
   useLayoutEffect(() => {
@@ -38,6 +39,8 @@ export function useFollowedDot(
     }
     const target = { x, y };
     const current = follower.current;
+    const isFix = fixes !== fixesSeen.current;
+    fixesSeen.current = fixes;
     if (!current) {
       follower.current = new PathFollower(target);
       heading.current = { shown: liveHeading, target: liveHeading };
@@ -51,9 +54,11 @@ export function useFollowedDot(
       current.jumpTo(target);
       heading.current.shown = liveHeading;
     } else {
-      current.extend(graph.pathBetween(graph.nearest(current.target), graph.nearest(target)));
+      current.extend(graph.pathBetween(graph.nearest(current.target), graph.nearest(target)), {
+        isFix,
+      });
     }
-  }, [x, y, liveHeading, graph]);
+  }, [x, y, liveHeading, fixes, graph]);
 
   useLayoutEffect(() => {
     if (!isLive) {

@@ -9,11 +9,12 @@
 
 import type { Point } from "../mapGeometry";
 import { angleDifference, circularMean, deviceYaw, normalizeDegrees, vectorAlong } from "./angles";
+import type { MatcherTuning } from "./mapMatcher";
 import { MapMatcher } from "./mapMatcher";
 import type { ObstacleField } from "./obstacles";
 import { StepDetector } from "./stepDetector";
 import type { WalkableEdge } from "./walkGraph";
-import { WalkGraph } from "./walkGraph";
+import { edgeKey, WalkGraph } from "./walkGraph";
 
 export const DEFAULT_STEP_LENGTH_M = 0.7;
 
@@ -33,6 +34,18 @@ const STRIDE_LEARNING_RATE = 0.7;
 export interface LivePosition extends Point {
   /** Degrees clockwise from the store's +y axis. */
   heading: number;
+  /** Counts the fixes so far; a new one tells the screen to slide there, not walk. */
+  fixes?: number;
+}
+
+export interface EngineOptions {
+  /**
+   * The way the first steps go. The graph's entrance has a single path in, so
+   * it knows; a drawn plan's entrance opens onto floor and says it here.
+   */
+  initialBearing?: number;
+  /** How the dot is kept to the paths, when this map's paths differ from the graph's. */
+  tuning?: MatcherTuning;
 }
 
 export class PositioningEngine {
@@ -53,10 +66,11 @@ export class PositioningEngine {
     edges: readonly WalkableEdge[],
     private stepLengthM: number = DEFAULT_STEP_LENGTH_M,
     obstacles?: ObstacleField,
+    options: EngineOptions = {},
   ) {
     this.graph = new WalkGraph(edges);
-    this.matcher = new MapMatcher(this.graph, start, obstacles);
-    this.initialBearing = this.graph.bearingOutOf(start);
+    this.matcher = new MapMatcher(this.graph, start, obstacles, options.tuning);
+    this.initialBearing = options.initialBearing ?? this.graph.bearingOutOf(start);
     this.lastFix = start;
   }
 
@@ -102,6 +116,24 @@ export class PositioningEngine {
     return steps > 0;
   }
 
+  /**
+   * The route the shopper is walking, as its legs' node ids, which the dot then
+   * keeps to unless the walk clearly leaves it. Null when there's none.
+   */
+  followRoute(legs: readonly (readonly string[])[] | null): void {
+    if (!legs) {
+      this.matcher.followRoute(null);
+      return;
+    }
+    const keys = new Set<string>();
+    for (const nodes of legs) {
+      for (let index = 1; index < nodes.length; index += 1) {
+        keys.add(edgeKey(nodes[index - 1]!, nodes[index]!));
+      }
+    }
+    this.matcher.followRoute(keys);
+  }
+
   /** Accepts a known position. Two of them also measure the shopper's stride. */
   anchorTo(point: Point): void {
     this.learnStride(point);
@@ -143,8 +175,14 @@ export class PositioningEngine {
     }
   }
 
-  /** The gyroscope drifts over a shop, but aisles are straight: following one resets it. */
+  /**
+   * The gyroscope drifts over a shop, but aisles are straight: following one resets
+   * it. Only beside a shelf: across open floor people walk any way they like.
+   */
   private correctDrift(): void {
+    if (!this.matcher.edgeGuides) {
+      return;
+    }
     const toEdge = angleDifference(this.heading, this.matcher.edgeBearing);
     const toNearestDirection = Math.abs(toEdge) > 90 ? angleDifference(0, toEdge + 180) : toEdge;
     if (Math.abs(toNearestDirection) <= ALIGNED_WITHIN_DEGREES) {

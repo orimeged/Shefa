@@ -92,7 +92,7 @@ describe("PathFollower", () => {
 
   it("covers a correction from Found it in about a third of a second", () => {
     const follower = new PathFollower({ x: 0, y: 0 });
-    follower.extend([{ x: 0, y: 0 }, { x: 0, y: 6 }, { x: 7, y: 6 }]);
+    follower.extend([{ x: 0, y: 0 }, { x: 0, y: 6 }, { x: 7, y: 6 }], { isFix: true });
     // 13 m: the walk from one aisle to the shelf of the item just found.
     let frames = 0;
     while (follower.backlogM > 0.05 && frames < 600) {
@@ -100,6 +100,21 @@ describe("PathFollower", () => {
       frames += 1;
     }
     expect(frames * FRAME_MS).toBeLessThan(450);
+  });
+
+  it("walks a long catch-up that isn't a fix at a person's pace, never darting", () => {
+    const follower = new PathFollower({ x: 0, y: 0 });
+    // 4 m at once: the matcher putting the dot back on the route, not Found it.
+    follower.extend([{ x: 0, y: 0 }, { x: 0, y: 1.5 }, { x: 2.5, y: 1.5 }]);
+    let previous = follower.position;
+    let fastest = 0;
+    for (let frame = 0; frame < 240; frame += 1) {
+      const now = follower.advance(FRAME_MS);
+      fastest = Math.max(fastest, Math.hypot(now.x - previous.x, now.y - previous.y) / (FRAME_MS / 1000));
+      previous = now;
+    }
+    expect(fastest).toBeLessThanOrEqual(2.2 + 1e-9);
+    expect(follower.position).toEqual({ x: 2.5, y: 1.5 });
   });
 
   it("spreads the three steps the detector confirms at once over walking pace", () => {

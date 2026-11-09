@@ -2,9 +2,13 @@
  * A manager's drawn floor plan as shoppers see it, and its routes as the trip
  * logic reads them.
  *
- * One SVG unit is one tile, so a 30-tile store draws like a 30-metre graph map
- * whatever a tile measures. Route points stay in metres, as on the graph, and
- * `toSvg` divides by the tile size. Row 0 is at the top, as the manager drew it.
+ * Three frames meet here:
+ * - tiles: `row`, `col`, row 0 at the top, as the manager drew it;
+ * - metres: x right and y up from the plan's bottom-left corner, the frame the
+ *   graph's map and the positioning engine use, so a turn to the right on the
+ *   floor is a turn to the right on the screen;
+ * - SVG units: one per tile, y down, so a 30-tile store draws like a 30-metre
+ *   graph map whatever a tile measures.
  */
 
 import type { GridPoint, GridRoute, Route, SavedFloorPlan } from "../api/types";
@@ -18,9 +22,17 @@ const PADDING = 0.4;
 // Room under the floor for the entrance and checkout names, as on the graph map.
 const LABEL_STRIP = 2.4;
 
+/** What turning metres into tiles and back needs. */
+export interface FloorFrame {
+  rows: number;
+  cols: number;
+  cellSizeM: number;
+}
+
 export interface FloorMap {
   grid: FloorGrid;
   cellSizeM: number;
+  frame: FloorFrame;
   /** Category or placed product id to the drawn department a route goes to. */
   placements: Readonly<Record<string, string>>;
   layout: MapLayout;
@@ -36,7 +48,17 @@ export function readFloorMap(saved: SavedFloorPlan | null): FloorMap | null {
     return null;
   }
   const cellSizeM = readCellSize(saved.floor_plan);
-  return { grid, cellSizeM, placements: saved.placements, layout: buildFloorLayout(grid, cellSizeM) };
+  return {
+    grid,
+    cellSizeM,
+    frame: frameOf(grid, cellSizeM),
+    placements: saved.placements,
+    layout: buildFloorLayout(grid, cellSizeM),
+  };
+}
+
+export function frameOf(grid: FloorGrid, cellSizeM: number): FloorFrame {
+  return { rows: grid.length, cols: grid[0]?.length ?? 0, cellSizeM };
 }
 
 /** A tile as routes and analytics name it, so trip progress can key on it like a node. */
@@ -50,8 +72,18 @@ export function parseCellId(id: string): GridPoint | null {
 }
 
 /** A tile's middle, in metres. */
-export function cellCentre({ row, col }: GridPoint, cellSizeM: number): Point {
-  return { x: (col + 0.5) * cellSizeM, y: (row + 0.5) * cellSizeM };
+export function cellCentre({ row, col }: GridPoint, { rows, cellSizeM }: FloorFrame): Point {
+  return { x: (col + 0.5) * cellSizeM, y: (rows - row - 0.5) * cellSizeM };
+}
+
+/** The tile a point in metres stands on; outside the plan, a row or column out of range. */
+export function tileAt({ x, y }: Point, { rows, cellSizeM }: FloorFrame): GridPoint {
+  return { row: rows - 1 - Math.floor(y / cellSizeM), col: Math.floor(x / cellSizeM) };
+}
+
+/** Metres to the SVG's tile units: one unit per tile, and y turned to point down. */
+export function metresToSvg({ x, y }: Point, { rows, cellSizeM }: FloorFrame): Point {
+  return { x: x / cellSizeM, y: rows - y / cellSizeM };
 }
 
 /**
@@ -59,10 +91,10 @@ export function cellCentre({ row, col }: GridPoint, cellSizeM: number): Point {
  * re-planning and drawing work the same on both. A stop names its department;
  * `aisle_no` and `side` have no meaning on a drawn plan and nothing shows them.
  */
-export function routeFromGrid(route: GridRoute, cellSizeM: number): Route {
+export function routeFromGrid(route: GridRoute, frame: FloorFrame): Route {
   const point = (cell: GridPoint) => ({
     node_id: cellId(cell.row, cell.col),
-    ...cellCentre(cell, cellSizeM),
+    ...cellCentre(cell, frame),
   });
   return {
     store_id: route.store_id,
@@ -77,7 +109,7 @@ export function routeFromGrid(route: GridRoute, cellSizeM: number): Route {
       node_id: cellId(stop.row, stop.col),
       aisle_no: 0,
       side: "left",
-      ...cellCentre(stop, cellSizeM),
+      ...cellCentre(stop, frame),
       leg_index: stop.leg_index,
       department: stop.department,
     })),
@@ -141,7 +173,29 @@ function columnRuns(grid: FloorGrid): Run[] {
   return runs;
 }
 
-const rect = ({ row, col, length }: Run): Rect => ({ x: col, y: row, width: length, height: 1 });
+/**
+ * Each kind's rectangles, with a stretch that repeats exactly on the rows below
+ * drawn as one block: a shelf running down the map is one shelf, not a stack of
+ * one-row bricks with seams between them.
+ */
+function blocks(runs: readonly Run[], kind: TileKind): Rect[] {
+  const open = new Map<string, Rect>();
+  const done: Rect[] = [];
+  for (const run of runs) {
+    if (run.tile.kind !== kind) {
+      continue;
+    }
+    const key = `${run.col}:${run.length}:${run.tile.label ?? ""}`;
+    const above = open.get(key);
+    if (above && above.y + above.height === run.row) {
+      above.height += 1;
+    } else {
+      if (above) done.push(above);
+      open.set(key, { x: run.col, y: run.row, width: run.length, height: 1 });
+    }
+  }
+  return [...done, ...open.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+}
 
 function centreOf(grid: FloorGrid, kind: TileKind): Point | null {
   const cells = grid.flatMap((line, row) =>
@@ -190,10 +244,10 @@ function shelfNames(across: readonly Run[], down: readonly Run[]): ShelfName[] {
 }
 
 export function buildFloorLayout(grid: FloorGrid, cellSizeM: number): MapLayout {
-  const rows = grid.length;
-  const cols = grid[0]?.length ?? 0;
+  const frame = frameOf(grid, cellSizeM);
+  const { rows, cols } = frame;
   const runs = rowRuns(grid);
-  const of = (kind: TileKind) => runs.filter((run) => run.tile.kind === kind).map(rect);
+  const of = (kind: TileKind) => blocks(runs, kind);
   const entrance = centreOf(grid, "entrance") ?? { x: 0.5, y: rows - 0.5 };
   const checkout = centreOf(grid, "checkout") ?? { x: cols - 0.5, y: rows - 0.5 };
 
@@ -213,7 +267,7 @@ export function buildFloorLayout(grid: FloorGrid, cellSizeM: number): MapLayout 
     aisleLabels: [],
     entrance,
     checkout,
-    toSvg: ({ x, y }) => ({ x: x / cellSizeM, y: y / cellSizeM }),
+    toSvg: (point) => metresToSvg(point, frame),
     // A stop already stands on the open tile beside its shelf.
     shelfSideOffset: () => 0,
   };

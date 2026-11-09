@@ -1,20 +1,26 @@
 import type { RefObject } from "react";
 import { useEffect, useMemo } from "react";
 
-import type { Route, StoreMap } from "../../api/types";
+import type { Route } from "../../api/types";
 import { useLiveIndoorPositioning } from "../../hooks/useLiveIndoorPositioning";
-import type { Point } from "../../lib/mapGeometry";
-import { buildMapLayout } from "../../lib/mapGeometry";
-import { storeObstacles } from "../../lib/positioning/obstacles";
-import { toWalkableEdges, WalkGraph } from "../../lib/positioning/walkGraph";
+import type { MapLayout, Point } from "../../lib/mapGeometry";
+import type { WalkingMap } from "../../lib/positioning/gridWalking";
+import type { WalkGraph } from "../../lib/positioning/walkGraph";
 import type { FoundSet } from "../../lib/routeProgress";
+import { remainingLegs } from "../../lib/routeProgress";
 import { LiveLocationControl } from "./LiveLocationControl";
 import { StoreMapView } from "./StoreMapView";
 
 interface LiveStoreMapProps {
-  map: StoreMap;
+  layout: MapLayout;
+  /** Where the dot may go and where it starts: the graph's aisles or a drawn plan's tiles. */
+  walking: WalkingMap;
+  /** The same walkways, for gliding the dot between readings. */
+  graph: WalkGraph;
   route: Route;
   found: FoundSet;
+  /** Keep the dot to the route still ahead; the drawn plan's open floor needs it most. */
+  followsRoute: boolean;
   /** The last ticked shelf, the one spot known for sure. */
   fix: Point | null;
   /** Filled with the live position, for re-planning from where the shopper is. */
@@ -24,22 +30,34 @@ interface LiveStoreMapProps {
 }
 
 export function LiveStoreMap({
-  map,
+  layout,
+  walking,
+  graph,
   route,
   found,
+  followsRoute,
   fix,
   livePosition,
   onLiveMove,
 }: LiveStoreMapProps) {
-  const edges = useMemo(() => toWalkableEdges(map), [map]);
-  const layout = useMemo(() => buildMapLayout(map), [map]);
-  const graph = useMemo(() => new WalkGraph(edges), [edges]);
-  const obstacles = useMemo(() => storeObstacles(map), [map]);
-  const startNode = useMemo(() => map.nodes.find((node) => node.type === "entrance")!, [map]);
-  const { x, y, heading, status, start, stop, anchorTo } = useLiveIndoorPositioning({
-    startNode,
-    edges,
-    obstacles,
+  const engineOptions = useMemo(
+    () => ({ initialBearing: walking.initialBearing, tuning: walking.tuning }),
+    [walking],
+  );
+  // Only what's still to walk: a leg already behind the shopper shouldn't pull the dot back.
+  const routeAhead = useMemo(
+    () =>
+      followsRoute
+        ? remainingLegs(route, found).map((leg) => leg.points.map((point) => point.node_id))
+        : null,
+    [followsRoute, route, found],
+  );
+  const { x, y, heading, fixes, status, start, stop, anchorTo } = useLiveIndoorPositioning({
+    startNode: walking.start,
+    edges: walking.edges,
+    obstacles: walking.obstacles,
+    engineOptions,
+    route: routeAhead,
   });
 
   // A tick says exactly where the shopper stands, which clears any drift.
@@ -63,7 +81,7 @@ export function LiveStoreMap({
         graph={graph}
         route={route}
         found={found}
-        live={isLive ? { x, y, heading } : null}
+        live={isLive ? { x, y, heading, fixes } : null}
       />
       <LiveLocationControl
         status={status}

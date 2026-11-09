@@ -61,12 +61,12 @@ export function routePlanner(floor: FloorMap | null): PlanRoute {
     try {
       return routeFromGrid(
         await createFloorRoute(start ? { ...body, start } : body, signal),
-        floor.cellSizeM,
+        floor.frame,
       );
     } catch (error) {
       // A plan saved since may have put a shelf where the shopper stood: go from the door.
       if (start && error instanceof ApiError && error.status === 422) {
-        return routeFromGrid(await createFloorRoute(body, signal), floor.cellSizeM);
+        return routeFromGrid(await createFloorRoute(body, signal), floor.frame);
       }
       throw error;
     }
