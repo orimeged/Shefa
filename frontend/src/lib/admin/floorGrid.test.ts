@@ -9,6 +9,8 @@ import {
   gridSize,
   makeTile,
   paint,
+  parseCellSize,
+  readCellSize,
   resize,
   shelfLabels,
   toPayload,
@@ -165,5 +167,27 @@ describe("the JSON payload", () => {
     const good = toPayload(drawn());
     const grid = fromPayload({ ...good, labels: [{ row: 0, col: 0, label: "קפה" }] });
     expect(grid?.[0]?.[0]).toBe(AISLE);
+  });
+});
+
+describe("the tile's real size", () => {
+  it("travels in the payload, a metre unless set", () => {
+    expect(toPayload(createGrid(5, 5)).cell_size_m).toBe(1);
+    expect(toPayload(createGrid(5, 5), 0.6).cell_size_m).toBe(0.6);
+  });
+
+  it("is read back from a saved plan, and a metre when an older plan has none", () => {
+    expect(readCellSize({ cell_size_m: 0.75 })).toBe(0.75);
+    expect(readCellSize({ version: 1 })).toBe(1);
+    expect(readCellSize(null)).toBe(1);
+  });
+
+  it("accepts what a manager types only inside what the server takes", () => {
+    expect(parseCellSize("0.5")).toBe(0.5);
+    expect(parseCellSize(" 2 ")).toBe(2);
+    expect(parseCellSize("")).toBeNull();
+    expect(parseCellSize("abc")).toBeNull();
+    expect(parseCellSize("0.1")).toBeNull();
+    expect(parseCellSize("6")).toBeNull();
   });
 });

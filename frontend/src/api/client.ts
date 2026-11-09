@@ -1,9 +1,12 @@
 import { apiUrl } from "./backend";
 import type {
+  FloorRouteRequest,
+  GridRoute,
   NotFoundReport,
   ResolvedItem,
   Route,
   RouteRequest,
+  SavedFloorPlan,
   SearchHit,
   StoreMap,
 } from "./types";
@@ -64,6 +67,21 @@ export function resolveList(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ lines, session_id: sessionId }),
+  });
+}
+
+/** The plan managers drew, or null when none is saved yet (the server answers 204). */
+export async function getFloorPlan(signal?: AbortSignal): Promise<SavedFloorPlan | null> {
+  const response = await send(`${BASE_URL}/floor-plan`, { signal });
+  return response.status === 204 ? null : ((await response.json()) as SavedFloorPlan);
+}
+
+export function createFloorRoute(body: FloorRouteRequest, signal?: AbortSignal): Promise<GridRoute> {
+  return request("/floor-plan/routes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
   });
 }
 

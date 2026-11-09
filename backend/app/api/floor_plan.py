@@ -1,17 +1,21 @@
 """The floor plan managers draw in the dashboard, and routes across it.
 
-Apart from `/map`, which kiosks and phones draw the store from today: a saved
-plan changes nothing there until those screens draw plans themselves.
+Kiosks and phones draw and route on a store's plan once one is saved and
+routable, and on the graph from `/map` before that. They load `/map` either way:
+it carries the catalog.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.admin import require_admin
-from app.api.routes import Navigation
+from app.api.routes import Analytics, Navigation, record_in_background
+from app.api.schemas import SessionId
+from app.domain.analytics import RouteTrip
 from app.domain.floor_plan import FloorPlan
 from app.domain.floor_routing import (
     FloorPlanCheck,
@@ -19,6 +23,7 @@ from app.domain.floor_routing import (
     GridPoint,
     GridRoute,
     InvalidStartError,
+    grid_route_edges,
 )
 from app.domain.models import Category, Model
 from app.services.floor_plans import FloorPlanRegistry, LoadedFloorPlan
@@ -40,6 +45,8 @@ class SavedFloorPlan(Model):
     updated_at: datetime
     # What a manager should fix before shoppers can walk it.
     check: FloorPlanCheck
+    # Category or placed product id to the drawn department a route would go to.
+    placements: dict[str, str]
 
 
 class FloorRouteRequest(BaseModel):
@@ -48,6 +55,8 @@ class FloorRouteRequest(BaseModel):
     category_ids: list[str] = Field(min_length=1, max_length=50)
     # Re-plans from where the shopper stands; the entrance when absent.
     start: GridPoint | None = None
+    # One shopping trip, so analytics count it once however often it re-plans.
+    session_id: SessionId | None = None
 
 
 @router.get(
@@ -79,20 +88,36 @@ def save_floor_plan(
 
 @router.post("/routes")
 def plan_floor_route(
-    store_id: str, body: FloorRouteRequest, navigation: Navigation, floor_plans: FloorPlans
+    store_id: str,
+    body: FloorRouteRequest,
+    navigation: Navigation,
+    floor_plans: FloorPlans,
+    analytics: Analytics,
+    background: BackgroundTasks,
 ) -> GridRoute:
     loaded = floor_plans.get(store_id)
     if loaded is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No floor plan saved for this store yet")
     start = (body.start.row, body.start.col) if body.start else None
     try:
-        return loaded.router.plan_route(store_id, body.category_ids, _targets(navigation), start)
+        route = loaded.router.plan_route(store_id, body.category_ids, _targets(navigation), start)
     except FloorPlanNotRoutableError as error:
         raise HTTPException(
             status.HTTP_409_CONFLICT, {"problems": [problem.value for problem in error.problems]}
         ) from error
     except InvalidStartError as error:
         raise HTTPException(422, str(error)) from error
+
+    # Into the same tables as the graph's routes: the dashboard counts both alike.
+    if route.stops:
+        trip = RouteTrip(
+            store_id=store_id,
+            session_id=body.session_id or str(uuid4()),
+            edges=grid_route_edges(route),
+            timestamp=datetime.now(UTC),
+        )
+        record_in_background(background, lambda: analytics.record_trip(trip))
+    return route
 
 
 def _saved(store_id: str, loaded: LoadedFloorPlan, navigation: NavigationService) -> SavedFloorPlan:
@@ -101,6 +126,7 @@ def _saved(store_id: str, loaded: LoadedFloorPlan, navigation: NavigationService
         floor_plan=loaded.plan,
         updated_at=loaded.saved_at,
         check=loaded.router.check(navigation.store_map.categories),
+        placements=loaded.router.placements(_targets(navigation)),
     )
 
 

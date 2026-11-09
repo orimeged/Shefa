@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AdminApi } from "../api/adminClient";
 import { createAdminApi } from "../api/adminClient";
-import type { CatalogCategory, FloorPlanCheck, NotFoundReportRow, Zone } from "../api/types";
+import type { CatalogCategory, NotFoundReportRow, SavedFloorPlan, Zone } from "../api/types";
 import { AdminLogin } from "../components/admin/AdminLogin";
 import { FloorGridEditor } from "../components/admin/FloorGridEditor";
 import { KpiRow } from "../components/admin/KpiRow";
@@ -19,9 +19,9 @@ import { usePolledReport } from "../hooks/usePolledReport";
 import { useStockAlerts } from "../hooks/useStockAlerts";
 import { useStoreMap } from "../hooks/useStoreMap";
 import { useLanguage } from "../i18n/LanguageProvider";
-import type { FloorGrid } from "../lib/admin/floorGrid";
-import { createGrid, fromPayload } from "../lib/admin/floorGrid";
+import { createGrid, DEFAULT_CELL_SIZE_M, fromPayload, readCellSize } from "../lib/admin/floorGrid";
 import { countAlerts } from "../lib/admin/stockAlerts";
+import { readFloorMap } from "../lib/floorPlanMap";
 
 // For this tab only: a shared tablet shouldn't stay signed in overnight.
 const TOKEN_KEY = "admin-token";
@@ -75,6 +75,25 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   const lostDemand = usePolledReport(api.lostDemand);
 
   const reload = useCallback(() => setAttempt((current) => current + 1), []);
+
+  // Loaded once for both the map panel and the editor; a save updates both.
+  const [savedFloor, setSavedFloor] = useState<SavedFloorPlan | null | undefined>(undefined);
+  const [floorFailed, setFloorFailed] = useState(false);
+  const [floorAttempt, setFloorAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setFloorFailed(false);
+    api
+      .floorPlan(controller.signal)
+      .then(setSavedFloor)
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setFloorFailed(true);
+        }
+      });
+    return () => controller.abort();
+  }, [api, floorAttempt]);
+  const floor = useMemo(() => (savedFloor ? readFloorMap(savedFloor) : null), [savedFloor]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -192,6 +211,7 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
                 <StoreMapPanel
                   api={api}
                   map={map}
+                  floor={floor}
                   zones={zones}
                   selectedNodeId={selectedNodeId}
                   placing={placing}
@@ -228,7 +248,16 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
 
         {/* Mounted while hidden too, so a drawing and its undo steps survive a look at the alerts. */}
         <div role="tabpanel" hidden={tab !== "floor"} aria-label={t.adminTabFloorEditor}>
-          {hasOpenedFloor && <FloorEditorPanel api={api} categories={categories} />}
+          {hasOpenedFloor && (
+            <FloorEditorPanel
+              api={api}
+              categories={categories}
+              saved={savedFloor}
+              failed={floorFailed}
+              onRetry={() => setFloorAttempt((current) => current + 1)}
+              onSaved={setSavedFloor}
+            />
+          )}
         </div>
 
         {selectedNodeId !== null && zones && (
@@ -252,52 +281,49 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
 function FloorEditorPanel({
   api,
   categories,
+  saved,
+  failed,
+  onRetry,
+  onSaved,
 }: {
   api: AdminApi;
   categories: readonly CatalogCategory[];
+  /** Undefined while loading; null when nothing is saved yet. */
+  saved: SavedFloorPlan | null | undefined;
+  failed: boolean;
+  onRetry: () => void;
+  onSaved: (saved: SavedFloorPlan) => void;
 }) {
   const { t, pick } = useLanguage();
-  const [start, setStart] = useState<{ grid: FloorGrid; check: FloorPlanCheck | null } | null>(
-    null,
-  );
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
   const suggestions = useMemo(
     () => [...new Set(categories.map((category) => pick(category.name, category.name_en)))],
     [categories, pick],
   );
+  // Only read when the editor first appears; it keeps its own state after that.
+  const start = useMemo(() => {
+    const grid = saved ? fromPayload(saved.floor_plan) : null;
+    return grid && saved
+      ? { grid, check: saved.check, cellSize: readCellSize(saved.floor_plan) }
+      : { grid: createGrid(), check: null, cellSize: DEFAULT_CELL_SIZE_M };
+  }, [saved]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setFailed(false);
-    api
-      .floorPlan(controller.signal)
-      .then((saved) => {
-        const grid = saved ? fromPayload(saved.floor_plan) : null;
-        setStart(grid && saved ? { grid, check: saved.check } : { grid: createGrid(), check: null });
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setFailed(true);
-        }
-      });
-    return () => controller.abort();
-  }, [api, attempt]);
-
-  if (failed) {
-    return <Notice message={t.floorLoadFailed} onRetry={() => setAttempt((current) => current + 1)} />;
+  if (failed && saved === undefined) {
+    return <Notice message={t.floorLoadFailed} onRetry={onRetry} />;
   }
-  if (!start) {
+  if (saved === undefined) {
     return <div className="h-[36rem] w-full animate-pulse rounded-2xl bg-slate-200/70" />;
   }
   return (
     <FloorGridEditor
       initialGrid={start.grid}
       initialCheck={start.check}
+      initialCellSize={start.cellSize}
       suggestions={suggestions}
       onSave={async (_, json) => {
         try {
-          return (await api.saveFloorPlan(json)).check;
+          const next = await api.saveFloorPlan(json);
+          onSaved(next);
+          return next.check;
         } catch {
           return null;
         }

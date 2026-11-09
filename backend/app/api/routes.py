@@ -46,6 +46,10 @@ def _record(write: Callable[[], None]) -> None:
         logger.warning("Analytics weren't recorded: %s", error)
 
 
+def record_in_background(background: BackgroundTasks, write: Callable[[], None]) -> None:
+    background.add_task(_record, write)
+
+
 @router.get("/health", tags=["system"])
 def health(request: Request) -> dict[str, str]:
     """For the host's health check: up means the database answers too."""

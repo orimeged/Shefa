@@ -1,10 +1,10 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 
-import type { Route, StoreMap } from "../../api/types";
+import type { Route } from "../../api/types";
 import { useFollowedDot } from "../../hooks/useFollowedDot";
 import { useLanguage } from "../../i18n/LanguageProvider";
+import type { MapLayout } from "../../lib/mapGeometry";
 import {
-  buildMapLayout,
   polylinePoints,
   stopPins,
   translateTo,
@@ -18,7 +18,7 @@ import {
   remainingLegs,
 } from "../../lib/routeProgress";
 import type { LivePosition } from "../../lib/positioning/engine";
-import { toWalkableEdges, WalkGraph } from "../../lib/positioning/walkGraph";
+import type { WalkGraph } from "../../lib/positioning/walkGraph";
 import { MapEndpoint, MapFloor } from "../MapFloor";
 import type { ZonePin } from "../ZonePins";
 import { ZonePins } from "../ZonePins";
@@ -26,7 +26,10 @@ import { ZonePins } from "../ZonePins";
 const WALK_TIMING = { duration: 700, easing: "ease-in-out" };
 
 interface StoreMapViewProps {
-  map: StoreMap;
+  /** The graph's aisles or a drawn floor plan; the route's points are in metres on either. */
+  layout: MapLayout;
+  /** The walkways a live dot glides along; only the graph has one. */
+  graph?: WalkGraph | null;
   route: Route;
   found: FoundSet;
   /** Where the sensors place the shopper. Without it, the dot follows the ticks. */
@@ -37,7 +40,8 @@ interface StoreMapViewProps {
 }
 
 export function StoreMapView({
-  map,
+  layout,
+  graph = null,
   route,
   found,
   live = null,
@@ -46,9 +50,6 @@ export function StoreMapView({
   className = "block h-auto max-h-[46dvh] w-full [@media(max-height:700px)]:max-h-[34dvh]",
 }: StoreMapViewProps) {
   const { t } = useLanguage();
-  const layout = useMemo(() => buildMapLayout(map), [map]);
-  const graph = useMemo(() => new WalkGraph(toWalkableEdges(map)), [map]);
-
   const path = polylinePoints(remainingLegs(route, found), layout);
   const pins = useMemo(() => stopPins(pendingStops(route, found), layout), [route, found, layout]);
   const zonePins = useMemo<ZonePin[] | null>(
@@ -104,6 +105,7 @@ export function StoreMapView({
       viewBox={layout.viewBox}
       role="img"
       aria-label={t.mapLabel}
+      data-map={layout.kind ?? "graph"}
       className={className}
     >
       <MapFloor layout={layout} shelfClassName="fill-shelf-strong" />

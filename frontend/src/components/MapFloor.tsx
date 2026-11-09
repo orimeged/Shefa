@@ -27,8 +27,40 @@ export function MapFloor({ layout, shelfClassName = "fill-shelf" }: MapFloorProp
         />
       ))}
 
+      {layout.doors?.map((door) => (
+        <rect key={`${door.x},${door.y}`} {...door} className="fill-brand-soft" />
+      ))}
+
       {layout.shelves.map((shelf) => (
-        <rect key={shelf.x} {...shelf} rx={0.35} className={shelfClassName} />
+        <rect
+          key={`${shelf.x},${shelf.y}`}
+          {...shelf}
+          rx={layout.shelfRadius ?? 0.35}
+          className={shelfClassName}
+        />
+      ))}
+
+      {/* A drawn plan's walls and checkout counters, which the graph's map doesn't have. */}
+      {layout.walls?.map((wall) => (
+        <rect key={`${wall.x},${wall.y}`} {...wall} className="fill-ink" />
+      ))}
+      {layout.counters?.map((counter) => (
+        <rect key={`${counter.x},${counter.y}`} {...counter} rx={0.12} className="fill-sky-700" />
+      ))}
+      {layout.shelfNames?.map(({ key, text, fontSize, isVertical, x, y }) => (
+        <text
+          key={key}
+          x={x}
+          y={y}
+          transform={isVertical ? `rotate(-90 ${x} ${y})` : undefined}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={fontSize}
+          fontWeight={600}
+          className="pointer-events-none fill-ink"
+        >
+          {text}
+        </text>
       ))}
 
       {layout.sectionDots.map(({ x, y }) => (

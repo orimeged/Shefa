@@ -1,6 +1,7 @@
 import { Check, SearchX, X } from "lucide-react";
 
 import type { RouteStop } from "../../api/types";
+import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ListGroup } from "../../lib/list/shoppingItems";
 import { CategoryIcon } from "../CategoryIcon";
@@ -25,6 +26,7 @@ export function ShoppingList({
   onFoundAfterAll,
 }: ShoppingListProps) {
   const { t } = useLanguage();
+  const where = usePlace();
   const foundGroups = foundIds.flatMap((id) => {
     const group = groups.get(id);
     return group && group.items.length > 0 ? [group] : [];
@@ -72,7 +74,7 @@ export function ShoppingList({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-lg font-medium">{item.text}</span>
                   <span className="block truncate text-sm text-muted">
-                    {t.aisle(group.aisleNo, group.side)}
+                    {where(group.categoryId, group.aisleNo, group.side)}
                   </span>
                 </span>
                 <button
@@ -119,6 +121,7 @@ interface ListRowProps {
 
 function ListRow({ group, order, checked, onToggle, onRemove, onNotFound }: ListRowProps) {
   const { t, pick } = useLanguage();
+  const where = usePlace();
   const name = pick(group.name, group.nameEn);
 
   return (
@@ -149,7 +152,7 @@ function ListRow({ group, order, checked, onToggle, onRemove, onNotFound }: List
             {name}
           </span>
           <span className="block truncate text-sm text-muted">
-            {t.aisle(group.aisleNo, group.side)}
+            {where(group.categoryId, group.aisleNo, group.side)}
           </span>
           {group.itemTexts.length > 0 && (
             <span className="block truncate text-sm font-medium text-brand-strong">

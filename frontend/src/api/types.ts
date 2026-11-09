@@ -99,6 +99,8 @@ export interface RouteStop {
   x: number;
   y: number;
   leg_index: number;
+  /** On a drawn floor plan: the department it stands in. There are no aisles there. */
+  department?: string;
 }
 
 /** `legs[stop.leg_index]` ends at that stop, and the last leg ends at the checkout. */
@@ -246,6 +248,8 @@ export interface EdgeFlow {
 export interface TrafficReport {
   trips: number;
   edges: EdgeFlow[];
+  /** Steps between floor-plan tiles, as "cell:row:col", only those someone walked. */
+  cell_edges?: EdgeFlow[];
 }
 
 export type FloorPlanProblem = "no_entrance" | "no_checkout" | "checkout_unreachable";
@@ -272,4 +276,44 @@ export interface SavedFloorPlan {
   floor_plan: unknown;
   updated_at: string;
   check: FloorPlanCheck;
+  /** Category or placed product id to the drawn department a route goes to. Absent: not drawn. */
+  placements: Record<string, string>;
+}
+
+/** Mirrors backend/app/domain/floor_routing.py. */
+export interface GridPoint {
+  row: number;
+  col: number;
+}
+
+export interface GridRouteStop {
+  seq: number;
+  category_id: string;
+  category_name: string;
+  category_name_en: string;
+  department: string;
+  row: number;
+  col: number;
+  leg_index: number;
+}
+
+export interface GridRouteLeg {
+  length_m: number;
+  cells: GridPoint[];
+}
+
+export interface GridRoute {
+  store_id: string;
+  start: GridPoint;
+  end: GridPoint;
+  total_length_m: number;
+  stops: GridRouteStop[];
+  legs: GridRouteLeg[];
+  unplaced_category_ids: string[];
+}
+
+export interface FloorRouteRequest {
+  category_ids: string[];
+  start?: GridPoint;
+  session_id?: string;
 }

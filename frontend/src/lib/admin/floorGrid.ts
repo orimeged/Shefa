@@ -40,6 +40,10 @@ export const MIN_SIZE = 5;
 export const MAX_SIZE = 60;
 export const MAX_LABEL_LENGTH = 40;
 export const PAYLOAD_VERSION = 1;
+/** One tile's side on the real floor, in metres; the server allows above 0 up to 5. */
+export const DEFAULT_CELL_SIZE_M = 1;
+export const MIN_CELL_SIZE_M = 0.25;
+export const MAX_CELL_SIZE_M = 5;
 
 export function isWalkable(tile: Tile): boolean {
   return WALKABLE[tile.kind];
@@ -183,10 +187,12 @@ export interface FloorGridPayload {
   tiles: TileKind[][];
   /** Shelf tiles that carry a department. */
   labels: { row: number; col: number; label: string }[];
+  /** Metres per tile: route distances are walked in these. */
+  cell_size_m: number;
 }
 
 /** The grid as plain JSON for the server: kinds in a matrix, labels beside it. */
-export function toPayload(grid: FloorGrid): FloorGridPayload {
+export function toPayload(grid: FloorGrid, cellSizeM = DEFAULT_CELL_SIZE_M): FloorGridPayload {
   const { rows, cols } = gridSize(grid);
   const labels: FloorGridPayload["labels"] = [];
   const tiles = grid.map((line, row) =>
@@ -197,7 +203,7 @@ export function toPayload(grid: FloorGrid): FloorGridPayload {
       return tile.kind;
     }),
   );
-  return { version: PAYLOAD_VERSION, rows, cols, tiles, labels };
+  return { version: PAYLOAD_VERSION, rows, cols, tiles, labels, cell_size_m: cellSizeM };
 }
 
 /** A payload read back, or null if it isn't one; anything stored can be stale or edited. */
@@ -235,6 +241,20 @@ export function fromPayload(value: unknown): FloorGrid | null {
     }
   }
   return grid;
+}
+
+/** A usable tile size, or null: blank, not a number, or outside what the server takes. */
+export function parseCellSize(value: unknown): number | null {
+  const size = typeof value === "string" ? Number(value.trim() || Number.NaN) : value;
+  return typeof size === "number" && size >= MIN_CELL_SIZE_M && size <= MAX_CELL_SIZE_M
+    ? size
+    : null;
+}
+
+/** The tile size a saved payload states, a metre when it says none. */
+export function readCellSize(payload: unknown): number {
+  const stated = isRecord(payload) ? payload.cell_size_m : undefined;
+  return typeof stated === "number" && stated > 0 ? stated : DEFAULT_CELL_SIZE_M;
 }
 
 function clampSize(size: number): number {

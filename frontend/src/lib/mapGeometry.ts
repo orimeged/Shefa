@@ -37,6 +37,15 @@ export interface ZoneShape extends Rect {
   elementId: string;
 }
 
+/** A department's name written along its shelf on a drawn floor plan. */
+export interface ShelfName extends Point {
+  key: string;
+  text: string;
+  fontSize: number;
+  /** Along a shelf that runs down the map rather than across it. */
+  isVertical: boolean;
+}
+
 export interface MapLayout {
   viewBox: string;
   floor: Rect;
@@ -49,6 +58,14 @@ export interface MapLayout {
   checkout: Point;
   toSvg: (point: Point) => Point;
   shelfSideOffset: (side: Side) => number;
+  /** A floor plan a manager drew, rather than the graph's aisles. */
+  kind?: "floor";
+  /** Drawn plans only: what was painted besides shelves, and the shelves' names. */
+  walls?: Rect[];
+  counters?: Rect[];
+  doors?: Rect[];
+  shelfNames?: ShelfName[];
+  shelfRadius?: number;
 }
 
 // Just enough for the floor's outline: every metre of margin is map not drawn.

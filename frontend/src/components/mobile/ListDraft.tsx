@@ -1,5 +1,6 @@
 import { Trash2, X } from "lucide-react";
 
+import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ListItem } from "../../lib/list/shoppingItems";
 import { CategoryIcon } from "../CategoryIcon";
@@ -13,6 +14,7 @@ interface ListDraftProps {
 /** The list while it's being put together. Nothing here plans a route. */
 export function ListDraft({ items, onRemove, onClear }: ListDraftProps) {
   const { t, pick } = useLanguage();
+  const where = usePlace();
   const placed = items.filter((item) => item.placement);
 
   return (
@@ -41,7 +43,7 @@ export function ListDraft({ items, onRemove, onClear }: ListDraftProps) {
                 <span className="block truncate text-sm text-muted">
                   {/* A catalog item's stop carries its own name, already on the line above. */}
                   {shelf === text ? "" : `${shelf} · `}
-                  {t.aisle(aisleNo, side)}
+                  {where(categoryId, aisleNo, side)}
                 </span>
               </span>
               <button

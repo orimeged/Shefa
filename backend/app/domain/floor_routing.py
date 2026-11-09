@@ -19,10 +19,12 @@ from app.domain.floor_plan import (
     find_path,
     path_length,
 )
+from app.domain.analytics import edge_key
 from app.domain.models import Category, Model
 from app.domain.routing import order_stops
 from app.domain.search_text import normalize
 
+CELL_PREFIX = "cell:"
 _START = "@start"
 _END = "@end"
 _STOP_PREFIX = "department:"
@@ -108,6 +110,8 @@ class _Department:
     shelf_tiles: tuple[Cell, ...]
     # Where the shopper stands: the open tile beside the shelf nearest its middle.
     stop: Cell | None
+    # One such tile on each side of the shelf a shopper can reach; `stop` is among them.
+    sides: tuple[Cell, ...] = ()
 
 
 class GridRouter:
@@ -149,6 +153,19 @@ class GridRouter:
     @property
     def routable(self) -> bool:
         return not self.problems
+
+    def placements(self, categories: Mapping[str, Category]) -> dict[str, str]:
+        """The drawn department every category and placed product would be routed to.
+
+        The same matching a route uses, so the shopper apps can say where something
+        stands without repeating it. Anything not drawn, or walled off, is absent.
+        """
+        found: dict[str, str] = {}
+        for category in categories.values():
+            department = self._department_for(category, categories)
+            if department is not None and department.stop is not None:
+                found[category.id] = department.label
+        return found
 
     def check(self, categories: Iterable[Category]) -> FloorPlanCheck:
         """What a manager should know about the plan before shoppers walk it."""
@@ -207,6 +224,7 @@ class GridRouter:
             for stop_id in order_stops(distances, _START, list(distances.cells), _END)
         ]
 
+        self._choose_sides(origin, order, stop_cells)
         places = [origin, *(stop_cells[label] for label in order)]
         flood_from_last = self.flood(places[-1])
         end = min(self._checkout_access, key=lambda cell: (flood_from_last[cell], cell))
@@ -257,6 +275,38 @@ class GridRouter:
                 self._start_floods[cell] = kept
         return kept
 
+    def _choose_sides(self, origin: Cell, order: list[str], stop_cells: dict[str, Cell]) -> None:
+        """Moves each stop to the side of its shelf the walk passes, in place.
+
+        The order is found with each department's middle tile; a shelf can also
+        be reached from its other side, and walking round it to the far one is
+        what a shopper would notice. Each pass keeps a change only if it shortens
+        the way in from the stop before plus the way on to the next.
+        """
+        sides = {department.label: department.sides for department in self._departments}
+        for _ in range(3):
+            changed = False
+            for index, label in enumerate(order):
+                previous = origin if index == 0 else stop_cells[order[index - 1]]
+                following = stop_cells[order[index + 1]] if index + 1 < len(order) else None
+                walks = {
+                    cell: self._walk_through(cell, previous, following) for cell in sides[label]
+                }
+                best = min(walks, key=lambda cell: (round(walks[cell], 6), cell))
+                current = self._walk_through(stop_cells[label], previous, following)
+                if walks[best] < current - 1e-9:
+                    stop_cells[label] = best
+                    changed = True
+            if not changed:
+                return
+
+    def _walk_through(self, cell: Cell, previous: Cell, following: Cell | None) -> float:
+        """From `previous` to `cell`, then on to `following`, or to a till when it is last."""
+        onward = (
+            self.flood(following)[cell] if following else self.distance_to_checkout(cell)
+        )
+        return self.flood(previous)[cell] + onward
+
     def _leg(self, from_cell: Cell, to_cell: Cell, size: float) -> GridRouteLeg:
         path = find_path(self.grid, from_cell, to_cell)
         if path is None:  # Can't happen: both ends are in the entrance's area.
@@ -295,10 +345,34 @@ class GridRouter:
                 key=key,
                 shelf_tiles=tuple(sorted(tiles_by_key[key])),
                 stop=self._stop_beside(tiles_by_key[key]),
+                sides=self._sides_of(tiles_by_key[key]),
             )
             for key, labels in labels_by_key.items()
         )
         return tuple(sorted(departments, key=lambda department: department.label))
+
+    def _sides_of(self, shelf_tiles: Sequence[Cell]) -> tuple[Cell, ...]:
+        """For each of the four sides, the reachable open tile there nearest the shelf's middle."""
+        middle_row = sum(row for row, _ in shelf_tiles) / len(shelf_tiles)
+        middle_col = sum(col for _, col in shelf_tiles) / len(shelf_tiles)
+        found: list[Cell] = []
+        for d_row, d_col in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            beside = {
+                (row + d_row, col + d_col)
+                for row, col in shelf_tiles
+                if (row + d_row, col + d_col) in self._reachable
+            }
+            if beside:
+                found.append(
+                    min(
+                        beside,
+                        key=lambda cell: (
+                            (cell[0] - middle_row) ** 2 + (cell[1] - middle_col) ** 2,
+                            cell,
+                        ),
+                    )
+                )
+        return tuple(dict.fromkeys(found))
 
     def _stop_beside(self, shelf_tiles: Sequence[Cell]) -> Cell | None:
         """The open tile beside the shelf closest to its middle, reachable from the entrance."""
@@ -339,6 +413,21 @@ class _Distances:
 
     def distance(self, from_node: str, to_node: str) -> float:
         return self._table[(from_node, to_node)]
+
+
+def cell_id(row: int, col: int) -> str:
+    """A tile as analytics name a place: the graph's nodes and the plan's tiles share a table."""
+    return f"{CELL_PREFIX}{row}:{col}"
+
+
+def grid_route_edges(route: GridRoute) -> tuple[tuple[str, str], ...]:
+    """Every step between two tiles on a route, each once however often it doubles back."""
+    steps = {
+        edge_key(cell_id(a.row, a.col), cell_id(b.row, b.col))
+        for leg in route.legs
+        for a, b in pairwise(leg.cells)
+    }
+    return tuple(sorted(steps))
 
 
 def _names(category: Category) -> tuple[str, ...]:

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { createRoute } from "../api/client";
 import type { Route } from "../api/types";
+import type { PlanRoute } from "./useShopperStore";
 
 interface QuickRoute {
   key: string;
@@ -14,7 +14,11 @@ interface QuickRoute {
  * kept, but the last route stays up while the next one loads: blanking the map
  * on every change would flash it, and pins couldn't animate in or out.
  */
-export function useQuickRoute(categoryIds: readonly string[], sessionId: string) {
+export function useQuickRoute(
+  categoryIds: readonly string[],
+  sessionId: string,
+  planRoute: PlanRoute,
+) {
   const key = categoryIds.join(",");
   const [result, setResult] = useState<QuickRoute>({ key: "", route: null, failed: false });
 
@@ -23,7 +27,7 @@ export function useQuickRoute(categoryIds: readonly string[], sessionId: string)
       return;
     }
     const controller = new AbortController();
-    createRoute({ category_ids: key.split(","), session_id: sessionId }, controller.signal)
+    planRoute({ category_ids: key.split(","), session_id: sessionId }, controller.signal)
       .then((route) => setResult({ key, route, failed: false }))
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -31,7 +35,7 @@ export function useQuickRoute(categoryIds: readonly string[], sessionId: string)
         }
       });
     return () => controller.abort();
-  }, [key, sessionId]);
+  }, [key, sessionId, planRoute]);
 
   const failed = result.key === key && result.failed;
   return {

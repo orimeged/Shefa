@@ -27,7 +27,10 @@ import {
   gridSize,
   isWalkable,
   makeTile,
+  MAX_CELL_SIZE_M,
+  MIN_CELL_SIZE_M,
   paint,
+  parseCellSize,
   resize,
   shelfLabels,
   toPayload,
@@ -68,6 +71,8 @@ interface FloorGridEditorProps {
   initialGrid: FloorGrid;
   /** The server's check of `initialGrid`; null when nothing has been saved yet. */
   initialCheck: FloorPlanCheck | null;
+  /** Metres one tile stands for on the real floor, as last saved. */
+  initialCellSize: number;
   /** Department names to offer for shelves. */
   suggestions: readonly string[];
   /** Sends the payload to the server: its check of the plan, or null if saving failed. */
@@ -85,6 +90,7 @@ interface Stroke {
 export function FloorGridEditor({
   initialGrid,
   initialCheck,
+  initialCellSize,
   suggestions,
   onSave,
 }: FloorGridEditorProps) {
@@ -95,8 +101,12 @@ export function FloorGridEditor({
   const [past, setPast] = useState<FloorGrid[]>([]);
   const [savedGrid, setSavedGrid] = useState(initialGrid);
   const [savedJson, setSavedJson] = useState(() =>
-    initialCheck ? JSON.stringify(toPayload(initialGrid)) : null,
+    initialCheck ? JSON.stringify(toPayload(initialGrid, initialCellSize)) : null,
   );
+  // Kept as typed, so "0." on the way to "0.5" isn't rewritten under the cursor.
+  const [cellSizeText, setCellSizeText] = useState(String(initialCellSize));
+  const [savedCellSize, setSavedCellSize] = useState(initialCellSize);
+  const cellSize = parseCellSize(cellSizeText);
   const [check, setCheck] = useState(initialCheck);
   const [isSaving, setIsSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -117,7 +127,7 @@ export function FloorGridEditor({
   const counts = useMemo(() => countTiles(grid), [grid]);
   const departments = useMemo(() => shelfLabels(grid), [grid]);
   const unlabelled = counts.shelf - departments.reduce((sum, entry) => sum + entry.tiles, 0);
-  const isDirty = grid !== savedGrid;
+  const isDirty = grid !== savedGrid || (cellSize !== null && cellSize !== savedCellSize);
   const currentTile = makeTile(tool, label);
 
   useEffect(() => {
@@ -168,18 +178,19 @@ export function FloorGridEditor({
   };
 
   const save = async () => {
-    if (isSaving) {
+    if (isSaving || cellSize === null) {
       return;
     }
     // What goes out now is what counts as saved; painting meanwhile stays unsaved.
     const sent = gridRef.current;
-    const payload = toPayload(sent);
+    const payload = toPayload(sent, cellSize);
     const json = JSON.stringify(payload);
     setIsSaving(true);
     const result = await onSave(payload, json);
     setIsSaving(false);
     if (result) {
       setSavedGrid(sent);
+      setSavedCellSize(cellSize);
       setSavedJson(json);
       setCheck(result);
       setSaveFailed(false);
@@ -352,7 +363,7 @@ export function FloorGridEditor({
           <button
             type="button"
             onClick={() => void save()}
-            disabled={isSaving}
+            disabled={isSaving || cellSize === null}
             className="flex h-11 items-center gap-2 rounded-full bg-brand px-5 font-semibold text-white shadow-sm transition hover:bg-brand-strong disabled:cursor-wait disabled:opacity-70"
           >
             <Save aria-hidden className="size-4" />
@@ -455,6 +466,35 @@ export function FloorGridEditor({
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm font-semibold text-slate-700">
+              {t.floorTileSize}
+              <span className="relative">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={MIN_CELL_SIZE_M}
+                  max={MAX_CELL_SIZE_M}
+                  step={0.05}
+                  value={cellSizeText}
+                  onChange={(event) => setCellSizeText(event.target.value)}
+                  aria-invalid={cellSize === null}
+                  aria-describedby={`${inspectorId}-scale`}
+                  className="h-11 w-full rounded-xl bg-white ps-3 pe-10 font-normal text-slate-900 ring-1 ring-slate-300 outline-none focus:ring-2 focus:ring-brand aria-invalid:ring-2 aria-invalid:ring-danger"
+                />
+                <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 font-normal text-slate-500">
+                  {t.metres}
+                </span>
+              </span>
+              <span
+                id={`${inspectorId}-scale`}
+                className={`text-xs font-normal ${cellSize === null ? "text-danger" : "text-slate-500"}`}
+              >
+                {cellSize === null
+                  ? t.floorTileSizeInvalid(MIN_CELL_SIZE_M, MAX_CELL_SIZE_M)
+                  : t.floorTileSizeHint(cols * cellSize, rows * cellSize)}
+              </span>
             </label>
           </div>
         </div>

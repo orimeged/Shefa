@@ -1,4 +1,4 @@
-import { Flame, MapPin, Waypoints } from "lucide-react";
+import { Flame, Grid3x3, MapPin, Waypoints } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
@@ -6,14 +6,18 @@ import type { AdminApi } from "../../api/adminClient";
 import type { NotFoundReportRow, StoreMap, Zone } from "../../api/types";
 import { usePolledReport } from "../../hooks/usePolledReport";
 import { useLanguage } from "../../i18n/LanguageProvider";
+import type { FloorMap } from "../../lib/floorPlanMap";
 import { buildMapLayout } from "../../lib/mapGeometry";
 import { Notice } from "../Notice";
 import { AdminMapEditor } from "./AdminMapEditor";
+import { FloorAnalyticsMap } from "./FloorAnalyticsMap";
 import { HeatLayer, MapLegend, TrafficLayer } from "./MapOverlays";
 
 interface StoreMapPanelProps {
   api: AdminApi;
   map: StoreMap;
+  /** The plan shoppers walk, once managers drew one that routes. */
+  floor: FloorMap | null;
   zones: readonly Zone[];
   selectedNodeId: number | null;
   /** The alert whose item is getting a new shelf. */
@@ -27,6 +31,7 @@ interface StoreMapPanelProps {
 export function StoreMapPanel({
   api,
   map,
+  floor,
   zones,
   selectedNodeId,
   placing,
@@ -41,6 +46,9 @@ export function StoreMapPanel({
   const heat = usePolledReport(api.notFoundHeatmap, refreshKey);
   const traffic = usePolledReport(api.trafficFlow, refreshKey);
   const layerFailed = (showHeat && heat.failed) || (showTraffic && traffic.failed);
+  const [view, setView] = useState<"floor" | "zones">("floor");
+  // Products are still placed in the graph's zones, so placing one needs that view.
+  const showsFloor = floor !== null && view === "floor" && placing === null;
 
   return (
     <section
@@ -51,7 +59,29 @@ export function StoreMapPanel({
         <h2 id="store-map-title" className="text-lg font-semibold text-slate-900">
           {t.mapPanelTitle}
         </h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {floor && placing === null && (
+            <div role="group" aria-label={t.floorViewLabel} className="flex rounded-full bg-slate-100 p-1">
+              {(["floor", "zones"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={view === option}
+                  onClick={() => setView(option)}
+                  className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium ${
+                    view === option ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
+                  }`}
+                >
+                  {option === "floor" ? (
+                    <Grid3x3 aria-hidden className="size-4" />
+                  ) : (
+                    <MapPin aria-hidden className="size-4" />
+                  )}
+                  {option === "floor" ? t.floorViewDrawn : t.floorViewZones}
+                </button>
+              ))}
+            </div>
+          )}
           <LayerToggle isOn={showHeat} onToggle={() => setShowHeat((on) => !on)}>
             <Flame aria-hidden className="size-4" />
             {t.layerHeat}
@@ -90,27 +120,42 @@ export function StoreMapPanel({
         </div>
       )}
 
-      <AdminMapEditor
-        layout={layout}
-        zones={zones}
-        selectedNodeId={selectedNodeId}
-        onSelectZone={onSelectZone}
-        underZones={
-          showTraffic && traffic.data ? (
-            <TrafficLayer edges={traffic.data.edges} layout={layout} />
-          ) : null
-        }
-        overZones={
-          showHeat && heat.data ? <HeatLayer points={heat.data.points} layout={layout} /> : null
-        }
-        legend={
-          <MapLegend
-            heat={showHeat}
-            traffic={showTraffic}
-            className="absolute bottom-16 left-1/2 z-10 hidden -translate-x-1/2 sm:flex"
-          />
-        }
-      />
+      {showsFloor ? (
+        <FloorAnalyticsMap
+          floor={floor}
+          heat={showHeat && heat.data ? heat.data.points : null}
+          cellEdges={showTraffic && traffic.data ? (traffic.data.cell_edges ?? []) : null}
+          legend={
+            <MapLegend
+              heat={showHeat}
+              traffic={showTraffic}
+              className="absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 sm:flex"
+            />
+          }
+        />
+      ) : (
+        <AdminMapEditor
+          layout={layout}
+          zones={zones}
+          selectedNodeId={selectedNodeId}
+          onSelectZone={onSelectZone}
+          underZones={
+            showTraffic && traffic.data ? (
+              <TrafficLayer edges={traffic.data.edges} layout={layout} />
+            ) : null
+          }
+          overZones={
+            showHeat && heat.data ? <HeatLayer points={heat.data.points} layout={layout} /> : null
+          }
+          legend={
+            <MapLegend
+              heat={showHeat}
+              traffic={showTraffic}
+              className="absolute bottom-16 left-1/2 z-10 hidden -translate-x-1/2 sm:flex"
+            />
+          }
+        />
+      )}
       {/* On a phone the store front is too shallow to float a legend over. */}
       <MapLegend
         heat={showHeat}
@@ -118,7 +163,7 @@ export function StoreMapPanel({
         className="flex self-center sm:hidden"
       />
 
-      <p className="text-sm text-slate-500">{t.adminMapHint}</p>
+      <p className="text-sm text-slate-500">{showsFloor ? t.floorMapHint : t.adminMapHint}</p>
     </section>
   );
 }

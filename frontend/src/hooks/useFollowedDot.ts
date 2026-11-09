@@ -19,7 +19,8 @@ const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: r
  */
 export function useFollowedDot(
   live: LivePosition | null,
-  graph: WalkGraph,
+  /** Null on a drawn floor plan, where there is no live dot to follow. */
+  graph: WalkGraph | null,
   layout: MapLayout,
   marker: RefObject<SVGGElement | null>,
   cone: RefObject<SVGPathElement | null>,
@@ -46,7 +47,7 @@ export function useFollowedDot(
     if (current.target.x === x && current.target.y === y) {
       return;
     }
-    if (prefersReducedMotion()) {
+    if (prefersReducedMotion() || !graph) {
       current.jumpTo(target);
       heading.current.shown = liveHeading;
     } else {

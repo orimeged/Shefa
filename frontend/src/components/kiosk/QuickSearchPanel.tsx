@@ -3,8 +3,11 @@ import { useMemo, useRef, useState } from "react";
 
 import type { SearchHit, StoreMap } from "../../api/types";
 import { useCategorySearch } from "../../hooks/useCategorySearch";
+import { usePlace } from "../../hooks/usePlace";
+import type { PlanRoute } from "../../hooks/useShopperStore";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { MAX_QUICK_ITEMS } from "../../lib/kiosk/quickList";
+import type { MapLayout } from "../../lib/mapGeometry";
 import { CategoryIcon } from "../CategoryIcon";
 import { LanguageToggle } from "../LanguageToggle";
 import { Notice } from "../Notice";
@@ -14,6 +17,9 @@ import type { CartItem, NewCartItem } from "./types";
 
 interface QuickSearchPanelProps {
   map: StoreMap | null;
+  layout: MapLayout | null;
+  isFloorPlan: boolean;
+  planRoute: PlanRoute;
   items: readonly CartItem[];
   sessionId: string;
   onAdd: (item: NewCartItem) => void;
@@ -33,6 +39,9 @@ function toCartItem(hit: SearchHit): NewCartItem {
 
 export function QuickSearchPanel({
   map,
+  layout,
+  isFloorPlan,
+  planRoute,
   items,
   sessionId,
   onAdd,
@@ -40,6 +49,7 @@ export function QuickSearchPanel({
   onClear,
 }: QuickSearchPanelProps) {
   const { t, pick } = useLanguage();
+  const where = usePlace();
   const [term, setTerm] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const { hits, failed, isSearching } = useCategorySearch(term, sessionId);
@@ -147,7 +157,7 @@ export function QuickSearchPanel({
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-2xl font-medium">{hit.matched_text}</span>
                         <span className="block truncate text-lg text-muted">
-                          {name} · {t.aisle(hit.aisle_no, hit.side)}
+                          {name} · {where(hit.category_id, hit.aisle_no, hit.side)}
                         </span>
                       </span>
                       {added ? (
@@ -162,7 +172,15 @@ export function QuickSearchPanel({
             </ul>
           </>
         ) : items.length > 0 ? (
-          <QuickRoute map={map} items={items} sessionId={sessionId} onRemove={onRemove} />
+          <QuickRoute
+            map={map}
+            layout={layout}
+            isFloorPlan={isFloorPlan}
+            planRoute={planRoute}
+            items={items}
+            sessionId={sessionId}
+            onRemove={onRemove}
+          />
         ) : (
           map && (
             <>

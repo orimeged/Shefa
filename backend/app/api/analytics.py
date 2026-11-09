@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.api.admin import require_admin
 from app.domain.analytics import DashboardCounts, HeatPoint, edge_key
+from app.domain.floor_routing import CELL_PREFIX
 from app.repositories.analytics_store import SqlAnalyticsStore
 from app.repositories.inventory_repository import SqlInventoryRepository
 from app.services.navigation import NavigationService
@@ -60,6 +61,8 @@ class EdgeFlow(BaseModel):
 class TrafficReport(BaseModel):
     trips: int
     edges: list[EdgeFlow]
+    # Steps between floor-plan tiles ("cell:row:col"), only those someone walked.
+    cell_edges: list[EdgeFlow] = []
 
 
 def _analytics(request: Request) -> SqlAnalyticsStore:
@@ -161,5 +164,10 @@ def traffic_flow(
                 trips=traffic.get(edge_key(edge.from_node, edge.to_node), 0),
             )
             for edge in navigation.store_map.edges
+        ],
+        cell_edges=[
+            EdgeFlow(from_node=node_a, to_node=node_b, trips=trips)
+            for (node_a, node_b), trips in sorted(traffic.items())
+            if node_a.startswith(CELL_PREFIX)
         ],
     )

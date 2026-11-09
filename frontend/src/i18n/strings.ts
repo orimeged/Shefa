@@ -11,6 +11,9 @@ export interface Strings {
   aisle: (aisleNo: number, side: Side) => string;
   /** For a narrow card, next to the zone badge. */
   aisleShort: (aisleNo: number, side: Side) => string;
+  /** Where a category stands on a drawn floor plan, which has no aisles. */
+  onShelf: (department: string) => string;
+  notOnMap: string;
   searchLabel: string;
   searchPlaceholder: string;
   clearSearch: string;
@@ -196,6 +199,14 @@ export interface Strings {
   floorProblems: { no_entrance: string; no_checkout: string; checkout_unreachable: string };
   floorUnreachable: (label: string) => string;
   floorUnlinked: (label: string) => string;
+  floorTileSize: string;
+  floorTileSizeHint: (width: number, height: number) => string;
+  floorTileSizeInvalid: (min: number, max: number) => string;
+  metres: string;
+  floorViewLabel: string;
+  floorViewDrawn: string;
+  floorViewZones: string;
+  floorMapHint: string;
   alertsHint: string;
   alertsSummary: (count: number) => string;
   alertsEmpty: string;
@@ -239,6 +250,10 @@ export interface Strings {
   trafficTrips: (count: number) => string;
 }
 
+function formatMetres(value: number, language: Language): string {
+  return new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(value);
+}
+
 export const strings: Record<Language, Strings> = {
   he: {
     direction: "rtl",
@@ -246,6 +261,8 @@ export const strings: Record<Language, Strings> = {
     otherLanguageLabel: "English",
     aisle: (aisleNo, side) => `מעבר ${aisleNo}, צד ${side === "left" ? "שמאל" : "ימין"}`,
     aisleShort: (aisleNo, side) => `מעבר ${aisleNo} · ${side === "left" ? "שמאל" : "ימין"}`,
+    onShelf: (department) => `מדף ${department}`,
+    notOnMap: "לא מסומן במפה",
     searchLabel: "חיפוש מוצר",
     searchPlaceholder: "למשל חלב, טחינה או קפה",
     clearSearch: "ניקוי החיפוש",
@@ -445,6 +462,15 @@ export const strings: Record<Language, Strings> = {
     floorUnreachable: (label) => `אין גישה מהכניסה אל "${label}".`,
     floorUnlinked: (label) =>
       `"${label}" לא תואם לאף מחלקה בקטלוג, ולכן רשימות של לקוחות לא יובילו אליו.`,
+    floorTileSize: "גודל משבצת אחת בסניף",
+    floorTileSizeHint: (width, height) =>
+      `הסניף בציור: ${formatMetres(width, "he")} × ${formatMetres(height, "he")} מטרים`,
+    floorTileSizeInvalid: (min, max) => `בין ${min} ל-${max} מטרים`,
+    metres: "מ׳",
+    floorViewLabel: "איזו מפה להציג",
+    floorViewDrawn: "המפה המצוירת",
+    floorViewZones: "אזורי מדף",
+    floorMapHint: "תנועה ודיווחי \"לא מצאתי\" על המפה שציירתם. הצבת מוצרים נעשית באזורי המדף.",
     alertsHint: "מה לקוחות לא מצאו על המדף ב-7 הימים האחרונים.",
     alertsSummary: (count) =>
       count === 1 ? "פריט אחד דווח 3 פעמים או יותר." : `${count} פריטים דווחו 3 פעמים או יותר.`,
@@ -496,6 +522,8 @@ export const strings: Record<Language, Strings> = {
     otherLanguageLabel: "עברית",
     aisle: (aisleNo, side) => `Aisle ${aisleNo}, ${side} side`,
     aisleShort: (aisleNo, side) => `Aisle ${aisleNo} · ${side}`,
+    onShelf: (department) => `${department} shelf`,
+    notOnMap: "Not on the map",
     searchLabel: "Search for a product",
     searchPlaceholder: "Try milk, tahini or coffee",
     clearSearch: "Clear search",
@@ -691,6 +719,15 @@ export const strings: Record<Language, Strings> = {
     floorUnreachable: (label) => `"${label}" can't be reached from the entrance.`,
     floorUnlinked: (label) =>
       `"${label}" doesn't match a catalog department, so shoppers' lists won't lead there.`,
+    floorTileSize: "One tile on the store floor",
+    floorTileSizeHint: (width, height) =>
+      `The drawing covers ${formatMetres(width, "en")} × ${formatMetres(height, "en")} metres`,
+    floorTileSizeInvalid: (min, max) => `Between ${min} and ${max} metres`,
+    metres: "m",
+    floorViewLabel: "Which map to show",
+    floorViewDrawn: "Drawn map",
+    floorViewZones: "Shelf zones",
+    floorMapHint: "Traffic and \"not found\" reports on the map you drew. Products are placed in the shelf zones.",
     alertsHint: "What shoppers couldn't find on the shelf in the last 7 days.",
     alertsSummary: (count) =>
       count === 1 ? "1 item reported 3 times or more." : `${count} items reported 3 times or more.`,

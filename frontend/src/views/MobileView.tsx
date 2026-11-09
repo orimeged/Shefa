@@ -9,6 +9,7 @@ import { FoundBurst } from "../components/mobile/FoundBurst";
 import { ListDraft } from "../components/mobile/ListDraft";
 import { ListEntry } from "../components/mobile/ListEntry";
 import { LiveStoreMap } from "../components/mobile/LiveStoreMap";
+import { StoreMapView } from "../components/mobile/StoreMapView";
 import { MobileSearchBar } from "../components/mobile/MobileSearchBar";
 import { NextTargetCard } from "../components/mobile/NextTargetCard";
 import { NotFoundSheet } from "../components/mobile/NotFoundSheet";
@@ -22,7 +23,8 @@ import { useDictation } from "../hooks/useDictation";
 import { useNotFoundReports } from "../hooks/useNotFoundReports";
 import { useShoppingList } from "../hooks/useShoppingList";
 import { useShoppingRoute } from "../hooks/useShoppingRoute";
-import { useStoreMap } from "../hooks/useStoreMap";
+import { PlacementsProvider } from "../hooks/usePlace";
+import { useShopperStore } from "../hooks/useShopperStore";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { buzz, FOUND_BUZZ, LIST_DONE_BUZZ } from "../lib/haptics";
 import type { ListItem } from "../lib/list/shoppingItems";
@@ -39,7 +41,7 @@ export default function MobileView() {
   const [params] = useSearchParams();
   const seedIds = useMemo(() => parseCategoryIds(params.get("categories")), [params]);
 
-  const { map, failed: mapFailed, retry: retryMap } = useStoreMap();
+  const { map, floor, planRoute, failed: mapFailed, retry: retryMap } = useShopperStore();
   const list = useShoppingList(map, seedIds);
   const { addText, categoryIds, found, groups, markUnplaced, rememberPosition, setMissing } = list;
   const isBuilding = list.phase === "building";
@@ -48,10 +50,15 @@ export default function MobileView() {
   const stickyTop = useRef<HTMLDivElement>(null);
   // Also kept as state: the target card counts down the metres as the dot moves.
   const [livePoint, setLivePoint] = useState<Point | null>(null);
-  const graph = useMemo(() => (map ? new WalkGraph(toWalkableEdges(map)) : null), [map]);
+  // Live location walks the graph's paths, so a drawn plan goes without it for now.
+  const graph = useMemo(
+    () => (map && !floor ? new WalkGraph(toWalkableEdges(map)) : null),
+    [map, floor],
+  );
   const liveNodeId = useCallback(
-    () => (map && livePosition.current ? nearestNodeId(map, livePosition.current) : null),
-    [map],
+    () =>
+      map && !floor && livePosition.current ? nearestNodeId(map, livePosition.current) : null,
+    [map, floor],
   );
 
   // While the list is being built there's nothing to route, whatever is added to it.
@@ -62,6 +69,7 @@ export default function MobileView() {
     restoredNodeId: list.restoredNodeId,
     liveNodeId,
     sessionId: list.sessionId,
+    planRoute,
   });
 
   const dictation = useDictation({ language, onTranscript: addText });
@@ -176,12 +184,14 @@ export default function MobileView() {
   const hasRoute = route !== null && categoryIds.length > 0;
   const nextStop = hasRoute ? pending[0] : undefined;
   // Live, the distance is walked from the dot, which may have left the planned route.
+  // Whole metres: a drawn plan's diagonals come back as 14.73, which nobody paces out.
+  const plannedM = hasRoute ? distanceToNextStop(route, found) : null;
   const distanceM =
     livePoint && nextStop && graph
       ? Math.round(graph.pathLength(graph.nearest(livePoint), graph.nearest(nextStop)))
-      : hasRoute
-        ? distanceToNextStop(route, found)
-        : null;
+      : plannedM === null
+        ? null
+        : Math.round(plannedM);
   const placedCount = list.items.filter((item) => item.placement).length;
   const canStart = isBuilding && placedCount > 0;
   const hasBottomBar = canStart || nextStop !== undefined;
@@ -201,6 +211,7 @@ export default function MobileView() {
     dictation.status === "finishing";
 
   return (
+    <PlacementsProvider placements={floor?.placements ?? null}>
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
       <div ref={stickyTop} className="sticky top-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
         <MobileSearchBar
@@ -247,7 +258,9 @@ export default function MobileView() {
 
         {!isBuilding && categoryIds.length > 0 && (
           <div className="relative">
-            {map && hasRoute ? (
+            {floor && hasRoute ? (
+              <StoreMapView layout={floor.layout} route={route} found={found} />
+            ) : map && hasRoute ? (
               <LiveStoreMap
                 map={map}
                 route={route}
@@ -408,5 +421,6 @@ export default function MobileView() {
         />
       )}
     </div>
+    </PlacementsProvider>
   );
 }

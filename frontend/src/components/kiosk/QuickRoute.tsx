@@ -1,10 +1,13 @@
 import { X } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import type { StoreMap } from "../../api/types";
+import { usePlace } from "../../hooks/usePlace";
 import { useQuickRoute } from "../../hooks/useQuickRoute";
+import type { PlanRoute } from "../../hooks/useShopperStore";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { inRouteOrder } from "../../lib/kiosk/quickList";
+import type { MapLayout } from "../../lib/mapGeometry";
 import type { FoundSet } from "../../lib/routeProgress";
 import { categoryZoneCode, zoneCodes } from "../../lib/zoneCode";
 import { StoreMapView } from "../mobile/StoreMapView";
@@ -14,6 +17,10 @@ import type { CartItem } from "./types";
 
 interface QuickRouteProps {
   map: StoreMap | null;
+  layout: MapLayout | null;
+  /** A drawn plan has no aisles to code, so its badges count the walk instead. */
+  isFloorPlan: boolean;
+  planRoute: PlanRoute;
   items: readonly CartItem[];
   sessionId: string;
   onRemove: (categoryId: string) => void;
@@ -25,25 +32,47 @@ const NOTHING_FOUND: FoundSet = new Set();
  * Where the picked items are, for someone who won't scan the code. The items
  * sit in one row so the map can take every bit of height that's left.
  */
-export function QuickRoute({ map, items, sessionId, onRemove }: QuickRouteProps) {
+export function QuickRoute({
+  map,
+  layout,
+  isFloorPlan,
+  planRoute,
+  items,
+  sessionId,
+  onRemove,
+}: QuickRouteProps) {
   const { t, pick } = useLanguage();
+  const where = usePlace();
   const { route, failed } = useQuickRoute(
     items.map((item) => item.categoryId),
     sessionId,
+    planRoute,
   );
 
-  const codes = useMemo(() => (map ? zoneCodes(map) : null), [map]);
-  const codeOf = (categoryId: string) =>
-    map && codes ? categoryZoneCode(map, codes, categoryId) : null;
+  const codes = useMemo(() => (map && !isFloorPlan ? zoneCodes(map) : null), [map, isFloorPlan]);
+  // 1, 2, 3 in walking order: the card and its pin share the number.
+  const walkOrder = useMemo(
+    () => new Map(route?.stops.map((stop, index) => [stop.category_id, String(index + 1)])),
+    [route],
+  );
+  const codeOf = useCallback(
+    (categoryId: string) => {
+      if (isFloorPlan) {
+        return walkOrder.get(categoryId) ?? null;
+      }
+      return map && codes ? categoryZoneCode(map, codes, categoryId) : null;
+    },
+    [isFloorPlan, walkOrder, map, codes],
+  );
   const badges = useMemo(
     () =>
       new Map(
         items.flatMap((item) => {
-          const code = map && codes ? categoryZoneCode(map, codes, item.categoryId) : null;
+          const code = codeOf(item.categoryId);
           return code ? [[item.categoryId, { code, tone: item.tone }] as const] : [];
         }),
       ),
-    [items, map, codes],
+    [items, codeOf],
   );
 
   return (
@@ -61,7 +90,7 @@ export function QuickRoute({ map, items, sessionId, onRemove }: QuickRouteProps)
               <span className="min-w-0 flex-1">
                 <span className="line-clamp-2 text-lg leading-tight font-semibold">{name}</span>
                 <span className="block truncate text-sm font-medium text-muted">
-                  {t.aisleShort(item.aisleNo, item.side)}
+                  {where(item.categoryId, item.aisleNo, item.side, true)}
                 </span>
               </span>
               {/* A full tap target that overlaps the corner, so the name keeps the width. */}
@@ -80,9 +109,9 @@ export function QuickRoute({ map, items, sessionId, onRemove }: QuickRouteProps)
 
       {failed && <Notice message={t.rerouteFailed} />}
       <div className="min-h-0 flex-1">
-        {map && route ? (
+        {layout && route ? (
           <StoreMapView
-            map={map}
+            layout={layout}
             route={route}
             found={NOTHING_FOUND}
             zoneBadges={badges}

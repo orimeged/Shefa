@@ -307,3 +307,84 @@ def test_a_leg_is_drawn_with_a_star(router: GridRouter) -> None:
     cells = tuple((point.row, point.col) for point in leg.cells)
     assert cells == find_path(FloorGrid(router.plan), cells[0], cells[-1])
     assert leg.length_m == pytest.approx(path_length(cells), abs=0.01)
+
+
+def test_a_routes_walkways_are_tile_steps_each_listed_once(router: GridRouter) -> None:
+    from app.domain.floor_routing import grid_route_edges
+
+    route = router.plan_route("demo", ["dairy", "coffee", "produce"], CATALOG)
+    edges = grid_route_edges(route)
+
+    assert edges == tuple(sorted(set(edges)))
+    assert all(a < b and a.startswith("cell:") and b.startswith("cell:") for a, b in edges)
+    steps = sum(len(leg.cells) - 1 for leg in route.legs)
+    assert 0 < len(edges) <= steps
+
+
+def test_placements_follow_the_same_matching_as_routes(router: GridRouter) -> None:
+    assert router.placements(CATALOG) == {
+        "dairy": "מוצרי חלב",
+        "bakery": "Bakery",
+        "coffee": "קפה ותה",
+        "produce": "פירות וירקות",
+        # A placed product goes where its department is drawn.
+        "product-7": "מוצרי חלב",
+    }
+
+
+SHELVES_FACING = [
+    "##########",
+    "#........#",
+    "#..dddd..#",
+    "#........#",
+    "#........#",
+    "#..cccc..#",
+    "#........#",
+    "#........#",
+    "E......CC#",
+]
+
+
+def _best_sides(router: GridRouter, route: GridRoute) -> float:
+    """Every choice of shelf side for the route's own order, tried; the shortest walk, in tiles."""
+    door = (route.start.row, route.start.col)
+    order = list(dict.fromkeys(stop.department for stop in route.stops))
+    labels = {entry.label for entry in router.plan.labels}
+    assert set(order) <= labels
+    sides = {
+        department.label: department.sides
+        for department in router._departments  # noqa: SLF001 - the candidates under test
+    }
+    best = float("inf")
+    for choice in itertools.product(*(sides[label] for label in order)):
+        places = [door, *choice]
+        walk = sum(distances_from(router.grid, [a])[b] for a, b in itertools.pairwise(places))
+        best = min(best, walk + router.distance_to_checkout(places[-1]))
+    return best
+
+
+def test_each_stop_is_on_whichever_side_of_its_shelf_makes_the_walk_shortest() -> None:
+    router = GridRouter(plan_from(SHELVES_FACING, {"d": "מוצרי חלב", "c": "קפה ותה"}))
+    route = router.plan_route("demo", ["dairy", "coffee"], CATALOG)
+
+    assert route.total_length_m == pytest.approx(_best_sides(router, route), abs=0.02)
+    assert_walkable_and_connected(route, router)
+
+
+def test_the_kiosk_layout_no_longer_walks_round_the_dairy_shelf(router: GridRouter) -> None:
+    """The case that showed it: coffee and dairy one aisle apart, far from the tills."""
+    route = router.plan_route("demo", ["dairy", "coffee"], CATALOG)
+    assert route.total_length_m == pytest.approx(_best_sides(router, route), abs=0.02)
+    between = route.legs[1].length_m
+    assert between <= 3, f"{between} m between two shelves one aisle apart"
+
+
+def test_a_shelf_reachable_from_one_side_offers_just_that_side() -> None:
+    router = GridRouter(
+        plan_from(
+            ["E....", "#dd##", ".....", ".....", "....C"],
+            {"d": "מוצרי חלב"},
+        )
+    )
+    [dairy] = [department for department in router._departments]  # noqa: SLF001
+    assert all(cell[0] in (0, 2) for cell in dairy.sides)

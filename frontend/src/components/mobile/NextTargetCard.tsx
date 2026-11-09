@@ -1,6 +1,7 @@
 import { PartyPopper } from "lucide-react";
 
 import type { RouteStop } from "../../api/types";
+import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { CategoryIcon } from "../CategoryIcon";
 
@@ -29,6 +30,7 @@ export function NextTargetCard({
   missingCount,
 }: NextTargetCardProps) {
   const { t, pick } = useLanguage();
+  const where = usePlace();
   const progress = t.progress(foundCount, total);
 
   if (!stop) {
@@ -51,7 +53,7 @@ export function NextTargetCard({
 
   const shelf = pick(stop.category_name, stop.category_name_en);
   const title = itemTexts.length > 0 ? itemTexts.join(" · ") : shelf;
-  const zone = t.aisle(stop.aisle_no, stop.side);
+  const zone = where(stop.category_id, stop.aisle_no, stop.side);
 
   return (
     <div

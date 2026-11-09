@@ -240,3 +240,82 @@ def test_the_dashboard_on_its_own_domain_may_save(settings: Settings) -> None:
         )
     assert response.status_code == 200
     assert "PUT" in response.headers["access-control-allow-methods"]
+
+
+# ---------- Where things stand, and the dashboard's figures ----------
+
+
+def test_the_plan_says_where_each_category_would_be_routed(
+    client: TestClient, drawing: dict[str, Any], store: Store
+) -> None:
+    placements = save(client, drawing).json()["placements"]
+    dairy_name = next(category.name for category in store.categories if category.id == "dairy")
+
+    assert placements["dairy"] == dairy_name
+    assert placements["bakery"] == "Bakery"
+    assert placements["coffee"] == "Coffee & Tea"
+    # In the catalog, not drawn: no entry, so the apps can say it isn't on the map.
+    assert "frozen" not in placements
+    assert client.get(URL).json()["placements"] == placements
+
+
+def summary(client: TestClient) -> dict[str, Any]:
+    response = client.get("/api/v1/admin/analytics/summary", params={"store_id": "demo"}, headers=AUTH)
+    assert response.status_code == 200
+    return response.json()
+
+
+def traffic(client: TestClient) -> dict[str, Any]:
+    response = client.get("/api/v1/admin/analytics/traffic-flow", params={"store_id": "demo"}, headers=AUTH)
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_a_route_on_the_drawing_counts_in_the_dashboard(
+    client: TestClient, drawing: dict[str, Any]
+) -> None:
+    save(client, drawing)
+    before = summary(client)["routes_today"]["current"]
+    route = client.post(
+        f"{URL}/routes", json={"category_ids": ["coffee", "bakery"], "session_id": "trip-1"}
+    ).json()
+
+    assert summary(client)["routes_today"]["current"] == before + 1
+    walked = {
+        tuple(sorted((f"cell:{a['row']}:{a['col']}", f"cell:{b['row']}:{b['col']}")))
+        for leg in route["legs"]
+        for a, b in zip(leg["cells"], leg["cells"][1:], strict=False)
+    }
+    report = traffic(client)
+    assert {(edge["from_node"], edge["to_node"]) for edge in report["cell_edges"]} == walked
+    assert all(edge["trips"] == 1 for edge in report["cell_edges"])
+    # The graph's walkways are still all listed, untouched by tile steps.
+    assert all(not edge["from_node"].startswith("cell:") for edge in report["edges"])
+
+
+def test_re_planning_one_trip_counts_it_once(client: TestClient, drawing: dict[str, Any]) -> None:
+    save(client, drawing)
+    before = summary(client)["routes_today"]["current"]
+    for start in (None, {"row": 3, "col": 4}, {"row": 5, "col": 5}):
+        body: dict[str, Any] = {"category_ids": ["coffee"], "session_id": "trip-2"}
+        if start:
+            body["start"] = start
+        assert client.post(f"{URL}/routes", json=body).status_code == 200
+
+    assert summary(client)["routes_today"]["current"] == before + 1
+
+
+def test_a_walk_with_nothing_on_it_isnt_a_trip(client: TestClient, drawing: dict[str, Any]) -> None:
+    save(client, drawing)
+    before = summary(client)["routes_today"]["current"]
+    route = client.post(f"{URL}/routes", json={"category_ids": ["frozen"], "session_id": "trip-3"})
+
+    assert route.json()["stops"] == []
+    assert summary(client)["routes_today"]["current"] == before
+    assert traffic(client)["cell_edges"] == []
+
+
+def test_a_blank_session_id_is_refused(client: TestClient, drawing: dict[str, Any]) -> None:
+    save(client, drawing)
+    response = client.post(f"{URL}/routes", json={"category_ids": ["coffee"], "session_id": "  "})
+    assert response.status_code == 422

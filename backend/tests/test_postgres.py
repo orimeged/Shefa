@@ -306,6 +306,15 @@ def test_a_floor_plan_is_kept_as_jsonb_and_routes(pg_client: TestClient, databas
     assert data_type == "jsonb"
     assert last_label == "קומבוצה"
 
-    route = pg_client.post("/api/v1/stores/demo/floor-plan/routes", json={"category_ids": ["dairy"]})
+    route = pg_client.post(
+        "/api/v1/stores/demo/floor-plan/routes",
+        json={"category_ids": ["dairy"], "session_id": "pg-trip"},
+    )
     assert route.status_code == 200
     assert route.json()["stops"][0]["department"] == "Dairy & Eggs"
+    # Recorded in PostgreSQL's analytics tables, which never fail a shopper's request loudly.
+    assert admin(pg_client, "/api/v1/admin/analytics/summary")["routes_today"]["current"] == 1
+    steps = admin(pg_client, "/api/v1/admin/analytics/traffic-flow")["cell_edges"]
+    walked = sum(len(leg["cells"]) - 1 for leg in route.json()["legs"])
+    assert 0 < len(steps) <= walked
+    assert all(edge["from_node"].startswith("cell:") for edge in steps)

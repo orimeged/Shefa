@@ -4,8 +4,9 @@ import { useEffect, useMemo } from "react";
 import type { Route, StoreMap } from "../../api/types";
 import { useLiveIndoorPositioning } from "../../hooks/useLiveIndoorPositioning";
 import type { Point } from "../../lib/mapGeometry";
+import { buildMapLayout } from "../../lib/mapGeometry";
 import { storeObstacles } from "../../lib/positioning/obstacles";
-import { toWalkableEdges } from "../../lib/positioning/walkGraph";
+import { toWalkableEdges, WalkGraph } from "../../lib/positioning/walkGraph";
 import type { FoundSet } from "../../lib/routeProgress";
 import { LiveLocationControl } from "./LiveLocationControl";
 import { StoreMapView } from "./StoreMapView";
@@ -31,6 +32,8 @@ export function LiveStoreMap({
   onLiveMove,
 }: LiveStoreMapProps) {
   const edges = useMemo(() => toWalkableEdges(map), [map]);
+  const layout = useMemo(() => buildMapLayout(map), [map]);
+  const graph = useMemo(() => new WalkGraph(edges), [edges]);
   const obstacles = useMemo(() => storeObstacles(map), [map]);
   const startNode = useMemo(() => map.nodes.find((node) => node.type === "entrance")!, [map]);
   const { x, y, heading, status, start, stop, anchorTo } = useLiveIndoorPositioning({
@@ -55,7 +58,13 @@ export function LiveStoreMap({
 
   return (
     <>
-      <StoreMapView map={map} route={route} found={found} live={isLive ? { x, y, heading } : null} />
+      <StoreMapView
+        layout={layout}
+        graph={graph}
+        route={route}
+        found={found}
+        live={isLive ? { x, y, heading } : null}
+      />
       <LiveLocationControl
         status={status}
         canStart={found.size === 0}

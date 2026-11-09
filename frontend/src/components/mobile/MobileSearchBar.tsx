@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { SearchHit } from "../../api/types";
 import { useCategorySearch } from "../../hooks/useCategorySearch";
+import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { readClipboard } from "../../lib/list/clipboard";
 import { CategoryIcon } from "../CategoryIcon";
@@ -46,6 +47,7 @@ export function MobileSearchBar({
   quickAddPanel,
 }: MobileSearchBarProps) {
   const { t, pick } = useLanguage();
+  const where = usePlace();
   const [term, setTerm] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [pasteFailed, setPasteFailed] = useState(false);
@@ -221,7 +223,7 @@ export function MobileSearchBar({
                           {hit.matched_text}
                         </span>
                         <span className="block truncate text-sm text-muted">
-                          {t.aisle(hit.aisle_no, hit.side)} · {name}
+                          {where(hit.category_id, hit.aisle_no, hit.side)} · {name}
                         </span>
                       </span>
                       {added ? (

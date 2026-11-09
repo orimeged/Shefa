@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { createRoute } from "../api/client";
 import type { Route, RouteRequest, RouteStop } from "../api/types";
 import type { Point } from "../lib/mapGeometry";
 import type { FoundSet } from "../lib/routeProgress";
 import { applyToggle, currentPoint, pendingStops } from "../lib/routeProgress";
+import type { PlanRoute } from "./useShopperStore";
 
 interface Options {
   categoryIds: readonly string[];
@@ -15,6 +15,8 @@ interface Options {
   /** The node nearest the live dot, when live location is on. */
   liveNodeId: () => string | null;
   sessionId: string;
+  /** The graph's planner or the drawn plan's; both answer with the same route shape. */
+  planRoute: PlanRoute;
 }
 
 /**
@@ -32,6 +34,7 @@ export function useShoppingRoute({
   restoredNodeId,
   liveNodeId,
   sessionId,
+  planRoute,
 }: Options) {
   const [route, setRoute] = useState<Route | null>(null);
   // Every stop seen so far: later routes leave out found items.
@@ -42,9 +45,9 @@ export function useShoppingRoute({
   const [fix, setFix] = useState<Point | null>(null);
   const inFlight = useRef<AbortController | null>(null);
 
-  const latest = useRef({ route, found, sessionId });
+  const latest = useRef({ route, found, sessionId, planRoute });
   useEffect(() => {
-    latest.current = { route, found, sessionId };
+    latest.current = { route, found, sessionId, planRoute };
   });
 
   const plan = useCallback((request: RouteRequest) => {
@@ -54,7 +57,8 @@ export function useShoppingRoute({
     setIsUpdating(true);
     setFailed(false);
 
-    createRoute({ ...request, session_id: latest.current.sessionId }, controller.signal)
+    latest.current
+      .planRoute({ ...request, session_id: latest.current.sessionId }, controller.signal)
       .then((next) => {
         setRoute(next);
         setKnownStops((known) => {

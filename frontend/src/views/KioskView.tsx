@@ -6,11 +6,15 @@ import { QuickSearchPanel } from "../components/kiosk/QuickSearchPanel";
 import type { CartItem } from "../components/kiosk/types";
 import { Notice } from "../components/Notice";
 import { useIdleReset } from "../hooks/useIdleReset";
-import { useStoreMap } from "../hooks/useStoreMap";
+import { PlacementsProvider } from "../hooks/usePlace";
+import type { PlanRoute } from "../hooks/useShopperStore";
+import { useShopperStore } from "../hooks/useShopperStore";
 import { useWakeLock } from "../hooks/useWakeLock";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { newUuid } from "../lib/events/notFoundQueue";
+import type { FloorMap } from "../lib/floorPlanMap";
 import { addQuickItem } from "../lib/kiosk/quickList";
+import type { MapLayout } from "../lib/mapGeometry";
 
 const IDLE_TIMEOUT_MS = 30_000;
 
@@ -21,7 +25,7 @@ const IDLE_TIMEOUT_MS = 30_000;
  */
 export default function KioskView() {
   const { t, resetLanguage } = useLanguage();
-  const { map, failed, retry } = useStoreMap();
+  const { map, floor, layout, planRoute, failed, retry } = useShopperStore();
   const [visit, setVisit] = useState(0);
   const screenCanStayOn = useWakeLock();
 
@@ -37,18 +41,30 @@ export default function KioskView() {
   return (
     <div className="flex h-dvh flex-col select-none">
       {failed && !map && <Notice message={t.searchFailed} onRetry={retry} className="m-3" />}
-      <KioskVisit key={visit} map={map} screenCanStayOn={screenCanStayOn} />
+      <PlacementsProvider placements={floor?.placements ?? null}>
+        <KioskVisit
+          key={visit}
+          map={map}
+          floor={floor}
+          layout={layout}
+          planRoute={planRoute}
+          screenCanStayOn={screenCanStayOn}
+        />
+      </PlacementsProvider>
     </div>
   );
 }
 
 interface KioskVisitProps {
   map: StoreMap | null;
+  floor: FloorMap | null;
+  layout: MapLayout | null;
+  planRoute: PlanRoute;
   screenCanStayOn: boolean;
 }
 
 /** Everything one shopper touches. A new key clears all of it at once. */
-function KioskVisit({ map, screenCanStayOn }: KioskVisitProps) {
+function KioskVisit({ map, floor, layout, planRoute, screenCanStayOn }: KioskVisitProps) {
   const [items, setItems] = useState<readonly CartItem[]>([]);
   const [sessionId] = useState(newUuid);
 
@@ -62,6 +78,9 @@ function KioskVisit({ map, screenCanStayOn }: KioskVisitProps) {
       />
       <QuickSearchPanel
         map={map}
+        layout={layout}
+        isFloorPlan={floor !== null}
+        planRoute={planRoute}
         items={items}
         sessionId={sessionId}
         onAdd={(item) => setItems((current) => addQuickItem(current, item))}
