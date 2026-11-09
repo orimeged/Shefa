@@ -12,6 +12,7 @@ import { angleDifference, circularMean, deviceYaw, normalizeDegrees, vectorAlong
 import type { MatcherTuning } from "./mapMatcher";
 import { MapMatcher } from "./mapMatcher";
 import type { ObstacleField } from "./obstacles";
+import type { RotationRate } from "./stepDetector";
 import { StepDetector } from "./stepDetector";
 import type { WalkableEdge } from "./walkGraph";
 import { edgeKey, WalkGraph } from "./walkGraph";
@@ -120,9 +121,12 @@ export class PositioningEngine {
       : unit;
   }
 
-  /** Returns true when the sample moved the shopper. */
-  handleMotion(x: number, y: number, z: number, timeMs: number): boolean {
-    const steps = this.detector.push(x, y, z, timeMs);
+  /**
+   * Returns true when the sample moved the shopper. The gyroscope's `rotation`
+   * tells walking from the hand moving the phone; without it, only a hard jolt does.
+   */
+  handleMotion(x: number, y: number, z: number, timeMs: number, rotation?: RotationRate | null): boolean {
+    const steps = this.detector.push(x, y, z, timeMs, rotation);
     for (let index = 0; index < steps; index += 1) {
       this.takeStep();
     }

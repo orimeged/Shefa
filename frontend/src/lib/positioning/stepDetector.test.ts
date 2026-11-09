@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { seededRandom } from "./simulatedWalk";
+import type { HandlingModel } from "./simulatedWalk";
+import { FIDGETING, seededRandom, simulateHandling, simulateWalk, TYPICAL_WALK, WAVING } from "./simulatedWalk";
 import { StepDetector } from "./stepDetector";
 
 const SAMPLE_MS = 1000 / 60;
@@ -66,6 +67,10 @@ describe("StepDetector", () => {
     expect(confirmed[0]).toBe(3);
   });
 
+  it("ignores a jolt of nearly twice gravity, which a hand gives and a footfall doesn't", () => {
+    expect(countSteps(wave(9, 600), 8000)).toBe(0);
+  });
+
   it("recovers after a gap in the sensor stream", () => {
     const detector = new StepDetector();
     let steps = 0;
@@ -77,5 +82,99 @@ describe("StepDetector", () => {
       steps += detector.push(0, 0, GRAVITY + wave(2.5, 550)(time), time);
     }
     expect(steps).toBeGreaterThan(before);
+  });
+});
+
+/** Steps counted while `model` handles the phone for 15 s, over ten seeds; with and without the gyroscope. */
+function handledSteps(model: HandlingModel): { withGyroscope: number; without: number } {
+  let withGyroscope = 0;
+  let without = 0;
+  for (let seed = 1; seed <= 10; seed += 1) {
+    const gated = new StepDetector();
+    const blind = new StepDetector();
+    simulateHandling(model, 15000, seed, {
+      orientation: () => {},
+      motion: (x, y, z, time, rotation) => {
+        withGyroscope += gated.push(x, y, z, time, rotation);
+        without += blind.push(x, y, z, time);
+      },
+    });
+  }
+  return { withGyroscope, without };
+}
+
+/** A walk with corners, some sharper than a right angle: every step taken, and every step counted. */
+function walkedSteps(swayDegrees: number): { taken: number; counted: number; fastestTilt: number } {
+  const path = [
+    { x: 0, y: 0 },
+    { x: 0, y: 8 },
+    { x: 6, y: 8 },
+    { x: 6, y: 0 },
+    { x: 12, y: 0 },
+    { x: 12, y: 10 },
+    { x: 4, y: 3 },
+  ];
+  let taken = 0;
+  let counted = 0;
+  let fastestTilt = 0;
+  for (let seed = 1; seed <= 5; seed += 1) {
+    const detector = new StepDetector();
+    simulateWalk(path, { ...TYPICAL_WALK, swayDegrees }, seed, {
+      orientation: () => {},
+      motion: (x, y, z, time, rotation) => {
+        counted += detector.push(x, y, z, time, rotation);
+        fastestTilt = Math.max(fastestTilt, detector.tiltDegreesPerSecond);
+      },
+      stepped: () => {
+        taken += 1;
+      },
+    });
+  }
+  return { taken, counted, fastestTilt };
+}
+
+describe("the phone moved about in the hand", () => {
+  it("counts no steps while the phone is waved about", () => {
+    const { withGyroscope, without } = handledSteps(WAVING);
+    // The accelerometer alone takes the waving for a walk: the dot ran off across the store.
+    expect(without).toBeGreaterThan(100);
+    expect(withGyroscope).toBe(0);
+  });
+
+  it("counts almost none for smaller handling, like gesturing with it", () => {
+    const { withGyroscope, without } = handledSteps(FIDGETING);
+    expect(withGyroscope).toBeLessThan(without / 10);
+  });
+
+  it("still counts every step of a walk, round corners and with the phone swaying", () => {
+    const typical = walkedSteps(TYPICAL_WALK.swayDegrees);
+    expect(typical.counted).toBe(typical.taken);
+    // Turning a corner is about the vertical, so it barely registers as tipping.
+    expect(typical.fastestTilt).toBeLessThan(50);
+    // Even swaying twice as much, well under the hand's speed.
+    const loose = walkedSteps(TYPICAL_WALK.swayDegrees * 2);
+    expect(loose.counted).toBe(loose.taken);
+  });
+
+  it("counts steps again once the phone is held still to walk", () => {
+    const detector = new StepDetector();
+    simulateHandling(WAVING, 5000, 7, {
+      orientation: () => {},
+      motion: (x, y, z, time, rotation) => detector.push(x, y, z, time, rotation),
+    });
+    let counted = 0;
+    let taken = 0;
+    simulateWalk([{ x: 0, y: 0 }, { x: 0, y: 10 }], TYPICAL_WALK, 7, {
+      orientation: () => {},
+      motion: (x, y, z, time, rotation) => {
+        counted += detector.push(x, y, z, 5000 + time, rotation);
+      },
+      stepped: () => {
+        taken += 1;
+      },
+    });
+    // Walking off the moment the waving stops, the hold-off and the tilt settling
+    // cost about a second of it: two steps, then every one counts.
+    expect(counted).toBeGreaterThanOrEqual(taken - 2);
   });
 });

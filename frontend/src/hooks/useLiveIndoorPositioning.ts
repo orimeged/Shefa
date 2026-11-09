@@ -194,7 +194,17 @@ export function useLiveIndoorPositioning({
         return;
       }
       sawMotion = true;
-      if (engine.handleMotion(acceleration.x, acceleration.y, acceleration.z, event.timeStamp)) {
+      // The gyroscope, where the phone has one: it tells waving the phone from walking with it.
+      const rotation = event.rotationRate;
+      if (
+        engine.handleMotion(
+          acceleration.x,
+          acceleration.y,
+          acceleration.z,
+          event.timeStamp,
+          rotation && { alpha: rotation.alpha, beta: rotation.beta, gamma: rotation.gamma },
+        )
+      ) {
         publish();
         if (engine.isCalibrated) {
           setStatus("tracking");

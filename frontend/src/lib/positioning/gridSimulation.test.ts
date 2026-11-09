@@ -202,9 +202,9 @@ function runTrip(trip: Trip, model: WalkModel, seed: number, useAnchors: boolean
       routed.handleOrientation(alpha, beta, gamma);
       unrouted.handleOrientation(alpha, beta, gamma);
     },
-    motion: (x, y, z, time) => {
-      routed.handleMotion(x, y, z, time);
-      unrouted.handleMotion(x, y, z, time);
+    motion: (x, y, z, time, rotation) => {
+      routed.handleMotion(x, y, z, time, rotation);
+      unrouted.handleMotion(x, y, z, time, rotation);
       for (let step = detector.push(x, y, z, time); step > 0; step--) {
         const move = vectorAlong(unrouted.snapshot.heading, DEFAULT_STEP_LENGTH_M);
         raw = { x: raw.x + move.x, y: raw.y + move.y };

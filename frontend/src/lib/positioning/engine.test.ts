@@ -7,7 +7,7 @@ import type { StoreMap } from "../../api/types";
 import type { Point } from "../mapGeometry";
 import { angleDifference } from "./angles";
 import { PositioningEngine } from "./engine";
-import { simulateWalk, TYPICAL_WALK } from "./simulatedWalk";
+import { simulateHandling, simulateWalk, TYPICAL_WALK, WAVING } from "./simulatedWalk";
 import { toWalkableEdges } from "./walkGraph";
 
 const store = JSON.parse(
@@ -27,7 +27,7 @@ function runWalk(waypoints: Point[], seed: number) {
 
   simulateWalk(waypoints, TYPICAL_WALK, seed, {
     orientation: (alpha, beta, gamma) => engine.handleOrientation(alpha, beta, gamma),
-    motion: (x, y, z, time) => engine.handleMotion(x, y, z, time),
+    motion: (x, y, z, time, rotation) => engine.handleMotion(x, y, z, time, rotation),
     stepped: (point) => {
       truth = point;
       const { x, y } = engine.snapshot;
@@ -124,6 +124,20 @@ describe("calibrating from the way the shopper faces at Start", () => {
     expect(Math.abs(angleDifference(engine.snapshot.heading, 90))).toBeLessThan(1);
   });
 
+  it("leaves the dot at the entrance while the phone is waved about there", () => {
+    const engine = new PositioningEngine(ENTRANCE, edges, undefined, undefined, { calibrateOnFacing: true });
+    facing(engine, 0);
+    let moved = 0;
+    simulateHandling(WAVING, 15000, 11, {
+      orientation: (alpha, beta, gamma) => engine.handleOrientation(alpha, beta, gamma),
+      motion: (x, y, z, time, rotation) => {
+        engine.handleMotion(x, y, z, time, rotation);
+        moved = Math.max(moved, Math.hypot(engine.snapshot.x - ENTRANCE.x, engine.snapshot.y - ENTRANCE.y));
+      },
+    });
+    expect(moved).toBe(0);
+  });
+
   it("needs a sixth of a second of readings, not one", () => {
     const engine = new PositioningEngine(ENTRANCE, edges, undefined, undefined, { calibrateOnFacing: true });
     facing(engine, 0, 3);
@@ -147,7 +161,7 @@ describe("calibrating from the way the shopper faces at Start", () => {
       seed,
       {
         orientation: (alpha, beta, gamma) => engine.handleOrientation(alpha, beta, gamma),
-        motion: (x, y, z, time) => engine.handleMotion(x, y, z, time),
+        motion: (x, y, z, time, rotation) => engine.handleMotion(x, y, z, time, rotation),
         stepped: (truth) => errors.push(Math.hypot(engine.snapshot.x - truth.x, engine.snapshot.y - truth.y)),
       },
     );

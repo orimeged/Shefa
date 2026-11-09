@@ -153,10 +153,33 @@ export function gridObstacles(grid: FloorGrid, frame: FloorFrame): ObstacleField
   return new ObstacleField(solids, box(0, 0, cols * size, rows * size));
 }
 
+/** The entrance drawn around (row, col), as tiles touching side by side; just that tile if it isn't one. */
+function entranceAround(grid: FloorGrid, row: number, col: number): { row: number; col: number }[] {
+  if (grid[row]?.[col]?.kind !== "entrance") {
+    return [{ row, col }];
+  }
+  const found = new Map([[`${row}:${col}`, { row, col }]]);
+  const queue = [{ row, col }];
+  for (let next = queue.pop(); next; next = queue.pop()) {
+    for (const [dRow, dCol] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+      const tile = { row: next.row + dRow, col: next.col + dCol };
+      const key = `${tile.row}:${tile.col}`;
+      if (!found.has(key) && grid[tile.row]?.[tile.col]?.kind === "entrance") {
+        found.set(key, tile);
+        queue.push(tile);
+      }
+    }
+  }
+  return [...found.values()];
+}
+
 /**
  * The way in from the entrance: away from whatever is behind it. That is the
  * plan's edge when the door is drawn on it, or else the wall or shelf it was
- * drawn against; in a corner, whichever way in has more floor ahead. Only an
+ * drawn against. An entrance is read whole, since it is often drawn several
+ * tiles deep: a strip running in from the plan's edge has the edge behind its
+ * outer end only. Where two sides have something behind them, the side more of
+ * the entrance stands on wins, then the way with more floor ahead. Only an
  * entrance standing in open floor falls back to its longest straight run.
  *
  * Live location takes this as the way the shopper faces when they press Start.
@@ -172,27 +195,39 @@ export function entranceBearing(grid: FloorGrid, row: number, col: number): numb
   ] as const;
   const outside = (r: number, c: number) => r < 0 || r >= rows || c < 0 || c >= cols;
   const blocked = (r: number, c: number) => !outside(r, c) && !isOpen(grid, r, c);
-  const run = (dRow: number, dCol: number) => {
-    let length = 0;
-    while (isOpen(grid, row + dRow * (length + 1), col + dCol * (length + 1))) {
-      length += 1;
-    }
-    return length;
-  };
-  const longest = (candidates: readonly (readonly [number, number])[]) =>
-    candidates.reduce((best, way) => (way[1] > best[1] ? way : best))[0];
+  const door = entranceAround(grid, row, col);
+  // Floor beyond the entrance one way: its own tiles lead there but aren't the store.
+  const ahead = (dRow: number, dCol: number) =>
+    Math.max(
+      ...door.map((tile) => {
+        let floor = 0;
+        for (let step = 1; isOpen(grid, tile.row + dRow * step, tile.col + dCol * step); step++) {
+          if (grid[tile.row + dRow * step]![tile.col + dCol * step]!.kind !== "entrance") {
+            floor += 1;
+          }
+        }
+        return floor;
+      }),
+    );
 
   for (const isBehind of [outside, blocked]) {
-    // The ways in: straight away from each side with something behind it, if open ahead.
+    // The ways in: straight away from each side with something behind it, if there's floor ahead.
     const inward = ways
-      .filter(([, dRow, dCol]) => isBehind(row + dRow, col + dCol))
-      .map(([bearing, dRow, dCol]) => [(bearing + 180) % 360, run(-dRow, -dCol)] as const)
-      .filter(([, ahead]) => ahead > 0);
+      .map(([bearing, dRow, dCol]) => ({
+        bearing: (bearing + 180) % 360,
+        backed: door.filter((tile) => isBehind(tile.row + dRow, tile.col + dCol)).length,
+        ahead: ahead(-dRow, -dCol),
+      }))
+      .filter((way) => way.backed > 0 && way.ahead > 0);
     if (inward.length > 0) {
-      return longest(inward);
+      return inward.reduce((best, way) =>
+        way.backed > best.backed || (way.backed === best.backed && way.ahead > best.ahead) ? way : best,
+      ).bearing;
     }
   }
-  return longest(ways.map(([bearing, dRow, dCol]) => [bearing, run(dRow, dCol)] as const));
+  return ways
+    .map(([bearing, dRow, dCol]) => ({ bearing, ahead: ahead(dRow, dCol) }))
+    .reduce((best, way) => (way.ahead > best.ahead ? way : best)).bearing;
 }
 
 /** The first entrance tile in reading order, where routes and live location start. */

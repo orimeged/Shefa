@@ -4,7 +4,7 @@ import type { FloorGrid } from "../admin/floorGrid";
 import { cellsBetween, createGrid, makeTile, paint } from "../admin/floorGrid";
 import { cellCentre, cellId, frameOf, tileAt } from "../floorPlanMap";
 import type { Point } from "../mapGeometry";
-import { vectorAlong } from "./angles";
+import { angleDifference, vectorAlong } from "./angles";
 import { DEFAULT_STEP_LENGTH_M, PositioningEngine } from "./engine";
 import { entranceBearing, gridObstacles, gridWalkableEdges, gridWalkingMap, isOpen } from "./gridWalking";
 import { MapMatcher } from "./mapMatcher";
@@ -23,6 +23,21 @@ function store(): FloorGrid {
   grid = paint(grid, cellsBetween({ row: 0, col: 9 }, { row: 1, col: 9 }), makeTile("wall"));
   grid = paint(grid, [{ row: 7, col: 1 }], makeTile("entrance"));
   return paint(grid, [{ row: 6, col: 10 }], makeTile("checkout"));
+}
+
+/** A plan from one string per row: . floor, # shelf, W wall, C till, E entrance. */
+function fromRows(lines: readonly string[]): FloorGrid {
+  const kinds = { ".": "aisle", "#": "shelf", W: "wall", C: "checkout", E: "entrance" } as const;
+  let grid = createGrid(lines.length, lines[0]!.length);
+  lines.forEach((line, row) => {
+    [...line].forEach((mark, col) => {
+      const kind = kinds[mark as keyof typeof kinds];
+      if (kind !== "aisle") {
+        grid = paint(grid, [{ row, col }], makeTile(kind, kind === "shelf" ? "מדף" : undefined));
+      }
+    });
+  });
+  return grid;
 }
 
 const GRID = store();
@@ -144,6 +159,51 @@ describe("the way in", () => {
     corner = paint(corner, [{ row: 5, col: 0 }], makeTile("entrance"));
     // Both the bottom and the left edge are behind it; 11 tiles to the right beat 5 up.
     expect(entranceBearing(corner, 5, 0)).toBe(90);
+  });
+
+  it("reads an entrance drawn several tiles deep as one, from the plan's edge in", () => {
+    // The plan from the second field test, saved on 2026-11-09: no walls, the entrance a strip
+    // two wide and four deep running up from the bottom edge. Its first tile, where the
+    // dot starts, has nothing behind it, and the longest run from there is to the left.
+    const fieldTest = fromRows([
+      ".....................##..#####",
+      ".............................#",
+      ...Array<string>(6).fill("............##..##..##...##..#"),
+      ...Array<string>(2).fill("............##..##...........#"),
+      ".............................#",
+      ...Array<string>(4).fill("....................#....##..#"),
+      "...........CCCCCCCC.#....##..#",
+      ...Array<string>(4).fill("......................EE......"),
+    ]);
+    const walking = gridWalkingMap(fieldTest, frameOf(fieldTest, 1.2))!;
+    expect(walking.start).toEqual(cellCentre({ row: 16, col: 22 }, frameOf(fieldTest, 1.2)));
+    // Up the plan, into the store: not left along the front.
+    expect(walking.initialBearing).toBe(0);
+
+    // Pressing Start there facing into the store, whatever the phone's own reference:
+    // the cone points up the plan at once.
+    const engine = new PositioningEngine(walking.start, walking.edges, DEFAULT_STEP_LENGTH_M, walking.obstacles, {
+      initialBearing: walking.initialBearing,
+      tuning: walking.tuning,
+      calibrateOnFacing: true,
+    });
+    for (let reading = 0; reading < 12; reading++) {
+      engine.handleOrientation(123, 38, 4);
+    }
+    expect(Math.abs(angleDifference(engine.snapshot.heading, 0))).toBeLessThan(0.5);
+  });
+
+  it("doesn't take a wide door's own tiles for floor ahead", () => {
+    // A door three tiles wide in a wall line: walls beside it, floor in front of and behind it.
+    const wide = fromRows([
+      "............",
+      "............",
+      "............",
+      "............",
+      "WWWWEEEWWWWW",
+      "............",
+    ]);
+    expect(entranceBearing(wide, 4, 4)).toBe(0);
   });
 
   it("is along the longest straight run for an entrance standing in open floor", () => {
