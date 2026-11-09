@@ -25,6 +25,13 @@ export interface WalkModel {
   /** Every this many steps the phone is turned in the hand, without the walker turning. */
   gripShiftEverySteps?: number;
   gripShiftDegrees?: number;
+  /**
+   * Standing still facing the first leg before walking, as the start screen asks:
+   * the phone reports where it points, and feels no steps.
+   */
+  standFirstMs?: number;
+  /** Degrees the shopper stands off the way in while standing there. */
+  standOffDegrees?: number;
 }
 
 export const TYPICAL_WALK: WalkModel = {
@@ -113,6 +120,16 @@ export function simulateWalk(
     };
     sinks.stepped(position);
   };
+
+  if (model.standFirstMs && path.length > 1) {
+    const facing = bearingBetween(path[0]!, path[1]!) + (model.standOffDegrees ?? 0);
+    for (let elapsed = 0; elapsed < model.standFirstMs; elapsed += SAMPLE_INTERVAL_MS) {
+      const heading = facing + model.gripYawDegrees + normal(random) * model.headingNoiseDegrees;
+      sinks.orientation(normalizeDegrees(arbitraryAlpha - heading), 38, 4);
+      sinks.motion(0.4, 5.9, GRAVITY_MS2 * 0.8 + normal(random) * model.sensorNoiseMs2, timeMs);
+      timeMs += SAMPLE_INTERVAL_MS;
+    }
+  }
 
   for (let index = 0; index + 1 < path.length; index += 1) {
     const target = path[index + 1]!;

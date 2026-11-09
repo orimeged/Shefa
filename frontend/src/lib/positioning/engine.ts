@@ -19,6 +19,8 @@ import { edgeKey, WalkGraph } from "./walkGraph";
 export const DEFAULT_STEP_LENGTH_M = 0.7;
 
 const CALIBRATION_STEPS = 4;
+/** Orientation readings averaged when calibrating from where the shopper faces: a sixth of a second. */
+const FACING_SAMPLES = 10;
 const YAW_SMOOTHING = 0.15;
 /** Walking along an edge within this angle counts as following it. */
 const ALIGNED_WITHIN_DEGREES = 30;
@@ -46,6 +48,12 @@ export interface EngineOptions {
   initialBearing?: number;
   /** How the dot is kept to the paths, when this map's paths differ from the graph's. */
   tuning?: MatcherTuning;
+  /**
+   * The shopper is standing at the entrance facing in as tracking starts, as the
+   * app asks them to: the phone's first readings say which way that is, so the
+   * dot points and moves the right way at once instead of after four steps.
+   */
+  calibrateOnFacing?: boolean;
 }
 
 export class PositioningEngine {
@@ -54,6 +62,8 @@ export class PositioningEngine {
   private readonly detector = new StepDetector();
   private readonly initialBearing: number;
   private readonly calibrationYaws: number[] = [];
+  /** Readings taken while standing at the start; null once used or not wanted. */
+  private facingYaws: number[] | null;
 
   private smoothedYaw: Point | null = null;
   private yawToBearing: number | null = null;
@@ -71,6 +81,7 @@ export class PositioningEngine {
     this.graph = new WalkGraph(edges);
     this.matcher = new MapMatcher(this.graph, start, obstacles, options.tuning);
     this.initialBearing = options.initialBearing ?? this.graph.bearingOutOf(start);
+    this.facingYaws = options.calibrateOnFacing ? [] : null;
     this.lastFix = start;
   }
 
@@ -97,7 +108,9 @@ export class PositioningEngine {
   }
 
   handleOrientation(alpha: number, beta: number, gamma: number): void {
-    const unit = vectorAlong(deviceYaw(alpha, beta, gamma), 1);
+    const yaw = deviceYaw(alpha, beta, gamma);
+    this.collectFacing(yaw);
+    const unit = vectorAlong(yaw, 1);
     const current = this.smoothedYaw;
     this.smoothedYaw = current
       ? {
@@ -162,6 +175,23 @@ export class PositioningEngine {
     }
     this.matcher.step(this.heading, this.stepLengthM);
     this.correctDrift();
+  }
+
+  /**
+   * The phone's reference for alpha is arbitrary, so only the difference between
+   * its yaw and the map's way in matters: that difference turns every later
+   * reading into a heading on the map. Averaged on the circle, so 359 and 1 make 0.
+   */
+  private collectFacing(yaw: number): void {
+    const yaws = this.facingYaws;
+    if (!yaws || this.yawToBearing !== null) {
+      return;
+    }
+    yaws.push(yaw);
+    if (yaws.length >= FACING_SAMPLES) {
+      this.yawToBearing = angleDifference(circularMean(yaws), this.initialBearing);
+      this.facingYaws = null;
+    }
   }
 
   private calibrate(): void {

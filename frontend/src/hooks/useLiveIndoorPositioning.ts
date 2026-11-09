@@ -142,7 +142,11 @@ export function useLiveIndoorPositioning({
       return;
     }
 
-    const engine = new PositioningEngine(startNode, edges, stepLengthM, obstacles, engineOptions);
+    // The start screen asks the shopper to stand at the entrance facing in.
+    const engine = new PositioningEngine(startNode, edges, stepLengthM, obstacles, {
+      ...engineOptions,
+      calibrateOnFacing: true,
+    });
     engine.followRoute(routeRef.current);
     engineRef.current = engine;
     setPosition(engine.snapshot);
@@ -164,7 +168,13 @@ export function useLiveIndoorPositioning({
         return;
       }
       sawOrientation = true;
+      const wasCalibrated = engine.isCalibrated;
       engine.handleOrientation(event.alpha, event.beta ?? 0, event.gamma ?? 0);
+      if (!wasCalibrated && engine.isCalibrated) {
+        // Calibrated from where the shopper faces: tracking before the first step.
+        setStatus("tracking");
+        publish();
+      }
 
       // Sensors fire at 60 Hz: the map only redraws when the change is visible.
       const heading = engine.snapshot.heading;

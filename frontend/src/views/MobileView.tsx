@@ -51,6 +51,16 @@ export default function MobileView() {
   const stickyTop = useRef<HTMLDivElement>(null);
   // Also kept as state: the target card counts down the metres as the dot moves.
   const [livePoint, setLivePoint] = useState<Point | null>(null);
+  // Navigation mode: the map and the next stop only, as in a satnav.
+  const [isNavigating, setIsNavigating] = useState(false);
+  // The search bar, called back mid-navigation to add an item.
+  const [isSearchingWhileNavigating, setIsSearchingWhileNavigating] = useState(false);
+  const navigatingChanged = useCallback((navigating: boolean) => {
+    setIsNavigating(navigating);
+    if (!navigating) {
+      setIsSearchingWhileNavigating(false);
+    }
+  }, []);
   // What live location walks on: the drawn plan's tiles when there is one, the graph's aisles otherwise.
   const walking = useMemo(
     () => (floor ? gridWalkingMap(floor.grid, floor.frame) : map ? graphWalkingMap(map) : null),
@@ -215,6 +225,7 @@ export default function MobileView() {
     <PlacementsProvider placements={floor?.placements ?? null}>
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
       <div ref={stickyTop} className="sticky top-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
+        {(!isNavigating || isSearchingWhileNavigating) && (
         <MobileSearchBar
           sessionId={list.sessionId}
           isBuilding={isBuilding}
@@ -226,6 +237,7 @@ export default function MobileView() {
           onDismissMicHint={dictation.dismissUnavailable}
           quickAddPanel={isBuilding ? null : departments}
         />
+        )}
 
         {hasRoute && (
           <>
@@ -270,6 +282,8 @@ export default function MobileView() {
                 fix={fix}
                 livePosition={livePosition}
                 onLiveMove={setLivePoint}
+                onNavigatingChange={navigatingChanged}
+                onSearch={() => setIsSearchingWhileNavigating((open) => !open)}
               />
             ) : layout && hasRoute ? (
               // A drawn plan with no entrance has nowhere to start live location from.
@@ -303,6 +317,7 @@ export default function MobileView() {
       </div>
 
       <main
+        hidden={isNavigating}
         className={`flex flex-1 flex-col px-4 pt-2 ${isBuilding ? "gap-8" : "gap-4"} ${
           canStart || nextStop
             ? "pb-[calc(7rem+env(safe-area-inset-bottom))]"

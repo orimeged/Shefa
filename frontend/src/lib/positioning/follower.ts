@@ -137,7 +137,12 @@ export class PathFollower {
 }
 
 /** Turns `current` toward `target` the short way round, by one frame's share. */
-export function easeHeading(current: number, target: number, elapsedMs: number): number {
-  const share = 1 - Math.exp(-elapsedMs / HEADING_LAG_MS);
+export function easeHeading(
+  current: number,
+  target: number,
+  elapsedMs: number,
+  lagMs: number = HEADING_LAG_MS,
+): number {
+  const share = 1 - Math.exp(-elapsedMs / lagMs);
   return normalizeDegrees(current + angleDifference(current, target) * share);
 }

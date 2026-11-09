@@ -54,11 +54,16 @@ export interface Strings {
   checkout: string;
   mapLabel: string;
 
-  liveStart: string;
   liveRequesting: string;
-  liveCalibrating: string;
-  liveOn: string;
   liveDenied: string;
+  navTitle: string;
+  navFacingHint: string;
+  navStart: string;
+  navNotNow: string;
+  navActive: string;
+  navAiming: string;
+  navEnd: string;
+  navAddItem: string;
   liveNoData: string;
   liveInsecure: string;
   liveUnsupported: string;
@@ -200,6 +205,8 @@ export interface Strings {
   floorUnreachable: (label: string) => string;
   floorUnlinked: (label: string) => string;
   floorTileSize: string;
+  floorWayIn: string;
+  floorWayInHint: string;
   floorTileSizeHint: (width: number, height: number) => string;
   floorTileSizeInvalid: (min: number, max: number) => string;
   metres: string;
@@ -303,11 +310,16 @@ export const strings: Record<Language, Strings> = {
     checkout: "קופות",
     mapLabel: "מפת הסניף עם המסלול",
 
-    liveStart: "הפעלת מיקום חי",
     liveRequesting: "מחכים להרשאה",
-    liveCalibrating: "מתחילים ללכת",
-    liveOn: "מיקום חי פעיל",
     liveDenied: "אין הרשאה לחיישני תנועה",
+    navTitle: "ניווט חי בחנות",
+    navFacingHint: "עמדו בכניסה עם הפנים לתוך החנות, לכיוון החץ הכחול, ולחצו.",
+    navStart: "התחלת ניווט",
+    navNotNow: "בלי ניווט חי",
+    navActive: "ניווט חי",
+    navAiming: "מכוונים לפי הכיוון שלכם",
+    navEnd: "סיום",
+    navAddItem: "הוספת מוצר",
     liveNoData: "לא מתקבלים נתוני תנועה",
     liveInsecure: "מיקום חי דורש HTTPS",
     liveUnsupported: "הטלפון לא תומך במיקום חי",
@@ -463,6 +475,8 @@ export const strings: Record<Language, Strings> = {
     floorUnlinked: (label) =>
       `"${label}" לא תואם לאף מחלקה בקטלוג, ולכן רשימות של לקוחות לא יובילו אליו.`,
     floorTileSize: "גודל משבצת אחת בסניף",
+    floorWayIn: "הכיוון פנימה מהכניסה",
+    floorWayInHint: "החץ הכחול בכניסה הוא הכיוון פנימה. לקוח שמתחיל ניווט עומד כך, ואם החץ לא נכון, ציירו את הכניסה צמודה לקיר החיצוני.",
     floorTileSizeHint: (width, height) =>
       `הסניף בציור: ${formatMetres(width, "he")} × ${formatMetres(height, "he")} מטרים`,
     floorTileSizeInvalid: (min, max) => `בין ${min} ל-${max} מטרים`,
@@ -564,11 +578,16 @@ export const strings: Record<Language, Strings> = {
     checkout: "Checkout",
     mapLabel: "Store map with your route",
 
-    liveStart: "Turn on live location",
     liveRequesting: "Waiting for permission",
-    liveCalibrating: "Start walking",
-    liveOn: "Live location on",
     liveDenied: "No access to motion sensors",
+    navTitle: "Live in-store navigation",
+    navFacingHint: "Stand at the entrance facing into the store, along the blue arrow, and tap.",
+    navStart: "Start navigation",
+    navNotNow: "Not now",
+    navActive: "Live navigation",
+    navAiming: "Taking your bearings",
+    navEnd: "End",
+    navAddItem: "Add an item",
     liveNoData: "No motion data received",
     liveInsecure: "Live location needs HTTPS",
     liveUnsupported: "Live location isn't supported",
@@ -720,6 +739,8 @@ export const strings: Record<Language, Strings> = {
     floorUnlinked: (label) =>
       `"${label}" doesn't match a catalog department, so shoppers' lists won't lead there.`,
     floorTileSize: "One tile on the store floor",
+    floorWayIn: "The way in from the entrance",
+    floorWayInHint: "The blue arrow at the entrance is the way in: shoppers face that way to start navigation. If it is wrong, draw the entrance against the outside wall.",
     floorTileSizeHint: (width, height) =>
       `The drawing covers ${formatMetres(width, "en")} × ${formatMetres(height, "en")} metres`,
     floorTileSizeInvalid: (min, max) => `Between ${min} and ${max} metres`,

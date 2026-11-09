@@ -154,17 +154,24 @@ export function gridObstacles(grid: FloorGrid, frame: FloorFrame): ObstacleField
 }
 
 /**
- * The way in from the entrance. On the plan's edge it is straight away from that
- * edge; elsewhere, along the longest straight run of open floor.
+ * The way in from the entrance: away from whatever is behind it. That is the
+ * plan's edge when the door is drawn on it, or else the wall or shelf it was
+ * drawn against; in a corner, whichever way in has more floor ahead. Only an
+ * entrance standing in open floor falls back to its longest straight run.
+ *
+ * Live location takes this as the way the shopper faces when they press Start.
  */
 export function entranceBearing(grid: FloorGrid, row: number, col: number): number {
   const rows = grid.length;
   const cols = grid[0]?.length ?? 0;
-  if (row === rows - 1) return UP;
-  if (row === 0) return DOWN;
-  if (col === 0) return RIGHT;
-  if (col === cols - 1) return LEFT;
-
+  const ways = [
+    [UP, -1, 0],
+    [RIGHT, 0, 1],
+    [DOWN, 1, 0],
+    [LEFT, 0, -1],
+  ] as const;
+  const outside = (r: number, c: number) => r < 0 || r >= rows || c < 0 || c >= cols;
+  const blocked = (r: number, c: number) => !outside(r, c) && !isOpen(grid, r, c);
   const run = (dRow: number, dCol: number) => {
     let length = 0;
     while (isOpen(grid, row + dRow * (length + 1), col + dCol * (length + 1))) {
@@ -172,29 +179,46 @@ export function entranceBearing(grid: FloorGrid, row: number, col: number): numb
     }
     return length;
   };
-  const ways: [number, number][] = [
-    [UP, run(-1, 0)],
-    [RIGHT, run(0, 1)],
-    [DOWN, run(1, 0)],
-    [LEFT, run(0, -1)],
-  ];
-  return ways.reduce((best, way) => (way[1] > best[1] ? way : best))[0];
+  const longest = (candidates: readonly (readonly [number, number])[]) =>
+    candidates.reduce((best, way) => (way[1] > best[1] ? way : best))[0];
+
+  for (const isBehind of [outside, blocked]) {
+    // The ways in: straight away from each side with something behind it, if open ahead.
+    const inward = ways
+      .filter(([, dRow, dCol]) => isBehind(row + dRow, col + dCol))
+      .map(([bearing, dRow, dCol]) => [(bearing + 180) % 360, run(-dRow, -dCol)] as const)
+      .filter(([, ahead]) => ahead > 0);
+    if (inward.length > 0) {
+      return longest(inward);
+    }
+  }
+  return longest(ways.map(([bearing, dRow, dCol]) => [bearing, run(dRow, dCol)] as const));
 }
 
-/** The plan as the engine needs it, or null when there's no entrance to start from. */
-export function gridWalkingMap(grid: FloorGrid, frame: FloorFrame): WalkingMap | null {
-  for (let row = 0; row < frame.rows; row++) {
-    for (let col = 0; col < frame.cols; col++) {
-      if (grid[row]![col]!.kind === "entrance") {
-        return {
-          edges: gridWalkableEdges(grid, frame),
-          obstacles: gridObstacles(grid, frame),
-          start: cellCentre({ row, col }, frame),
-          initialBearing: entranceBearing(grid, row, col),
-          tuning: GRID_TUNING,
-        };
+/** The first entrance tile in reading order, where routes and live location start. */
+export function firstEntrance(grid: FloorGrid): { row: number; col: number } | null {
+  for (let row = 0; row < grid.length; row++) {
+    const line = grid[row]!;
+    for (let col = 0; col < line.length; col++) {
+      if (line[col]!.kind === "entrance") {
+        return { row, col };
       }
     }
   }
   return null;
+}
+
+/** The plan as the engine needs it, or null when there's no entrance to start from. */
+export function gridWalkingMap(grid: FloorGrid, frame: FloorFrame): WalkingMap | null {
+  const door = firstEntrance(grid);
+  if (!door) {
+    return null;
+  }
+  return {
+    edges: gridWalkableEdges(grid, frame),
+    obstacles: gridObstacles(grid, frame),
+    start: cellCentre(door, frame),
+    initialBearing: entranceBearing(grid, door.row, door.col),
+    tuning: GRID_TUNING,
+  };
 }

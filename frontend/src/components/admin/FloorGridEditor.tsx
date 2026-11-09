@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowUp,
   BrickWall,
   Check,
   CircleAlert,
@@ -17,6 +18,7 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type { FloorPlanCheck } from "../../api/types";
 import { useLanguage } from "../../i18n/LanguageProvider";
+import { entranceBearing, firstEntrance } from "../../lib/positioning/gridWalking";
 import type { Cell, FloorGrid, FloorGridPayload, Tile, TileKind } from "../../lib/admin/floorGrid";
 import {
   AISLE,
@@ -127,6 +129,11 @@ export function FloorGridEditor({
   const counts = useMemo(() => countTiles(grid), [grid]);
   const departments = useMemo(() => shelfLabels(grid), [grid]);
   const unlabelled = counts.shelf - departments.reduce((sum, entry) => sum + entry.tiles, 0);
+  // Which way the app takes as "into the store": live location points the shopper that way at Start.
+  const doorway = useMemo(() => {
+    const door = firstEntrance(grid);
+    return door ? { ...door, bearing: entranceBearing(grid, door.row, door.col) } : null;
+  }, [grid]);
   const isDirty = grid !== savedGrid || (cellSize !== null && cellSize !== savedCellSize);
   const currentTile = makeTile(tool, label);
 
@@ -543,8 +550,30 @@ export function FloorGridEditor({
                   }}
                 />
               )}
+              {doorway && (
+                <div
+                  data-doorway={doorway.bearing}
+                  title={t.floorWayIn}
+                  className="pointer-events-none absolute grid place-items-center"
+                  style={{
+                    left: `${(doorway.col / cols) * 100}%`,
+                    top: `${(doorway.row / rows) * 100}%`,
+                    width: `${100 / cols}%`,
+                    height: `${100 / rows}%`,
+                  }}
+                >
+                  <span
+                    className="grid size-[160%] place-items-center rounded-full bg-you text-white shadow-md ring-2 ring-white"
+                    style={{ transform: `rotate(${doorway.bearing}deg)` }}
+                  >
+                    <ArrowUp aria-hidden className="size-[70%]" strokeWidth={3} />
+                  </span>
+                </div>
+              )}
             </div>
           </div>
+
+          {doorway && <p className="-mt-1 text-xs text-slate-500">{t.floorWayInHint}</p>}
 
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-slate-500">
             <p id={inspectorId} aria-live="polite" className="min-h-5">

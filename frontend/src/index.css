@@ -80,6 +80,32 @@ label {
   transition: none;
 }
 
+/* The way to face before navigation starts: a slow breath, so the eye finds it. */
+.way-in path {
+  animation: way-in 1.6s ease-in-out infinite;
+}
+
+@keyframes way-in {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.nav-sheet {
+  animation: nav-sheet 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes nav-sheet {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
 .confetti-piece {
   position: absolute;
   width: 7px;
@@ -205,6 +231,11 @@ label {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .way-in path,
+  .nav-sheet {
+    animation: none;
+  }
+
   .route-draw,
   .route-flow,
   .pulse-ring,

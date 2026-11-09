@@ -125,8 +125,29 @@ describe("the way in", () => {
     expect(entranceBearing(GRID, 4, 11)).toBe(270);
   });
 
-  it("is along the longest straight run for an entrance inside the plan", () => {
-    // From (3,8): up 1 to the wall stub? (2,8)…(0,8) are open: 3; down to row 7: 4; left (3,7) then shelf: 1; right 3.
+  it("is straight away from the wall the entrance was drawn against, inside the plan's edge", () => {
+    // The case from the field test: walls round the plan, the door one row in, the front aisle long.
+    let walled = createGrid(10, 20);
+    const border = [];
+    for (let col = 0; col < 20; col++) border.push({ row: 0, col }, { row: 9, col });
+    for (let row = 0; row < 10; row++) border.push({ row, col: 0 }, { row, col: 19 });
+    walled = paint(walled, border, makeTile("wall"));
+    walled = paint(walled, [{ row: 8, col: 3 }], makeTile("entrance"));
+    // The wall below says the way in is up, though the aisle along the front is longer.
+    expect(entranceBearing(walled, 8, 3)).toBe(0);
+    // Against the left wall, it is to the right; against a shelf, away from the shelf.
+    expect(entranceBearing(walled, 4, 1)).toBe(90);
+  });
+
+  it("in a corner, goes the way with more floor ahead", () => {
+    let corner = createGrid(6, 12);
+    corner = paint(corner, [{ row: 5, col: 0 }], makeTile("entrance"));
+    // Both the bottom and the left edge are behind it; 11 tiles to the right beat 5 up.
+    expect(entranceBearing(corner, 5, 0)).toBe(90);
+  });
+
+  it("is along the longest straight run for an entrance standing in open floor", () => {
+    // From (3,8): up 3 to the plan's edge, down 4, left 1 to the shelf, right 3.
     expect(entranceBearing(GRID, 3, 8)).toBe(180);
   });
 

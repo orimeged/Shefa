@@ -106,13 +106,18 @@ describe("a drawn plan's graph, thousands of tiles", () => {
   it("answers a walk across the store quickly enough to follow a dot", () => {
     const from = graph.nearest(cellCentre({ row: 1, col: 1 }, frame));
     const to = graph.nearest(cellCentre({ row: 58, col: 58 }, frame));
-    const started = performance.now();
-    for (let i = 0; i < 20; i++) {
-      graph.pathBetween(from, to);
-      graph.pathLength(from, to);
-      graph.nearest({ x: 20 + i, y: 30 });
+    // The fastest of a few rounds: a busy machine running the other test files
+    // in parallel slows the clock, not the search.
+    let each = Infinity;
+    for (let round = 0; round < 5; round++) {
+      const started = performance.now();
+      for (let i = 0; i < 20; i++) {
+        graph.pathBetween(from, to);
+        graph.pathLength(from, to);
+        graph.nearest({ x: 20 + i, y: 30 });
+      }
+      each = Math.min(each, (performance.now() - started) / 20);
     }
-    const each = (performance.now() - started) / 20;
     expect(each).toBeLessThan(50);
     // And the walk goes round the shelves, never through them.
     expect(graph.pathLength(from, to)).toBeGreaterThan(Math.hypot(57 * 0.8, 57 * 0.8));

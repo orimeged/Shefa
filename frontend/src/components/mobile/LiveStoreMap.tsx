@@ -1,15 +1,19 @@
 import type { RefObject } from "react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { Route } from "../../api/types";
 import { useLiveIndoorPositioning } from "../../hooks/useLiveIndoorPositioning";
 import type { MapLayout, Point } from "../../lib/mapGeometry";
 import type { WalkingMap } from "../../lib/positioning/gridWalking";
 import type { WalkGraph } from "../../lib/positioning/walkGraph";
+import { parseViewBox } from "../../lib/mapCamera";
 import type { FoundSet } from "../../lib/routeProgress";
 import { remainingLegs } from "../../lib/routeProgress";
-import { LiveLocationControl } from "./LiveLocationControl";
+import { NavigationHud, NavigationStart } from "./NavigationControls";
 import { StoreMapView } from "./StoreMapView";
+
+/** Navigation mode: the map fills the screen between the next stop's card and the Found it bar. */
+const FOCUSED_MAP = "block h-[calc(100dvh-13rem)] min-h-[50dvh] w-full";
 
 interface LiveStoreMapProps {
   layout: MapLayout;
@@ -27,6 +31,10 @@ interface LiveStoreMapProps {
   livePosition: RefObject<Point | null>;
   /** Told each time the live position moves, and given null when it stops. */
   onLiveMove: (point: Point | null) => void;
+  /** Told when navigation mode starts and ends, so the screen around the map can step aside. */
+  onNavigatingChange?: (isNavigating: boolean) => void;
+  /** Brings the search bar back while navigating, to add an item. */
+  onSearch?: () => void;
 }
 
 export function LiveStoreMap({
@@ -39,7 +47,10 @@ export function LiveStoreMap({
   fix,
   livePosition,
   onLiveMove,
+  onNavigatingChange,
+  onSearch,
 }: LiveStoreMapProps) {
+  const [dismissed, setDismissed] = useState(false);
   const engineOptions = useMemo(
     () => ({ initialBearing: walking.initialBearing, tuning: walking.tuning }),
     [walking],
@@ -74,6 +85,23 @@ export function LiveStoreMap({
     onLiveMove(livePosition.current);
   }, [isLive, x, y, livePosition, onLiveMove]);
 
+  useEffect(() => {
+    onNavigatingChange?.(isLive);
+  }, [isLive, onNavigatingChange]);
+
+  // Tracking starts from the entrance, so it can only begin before the first tick.
+  const offersStart = !isLive && found.size === 0 && !dismissed;
+  const wayIn = useMemo(
+    () => ({ at: walking.start, bearing: walking.initialBearing ?? graph.bearingOutOf(walking.start) }),
+    [walking, graph],
+  );
+  // The start sheet covers half the map: the half without the entrance and its arrow.
+  const sheetPlacement = useMemo(() => {
+    const view = parseViewBox(layout.viewBox);
+    const door = layout.toSvg(walking.start);
+    return door.y - view.y > view.height / 2 ? "top" : "bottom";
+  }, [layout, walking]);
+
   return (
     <>
       <StoreMapView
@@ -82,13 +110,19 @@ export function LiveStoreMap({
         route={route}
         found={found}
         live={isLive ? { x, y, heading, fixes } : null}
+        follow={isLive}
+        wayIn={offersStart ? wayIn : null}
+        className={isLive ? FOCUSED_MAP : undefined}
       />
-      <LiveLocationControl
-        status={status}
-        canStart={found.size === 0}
-        onStart={() => void start()}
-        onStop={stop}
-      />
+      {offersStart && (
+        <NavigationStart
+          status={status}
+          placement={sheetPlacement}
+          onStart={() => void start()}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
+      {isLive && <NavigationHud status={status} onStop={stop} onSearch={onSearch} />}
     </>
   );
 }
