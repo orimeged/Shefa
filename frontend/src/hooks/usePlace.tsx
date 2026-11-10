@@ -17,6 +17,11 @@ export function PlacementsProvider({
   return <PlacementsContext value={placements}>{children}</PlacementsContext>;
 }
 
+/** Category id to drawn department, or null on a store routed by the graph. */
+export function usePlacements(): Readonly<Record<string, string>> | null {
+  return use(PlacementsContext);
+}
+
 /**
  * Says where a category stands. On the graph that is its aisle and side; on a
  * drawn plan there are no aisles, so it is the shelf the manager named, or that

@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
-    // Motion sensors only work over HTTPS, so live location needs `--mode https`.
+    // The kiosk's screen wake lock and the microphone only work over HTTPS: `--mode https` on a LAN.
     plugins: [react(), tailwindcss(), ...(mode === "https" ? [basicSsl()] : [])],
     define: { __LAN_IP__: JSON.stringify(detectLanIp()) },
     server: { host: true, port: 5173, strictPort: true, proxy },

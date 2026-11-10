@@ -1,4 +1,4 @@
-import { CircleAlert, LoaderCircle, Navigation, Trash2 } from "lucide-react";
+import { CircleAlert, Navigation, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
@@ -8,18 +8,18 @@ import { DictationOverlay } from "../components/mobile/DictationOverlay";
 import { FoundBurst } from "../components/mobile/FoundBurst";
 import { ListDraft } from "../components/mobile/ListDraft";
 import { ListEntry } from "../components/mobile/ListEntry";
-import { LiveStoreMap } from "../components/mobile/LiveStoreMap";
-import { StoreMapView } from "../components/mobile/StoreMapView";
 import { MobileSearchBar } from "../components/mobile/MobileSearchBar";
-import { NextTargetCard } from "../components/mobile/NextTargetCard";
 import { NotFoundSheet } from "../components/mobile/NotFoundSheet";
 import { QuickCategoryChips } from "../components/mobile/QuickCategoryChips";
 import { ShoppingList } from "../components/mobile/ShoppingList";
-import { StopActions } from "../components/mobile/StopActions";
+import { StationSheet } from "../components/mobile/StationSheet";
+import { StoreMapView } from "../components/mobile/StoreMapView";
 import { Toast } from "../components/mobile/Toast";
+import { TripHeader } from "../components/mobile/TripHeader";
 import { UnmatchedItems } from "../components/mobile/UnmatchedItems";
 import { Notice } from "../components/Notice";
 import { useDictation } from "../hooks/useDictation";
+import { useElementBox } from "../hooks/useElementBox";
 import { useNotFoundReports } from "../hooks/useNotFoundReports";
 import { useShoppingList } from "../hooks/useShoppingList";
 import { useShoppingRoute } from "../hooks/useShoppingRoute";
@@ -28,14 +28,13 @@ import { useShopperStore } from "../hooks/useShopperStore";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { buzz, FOUND_BUZZ, LIST_DONE_BUZZ } from "../lib/haptics";
 import type { ListItem } from "../lib/list/shoppingItems";
-import type { Point } from "../lib/mapGeometry";
-import { graphWalkingMap, gridWalkingMap } from "../lib/positioning/gridWalking";
-import { WalkGraph } from "../lib/positioning/walkGraph";
-import { completesList, currentPoint, distanceToNextStop } from "../lib/routeProgress";
+import { completesList, currentPoint, distanceToNextStop, remainingDistance } from "../lib/routeProgress";
 import { parseCategoryIds } from "../lib/shareUrl";
 
 const NO_STOPS: readonly string[] = [];
 const FINALE_MS = 1600;
+/** Clear of the screen's edges when the camera frames a walk, in pixels. */
+const SIDE_INSET_PX = 18;
 
 export default function MobileView() {
   const { t, language } = useLanguage();
@@ -46,39 +45,21 @@ export default function MobileView() {
   const list = useShoppingList(map, seedIds);
   const { addText, categoryIds, found, groups, markUnplaced, rememberPosition, setMissing } = list;
   const isBuilding = list.phase === "building";
+  const isShopping = !isBuilding && categoryIds.length > 0;
 
-  const livePosition = useRef<Point | null>(null);
   const stickyTop = useRef<HTMLDivElement>(null);
-  // Also kept as state: the target card counts down the metres as the dot moves.
-  const [livePoint, setLivePoint] = useState<Point | null>(null);
-  // Navigation mode: the map and the next stop only, as in a satnav.
-  const [isNavigating, setIsNavigating] = useState(false);
-  // The search bar, called back mid-navigation to add an item.
-  const [isSearchingWhileNavigating, setIsSearchingWhileNavigating] = useState(false);
-  const navigatingChanged = useCallback((navigating: boolean) => {
-    setIsNavigating(navigating);
-    if (!navigating) {
-      setIsSearchingWhileNavigating(false);
-    }
-  }, []);
-  // What live location walks on: the drawn plan's tiles when there is one, the graph's aisles otherwise.
-  const walking = useMemo(
-    () => (floor ? gridWalkingMap(floor.grid, floor.frame) : map ? graphWalkingMap(map) : null),
-    [floor, map],
-  );
-  const graph = useMemo(() => (walking ? new WalkGraph(walking.edges) : null), [walking]);
-  const liveNodeId = useCallback(
-    () => (graph && livePosition.current ? graph.nearestNodeId(livePosition.current) : null),
-    [graph],
-  );
+  const header = useRef<HTMLElement>(null);
+  const sheet = useRef<HTMLElement>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isOverview, setIsOverview] = useState(false);
+  const [isListOpen, setIsListOpen] = useState(false);
 
   // While the list is being built there's nothing to route, whatever is added to it.
-  const { route, pending, fix, isUpdating, failed, toggleFound, retry } = useShoppingRoute({
+  const { route, pending, knownStops, isUpdating, failed, toggleFound, retry } = useShoppingRoute({
     categoryIds: isBuilding ? NO_STOPS : categoryIds,
     found,
     setFound: list.setFound,
     restoredNodeId: list.restoredNodeId,
-    liveNodeId,
     sessionId: list.sessionId,
     planRoute,
   });
@@ -109,31 +90,32 @@ export default function MobileView() {
     }
   }, [route, markUnplaced]);
 
-  // The live dot belongs to the trip that turned it on, not to the next one.
+  // A new trip starts on its route, with the search and the list put away.
   useEffect(() => {
-    if (isBuilding) {
-      livePosition.current = null;
-      setLivePoint(null);
+    if (!isShopping) {
+      setIsSearching(false);
+      setIsOverview(false);
+      setIsListOpen(false);
     }
-  }, [isBuilding]);
+  }, [isShopping]);
 
-  // Focus and scrolling into view must stop clear of the sticky map above and the
-  // answer bar below, or a focused row sits hidden under one of them.
+  // Building the list: focus and scrolling into view must stop clear of the sticky
+  // search above and the answer bar below, or a focused row sits hidden under one.
   useEffect(() => {
     const root = document.documentElement;
-    const header = stickyTop.current;
-    if (!header) {
+    const top = stickyTop.current;
+    if (!top) {
       return;
     }
     const observer = new ResizeObserver(() => {
-      root.style.scrollPaddingTop = `${header.offsetHeight}px`;
+      root.style.scrollPaddingTop = `${top.offsetHeight}px`;
     });
-    observer.observe(header);
+    observer.observe(top);
     return () => {
       observer.disconnect();
       root.style.scrollPaddingTop = "";
     };
-  }, []);
+  }, [isShopping]);
 
   const clearList = () => {
     if (window.confirm(t.clearConfirm)) {
@@ -142,10 +124,9 @@ export default function MobileView() {
   };
 
   const markNotFound = (stop: RouteStop, items: readonly ListItem[]) => {
-    // Without live location, the shelf they were sent to is where they are.
-    const { x, y } = livePosition.current ?? stop;
+    // The shelf they were sent to is where they are.
     for (const item of items) {
-      reportNotFound({ itemQuery: item.query, categoryId: stop.category_id, x, y });
+      reportNotFound({ itemQuery: item.query, categoryId: stop.category_id, x: stop.x, y: stop.y });
     }
     setMissing(
       items.map((item) => item.id),
@@ -194,25 +175,18 @@ export default function MobileView() {
 
   const hasRoute = route !== null && categoryIds.length > 0;
   const nextStop = hasRoute ? pending[0] : undefined;
-  // Live, the distance is walked from the dot, which may have left the planned route.
   // Whole metres: a drawn plan's diagonals come back as 14.73, which nobody paces out.
   const plannedM = hasRoute ? distanceToNextStop(route, found) : null;
-  const distanceM =
-    livePoint && nextStop && graph
-      ? Math.round(graph.pathLength(graph.nearest(livePoint), graph.nearest(nextStop)))
-      : plannedM === null
-        ? null
-        : Math.round(plannedM);
+  const distanceM = plannedM === null ? null : Math.round(plannedM);
   const placedCount = list.items.filter((item) => item.placement).length;
   const canStart = isBuilding && placedCount > 0;
-  const hasBottomBar = canStart || nextStop !== undefined;
   useEffect(() => {
     const root = document.documentElement;
-    root.style.scrollPaddingBottom = hasBottomBar ? "calc(7rem + env(safe-area-inset-bottom))" : "";
+    root.style.scrollPaddingBottom = canStart ? "calc(7rem + env(safe-area-inset-bottom))" : "";
     return () => {
       root.style.scrollPaddingBottom = "";
     };
-  }, [hasBottomBar]);
+  }, [canStart]);
   const total = categoryIds.length;
   const foundCount = categoryIds.filter((id) => found.has(id)).length;
   const missingCount = list.items.filter((item) => item.missing).length;
@@ -221,187 +195,46 @@ export default function MobileView() {
     dictation.status === "listening" ||
     dictation.status === "finishing";
 
-  return (
-    <PlacementsProvider placements={floor?.placements ?? null}>
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
-      <div ref={stickyTop} className="sticky top-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
-        {(!isNavigating || isSearchingWhileNavigating) && (
-        <MobileSearchBar
-          sessionId={list.sessionId}
-          isBuilding={isBuilding}
-          isListed={isListed}
-          micUnavailable={dictation.status === "unavailable"}
-          onAddHit={list.addHit}
-          onAddText={addText}
-          onDictate={dictation.start}
-          onDismissMicHint={dictation.dismissUnavailable}
-          quickAddPanel={isBuilding ? null : departments}
-        />
-        )}
+  // The stations behind the shopper, ticked or given up, wherever later routes go.
+  const reached = useMemo(
+    () => categoryIds.flatMap((id) => (found.has(id) ? (knownStops.get(id) ?? []) : [])),
+    [categoryIds, found, knownStops],
+  );
+  const missingIds = useMemo(
+    () =>
+      new Set(
+        categoryIds.filter((id) => {
+          // A group keeps what's still looked for apart from what was given up.
+          const group = groups.get(id);
+          return group !== undefined && group.items.length === 0 && group.missing.length > 0;
+        }),
+      ),
+    [categoryIds, groups],
+  );
 
-        {hasRoute && (
-          <>
-            <div
-              className="h-1 bg-line"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={total}
-              aria-valuenow={foundCount}
-            >
-              <div
-                className="h-full bg-brand transition-[width] duration-500"
-                style={{ width: `${(foundCount / total) * 100}%` }}
-              />
-            </div>
-          </>
-        )}
+  // What floats over the map, which the camera frames around. The pulled-up list
+  // covers the map on purpose, so the frame stays where the closed sheet left it.
+  const headerBox = useElementBox(header, isShopping);
+  const sheetBox = useElementBox(sheet, isShopping && hasRoute);
+  const [sheetInset, setSheetInset] = useState(0);
+  useEffect(() => {
+    if (!isListOpen && sheetBox.height > 0) {
+      setSheetInset(window.innerHeight - sheetBox.top);
+    }
+  }, [isListOpen, sheetBox]);
+  const insets = useMemo(
+    () => ({ top: headerBox.bottom + 10, right: SIDE_INSET_PX, bottom: sheetInset + 10, left: SIDE_INSET_PX }),
+    [headerBox.bottom, sheetInset],
+  );
+  const aboveSheetPx = hasRoute && sheetBox.height > 0 ? window.innerHeight - sheetBox.top : undefined;
 
-        {!isBuilding && categoryIds.length > 0 && hasRoute && (
-          <div className="relative z-10 -mb-1 px-3 pt-2">
-            <NextTargetCard
-              stop={nextStop}
-              itemTexts={nextStop ? (groups.get(nextStop.category_id)?.itemTexts ?? []) : []}
-              distanceM={distanceM}
-              foundCount={foundCount}
-              total={total}
-              missingCount={missingCount}
-            />
-          </div>
-        )}
-
-        {!isBuilding && categoryIds.length > 0 && (
-          <div className="relative">
-            {layout && walking && graph && hasRoute ? (
-              <LiveStoreMap
-                layout={layout}
-                walking={walking}
-                graph={graph}
-                route={route}
-                found={found}
-                followsRoute={floor !== null}
-                fix={fix}
-                livePosition={livePosition}
-                onLiveMove={setLivePoint}
-                onNavigatingChange={navigatingChanged}
-                onSearch={() => setIsSearchingWhileNavigating((open) => !open)}
-              />
-            ) : layout && hasRoute ? (
-              // A drawn plan with no entrance has nowhere to start live location from.
-              <StoreMapView layout={layout} route={route} found={found} />
-            ) : (
-              !failed &&
-              !mapFailed && (
-                <div className="p-3">
-                  <div className="aspect-[34/29.6] max-h-[46dvh] w-full animate-pulse rounded-3xl bg-line/60" />
-                </div>
-              )
-            )}
-            {isUpdating && route && (
-              <p className="absolute start-3 top-3 flex items-center gap-2 rounded-full bg-ink/85 px-3 py-1.5 text-sm font-medium text-white">
-                <LoaderCircle aria-hidden className="size-4 animate-spin" />
-                {t.updatingRoute}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* In the sticky area so it stays on screen while the list is scrolled. */}
-        {failed && (
-          <Notice
-            message={route ? t.rerouteFailed : t.loadFailed}
-            onRetry={retry}
-            className="mx-4 mb-2"
-          />
-        )}
-        {mapFailed && <Notice message={t.loadFailed} onRetry={retryMap} className="mx-4 mb-2" />}
-      </div>
-
-      <main
-        hidden={isNavigating}
-        className={`flex flex-1 flex-col px-4 pt-2 ${isBuilding ? "gap-8" : "gap-4"} ${
-          canStart || nextStop
-            ? "pb-[calc(7rem+env(safe-area-inset-bottom))]"
-            : "pb-[calc(5rem+env(safe-area-inset-bottom))]"
-        }`}
-      >
-        {isBuilding && list.isEmpty ? (
-          <header className="pt-4">
-            <h1 className="text-3xl font-semibold tracking-tight">{t.smartTitle}</h1>
-            <p className="mt-1 text-muted">{t.smartSubtitle}</p>
-          </header>
-        ) : (
-          <h1 className="sr-only">{isBuilding ? t.smartTitle : t.routeTitle}</h1>
-        )}
-
-        {isBuilding && placedCount > 0 && (
-          <ListDraft items={list.items} onRemove={list.removeItem} onClear={clearList} />
-        )}
-
-        <UnmatchedItems
-          map={map}
-          pendingCount={list.pendingItems.length}
-          unmatched={list.unmatchedItems}
-          resolveFailed={list.resolveFailed}
-          onRetry={list.retryResolve}
-          onAssign={list.assignCategory}
-          onRemove={list.removeItem}
-        />
-
-        {isBuilding && <ListEntry onAddText={addText} />}
-        {isBuilding && departments}
-
-        {hasRoute && (
-          <>
-            <ShoppingList
-              pending={pending}
-              foundIds={[...found]}
-              groups={groups}
-              onToggle={handleFound}
-              onRemove={list.removeCategory}
-              onNotFound={handleNotFound}
-              onFoundAfterAll={(itemId) => setMissing([itemId], false)}
-            />
-          </>
-        )}
-
-        {failed && !route && (
-          <p className="flex items-center gap-2 text-muted">
-            <CircleAlert aria-hidden className="size-5 shrink-0" />
-            {t.loadFailed}
-          </p>
-        )}
-
-        {!isBuilding && (
-          <button
-            type="button"
-            onClick={clearList}
-            className="mx-auto flex h-11 items-center gap-2 px-4 text-sm font-medium text-muted"
-          >
-            <Trash2 aria-hidden className="size-4" />
-            {t.clearList}
-          </button>
-        )}
-      </main>
-
-      {canStart && (
-        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl bg-gradient-to-t from-paper via-paper/90 to-transparent px-4 pt-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={list.startShopping}
-            className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-brand text-xl font-semibold text-white shadow-xl"
-          >
-            <Navigation aria-hidden className="size-6" />
-            {t.calculateRoute(placedCount)}
-          </button>
-        </div>
-      )}
-
-      {nextStop && (
-        <StopActions stop={nextStop} onFound={handleFound} onNotFound={handleNotFound} />
-      )}
-
+  const overlays = (
+    <>
       {finale > 0 && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto h-0 max-w-xl">
+        <div
+          className="pointer-events-none fixed inset-x-0 z-40 mx-auto h-0 max-w-xl"
+          style={{ bottom: `calc(${aboveSheetPx ?? 80}px + env(safe-area-inset-bottom))` }}
+        >
           <FoundBurst key={finale} finale />
         </div>
       )}
@@ -411,6 +244,7 @@ export default function MobileView() {
           message={tripMessage}
           onDismiss={dismissTripMessage}
           aboveAction={nextStop !== undefined}
+          offsetPx={isShopping ? aboveSheetPx : undefined}
         />
       ) : (
         list.notice && (
@@ -418,6 +252,7 @@ export default function MobileView() {
             notice={list.notice}
             onDismiss={list.dismissNotice}
             aboveAction={canStart || nextStop !== undefined}
+            offsetPx={isShopping ? aboveSheetPx : undefined}
           />
         )
       )}
@@ -440,7 +275,195 @@ export default function MobileView() {
           onCancel={dictation.cancel}
         />
       )}
-    </div>
+    </>
+  );
+
+  const searchBar = (
+    <MobileSearchBar
+      sessionId={list.sessionId}
+      isBuilding={isBuilding}
+      isListed={isListed}
+      micUnavailable={dictation.status === "unavailable"}
+      onAddHit={list.addHit}
+      onAddText={addText}
+      onDictate={dictation.start}
+      onDismissMicHint={dictation.dismissUnavailable}
+      quickAddPanel={isBuilding ? null : departments}
+    />
+  );
+
+  if (isShopping) {
+    return (
+      <PlacementsProvider placements={floor?.placements ?? null}>
+        <div className="fixed inset-0 overflow-hidden bg-paper">
+          <h1 className="sr-only">{t.routeTitle}</h1>
+
+          {layout && hasRoute ? (
+            <StoreMapView
+              layout={layout}
+              route={route}
+              found={found}
+              reached={reached}
+              missing={missingIds}
+              focus={isOverview ? "overview" : "route"}
+              insets={insets}
+              firstNumber={foundCount + 1}
+              className="absolute inset-0 block h-full w-full"
+            />
+          ) : (
+            !failed &&
+            !mapFailed && <div aria-hidden className="map-loading absolute inset-0" />
+          )}
+
+          <TripHeader
+            ref={header}
+            foundCount={foundCount}
+            total={total}
+            remainingM={hasRoute ? Math.round(remainingDistance(route, found)) : null}
+            isUpdating={isUpdating && route !== null}
+            isOverview={isOverview}
+            onToggleOverview={() => setIsOverview((overview) => !overview)}
+            onSearch={() => setIsSearching(true)}
+          />
+
+          {(failed || mapFailed) && (
+            <div className="absolute inset-x-0 top-28 z-20 mx-auto max-w-xl px-3">
+              {failed && <Notice message={route ? t.rerouteFailed : t.loadFailed} onRetry={retry} />}
+              {mapFailed && <Notice message={t.loadFailed} onRetry={retryMap} />}
+            </div>
+          )}
+
+          {isSearching && (
+            <div className="trip-search absolute inset-x-0 top-0 z-30 mx-auto max-w-xl rounded-b-3xl bg-paper/95 pt-[env(safe-area-inset-top)] pb-1 shadow-xl backdrop-blur-md">
+              <div className="flex items-start">
+                <div className="min-w-0 flex-1">{searchBar}</div>
+                <button
+                  type="button"
+                  onClick={() => setIsSearching(false)}
+                  aria-label={t.closeSearch}
+                  className="me-2 mt-2.5 grid size-12 shrink-0 place-items-center rounded-full text-muted hover:bg-line/60"
+                >
+                  <X aria-hidden className="size-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {hasRoute && (
+            <div className="absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+              <StationSheet
+                ref={sheet}
+                stop={nextStop}
+                number={Math.min(foundCount + 1, total)}
+                total={total}
+                itemTexts={nextStop ? (groups.get(nextStop.category_id)?.itemTexts ?? []) : []}
+                distanceM={distanceM}
+                then={pending[1]}
+                missingCount={missingCount}
+                waiting={list.unmatchedItems.map((item) => item.text)}
+                onArrived={handleFound}
+                onNotFound={handleNotFound}
+                expanded={isListOpen}
+                onToggleExpanded={() => setIsListOpen((open) => !open)}
+              >
+                <div className="flex flex-col gap-4">
+                  <UnmatchedItems
+                    map={map}
+                    pendingCount={list.pendingItems.length}
+                    unmatched={list.unmatchedItems}
+                    resolveFailed={list.resolveFailed}
+                    onRetry={list.retryResolve}
+                    onAssign={list.assignCategory}
+                    onRemove={list.removeItem}
+                  />
+                  <ShoppingList
+                    pending={pending}
+                    foundIds={[...found]}
+                    groups={groups}
+                    onToggle={handleFound}
+                    onRemove={list.removeCategory}
+                    onNotFound={handleNotFound}
+                    onFoundAfterAll={(itemId) => setMissing([itemId], false)}
+                  />
+                  <button
+                    type="button"
+                    onClick={clearList}
+                    className="mx-auto flex h-11 items-center gap-2 px-4 text-sm font-medium text-muted"
+                  >
+                    <Trash2 aria-hidden className="size-4" />
+                    {t.clearList}
+                  </button>
+                </div>
+              </StationSheet>
+            </div>
+          )}
+
+          {overlays}
+        </div>
+      </PlacementsProvider>
+    );
+  }
+
+  return (
+    <PlacementsProvider placements={floor?.placements ?? null}>
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
+        <div ref={stickyTop} className="sticky top-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
+          {searchBar}
+          {mapFailed && <Notice message={t.loadFailed} onRetry={retryMap} className="mx-4 mb-2" />}
+        </div>
+
+        <main
+          className={`flex flex-1 flex-col gap-8 px-4 pt-2 ${
+            canStart ? "pb-[calc(7rem+env(safe-area-inset-bottom))]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]"
+          }`}
+        >
+          {isBuilding && list.isEmpty ? (
+            <header className="pt-4">
+              <h1 className="text-3xl font-semibold tracking-tight">{t.smartTitle}</h1>
+              <p className="mt-1 text-muted">{t.smartSubtitle}</p>
+            </header>
+          ) : (
+            <h1 className="sr-only">{isBuilding ? t.smartTitle : t.routeTitle}</h1>
+          )}
+
+          {isBuilding && placedCount > 0 && <ListDraft items={list.items} onRemove={list.removeItem} onClear={clearList} />}
+
+          <UnmatchedItems
+            map={map}
+            pendingCount={list.pendingItems.length}
+            unmatched={list.unmatchedItems}
+            resolveFailed={list.resolveFailed}
+            onRetry={list.retryResolve}
+            onAssign={list.assignCategory}
+            onRemove={list.removeItem}
+          />
+
+          {isBuilding && <ListEntry onAddText={addText} />}
+          {isBuilding && departments}
+
+          {failed && !route && (
+            <p className="flex items-center gap-2 text-muted">
+              <CircleAlert aria-hidden className="size-5 shrink-0" />
+              {t.loadFailed}
+            </p>
+          )}
+        </main>
+
+        {canStart && (
+          <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl bg-gradient-to-t from-paper via-paper/90 to-transparent px-4 pt-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              onClick={list.startShopping}
+              className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-brand text-xl font-semibold text-white shadow-xl"
+            >
+              <Navigation aria-hidden className="size-6" />
+              {t.calculateRoute(placedCount)}
+            </button>
+          </div>
+        )}
+
+        {overlays}
+      </div>
     </PlacementsProvider>
   );
 }

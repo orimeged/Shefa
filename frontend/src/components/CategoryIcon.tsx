@@ -36,6 +36,11 @@ const ICONS: Record<string, LucideIcon> = {
   meat: Drumstick,
 };
 
+/** Whether a category has an icon of its own rather than the basket every other gets. */
+export function hasCategoryIcon(categoryId: string): boolean {
+  return categoryId in ICONS;
+}
+
 export function CategoryIcon({ categoryId, ...props }: LucideProps & { categoryId: string }) {
   const Icon = ICONS[categoryId] ?? ShoppingBasket;
   return <Icon aria-hidden {...props} />;

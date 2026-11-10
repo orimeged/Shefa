@@ -115,6 +115,10 @@ export function QuickRoute({
             route={route}
             found={NOTHING_FOUND}
             zoneBadges={badges}
+            // A screen at the door: the whole store and the whole walk, markers sized for a tablet.
+            focus="overview"
+            emphasis="all"
+            markerScale={1.25}
             className="block h-full w-full"
           />
         ) : (

@@ -1,9 +1,10 @@
 /**
- * The camera of navigation mode: the map follows the shopper, closer in, turned
- * so the way they face points up the screen, the way a satnav does it.
+ * The map's camera: which part of the store the screen shows. It frames what
+ * matters now, the walk to the next station, inside the part of the map that
+ * the header and the station sheet leave clear, and flies there when it changes.
  *
- * Everything is in the SVG's own units. The camera only moves the map's content:
- * the SVG keeps its viewBox, so the whole store is one blend away.
+ * The camera is the SVG's viewBox, kept to the screen's own proportions so the
+ * map is never stretched or letterboxed. Everything is in the map's units.
  */
 
 import type { Point } from "./mapGeometry";
@@ -15,86 +16,114 @@ export interface ViewBox {
   height: number;
 }
 
-export interface CameraState {
-  /** How far in, 1 being the whole store. */
-  zoom: number;
-  /** The heading that points up the screen, in degrees clockwise from the map's up. */
-  rotation: number;
-  /** 0 is the whole store as drawn, 1 the camera on the shopper; between, the move into it. */
-  blend: number;
+export interface Size {
+  width: number;
+  height: number;
 }
 
-/** About this many metres across the screen: an aisle and what's either side of it. */
-export const FOLLOW_WINDOW_M = 16;
-/** The shopper sits below the middle, so more of what lies ahead is in view. */
-export const FOLLOW_ANCHOR_Y = 0.64;
+/** Screen pixels covered by something floating over the map, on each side. */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
 
-export function parseViewBox(viewBox: string): ViewBox {
-  const [x = 0, y = 0, width = 1, height = 1] = viewBox.trim().split(/[\s,]+/).map(Number);
+export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
+export interface FrameOptions {
+  /** Never closer than this many units across the clear part: an aisle and what's either side. */
+  minSpan?: number;
+}
+
+const DEFAULT_MIN_SPAN = 9;
+
+export function parseViewBox(text: string): ViewBox {
+  const [x = 0, y = 0, width = 1, height = 1] = text.trim().split(/[\s,]+/).map(Number);
   return { x, y, width, height };
 }
 
-/** The zoom that shows about `windowM` metres across, never less than the whole store. */
-export function followZoom(view: ViewBox, unitsPerMetre: number, windowM = FOLLOW_WINDOW_M): number {
-  return Math.max(1, view.width / (windowM * unitsPerMetre));
+export function formatViewBox({ x, y, width, height }: ViewBox): string {
+  const round = (value: number) => Math.round(value * 1000) / 1000;
+  return `${round(x)} ${round(y)} ${round(width)} ${round(height)}`;
 }
 
-function lerp(a: Point, b: Point, share: number): Point {
-  return { x: a.x + (b.x - a.x) * share, y: a.y + (b.y - a.y) * share };
-}
-
-/** Where on the view the shopper is shown once the camera follows them. */
-export function followAnchor(view: ViewBox): Point {
-  return { x: view.x + view.width / 2, y: view.y + view.height * FOLLOW_ANCHOR_Y };
+/** The box around `points`, `margin` wider on every side. */
+export function boundsOf(points: readonly Point[], margin = 0): ViewBox {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const x = Math.min(...xs) - margin;
+  const y = Math.min(...ys) - margin;
+  return { x, y, width: Math.max(...xs) + margin - x, height: Math.max(...ys) + margin - y };
 }
 
 /**
- * An SVG transform for the map's content: `spot` moved to the follow anchor,
- * turned by -rotation so that heading points up, and scaled by the zoom. At blend
- * 0 it is no transform at all; every value eases between, so going in is a move.
+ * The viewBox showing `focus` whole and as large as it fits in the clear part of
+ * a `screen`-sized map, centred there. Its proportions are the screen's.
  */
-export function cameraTransform(view: ViewBox, spot: Point, { zoom, rotation, blend }: CameraState): string {
-  const centre = { x: view.x + view.width / 2, y: view.y + view.height / 2 };
-  const at = lerp(centre, followAnchor(view), blend);
-  const pivot = lerp(centre, spot, blend);
-  const scale = 1 + (zoom - 1) * blend;
-  const turn = -rotation * blend;
-  return `translate(${at.x} ${at.y}) rotate(${turn}) scale(${scale}) translate(${-pivot.x} ${-pivot.y})`;
-}
-
-/** Where a point of the map lands on the view under the camera: the same transform, worked out. */
-export function onView(view: ViewBox, spot: Point, camera: CameraState, point: Point): Point {
-  const centre = { x: view.x + view.width / 2, y: view.y + view.height / 2 };
-  const at = lerp(centre, followAnchor(view), camera.blend);
-  const pivot = lerp(centre, spot, camera.blend);
-  const scale = 1 + (camera.zoom - 1) * camera.blend;
-  const radians = (-camera.rotation * camera.blend * Math.PI) / 180;
-  const dx = (point.x - pivot.x) * scale;
-  const dy = (point.y - pivot.y) * scale;
+export function frameFocus(
+  focus: ViewBox,
+  screen: Size,
+  insets: Insets = NO_INSETS,
+  { minSpan = DEFAULT_MIN_SPAN }: FrameOptions = {},
+): ViewBox {
+  const clearWidth = Math.max(1, screen.width - insets.left - insets.right);
+  const clearHeight = Math.max(1, screen.height - insets.top - insets.bottom);
+  // Pixels per unit: the focus fits both ways, and no closer than minSpan across.
+  const scale = Math.min(
+    clearWidth / Math.max(focus.width, 1e-6),
+    clearHeight / Math.max(focus.height, 1e-6),
+    clearWidth / minSpan,
+  );
+  const centre = { x: focus.x + focus.width / 2, y: focus.y + focus.height / 2 };
   return {
-    x: at.x + dx * Math.cos(radians) - dy * Math.sin(radians),
-    y: at.y + dx * Math.sin(radians) + dy * Math.cos(radians),
+    x: centre.x - (insets.left + clearWidth / 2) / scale,
+    y: centre.y - (insets.top + clearHeight / 2) / scale,
+    width: screen.width / scale,
+    height: screen.height / scale,
   };
 }
 
-function signed(degrees: number): number {
-  return ((((degrees + 180) % 360) + 360) % 360) - 180;
+/** Units per screen pixel under `view`: what keeps a marker the same size on screen at any zoom. */
+export function unitsPerPixel(view: ViewBox, screen: Size): number {
+  return view.width / Math.max(1, screen.width);
 }
+
+/** Where a point of the map lands on the screen under `view`, in pixels. */
+export function toScreen(point: Point, view: ViewBox, screen: Size): Point {
+  const perPixel = unitsPerPixel(view, screen);
+  return { x: (point.x - view.x) / perPixel, y: (point.y - view.y) / perPixel };
+}
+
+export function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+/** How much wider the view grows halfway through a long flight, to show where it's going. */
+const FLIGHT_LIFT = 0.45;
 
 /**
- * The rotation to give a label on a map turned by `rotation`, so it keeps lying
- * along its shelf (`base`) but never reads upside down on the screen.
+ * The camera's path from one view to another, for t from 0 to 1. The centre
+ * glides, the zoom changes evenly in scale rather than in units, and a flight
+ * across the store rises a little in the middle and settles, so the eye keeps
+ * its place. Exactly `from` at 0 and `to` at 1.
  */
-export function uprightAngle(base: number, rotation: number): number {
-  const onScreen = signed(base - rotation);
-  // A quarter turn either way still reads; past it, the label flips over.
-  const readable = onScreen > 90 ? onScreen - 180 : onScreen < -90 ? onScreen + 180 : onScreen;
-  return readable + rotation;
-}
-
-/** SVG units per metre, from a layout's own conversion: 1 on the graph, one per tile on a plan. */
-export function unitsPerMetre(toSvg: (point: Point) => Point): number {
-  const a = toSvg({ x: 0, y: 0 });
-  const b = toSvg({ x: 1, y: 0 });
-  return Math.hypot(b.x - a.x, b.y - a.y);
+export function flight(from: ViewBox, to: ViewBox): (t: number) => ViewBox {
+  const fromCentre = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  const toCentre = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+  const travel = Math.hypot(toCentre.x - fromCentre.x, toCentre.y - fromCentre.y);
+  const lift = FLIGHT_LIFT * Math.min(1, travel / Math.max(from.width, to.width));
+  return (t: number) => {
+    if (t <= 0) return from;
+    if (t >= 1) return to;
+    const eased = easeInOutCubic(t);
+    const rise = 1 + lift * Math.sin(Math.PI * t);
+    const width = from.width * (to.width / from.width) ** eased * rise;
+    const height = from.height * (to.height / from.height) ** eased * rise;
+    const centre = {
+      x: fromCentre.x + (toCentre.x - fromCentre.x) * eased,
+      y: fromCentre.y + (toCentre.y - fromCentre.y) * eased,
+    };
+    return { x: centre.x - width / 2, y: centre.y - height / 2, width, height };
+  };
 }

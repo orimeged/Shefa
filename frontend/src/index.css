@@ -71,38 +71,121 @@ label {
   animation: pulse-ring 1.8s ease-out infinite;
 }
 
-.map-marker {
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+/* The station sheet rises into place once, and each new station slides in on it. */
+.station-sheet {
+  animation: sheet-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Moved every frame along the paths, so a transition would only make it lag. */
-.map-marker.is-live {
-  transition: none;
+.station-in {
+  animation: station-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* The way to face before navigation starts: a slow breath, so the eye finds it. */
-.way-in path {
-  animation: way-in 1.6s ease-in-out infinite;
+.trip-search {
+  animation: search-drop 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes way-in {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
+/* The big button's sheen: light passing across it now and then, so the eye finds it. */
+.arrive-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.28) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: sheen 4.5s ease-in-out 1.2s infinite;
+  pointer-events: none;
 }
 
-.nav-sheet {
-  animation: nav-sheet 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+/* The next station's pin drops in, and its shadow breathes on the floor. */
+.pin-drop {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pin-drop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.35s both;
 }
 
-@keyframes nav-sheet {
+.ground-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ground-pulse 1.8s ease-out infinite;
+}
+
+/* Department badges come and go as the camera makes room for them. */
+.map-badge {
+  transition: opacity 0.35s ease;
+}
+
+.map-badge.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segment-now {
+  animation: segment-now 1.6s ease-in-out infinite;
+}
+
+.map-loading {
+  background:
+    radial-gradient(circle at 50% 45%, rgb(255 255 255 / 0.9), transparent 60%),
+    var(--color-paper);
+  animation: segment-now 1.6s ease-in-out infinite;
+}
+
+@keyframes sheet-rise {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(24px);
+  }
+}
+
+@keyframes station-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--slide-from, 1) * 18px));
+  }
+}
+
+[dir="rtl"] .station-in {
+  --slide-from: -1;
+}
+
+@keyframes search-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes sheen {
+  0%,
+  70% {
+    transform: translateX(-120%);
+  }
+  85%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes pin-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.6);
+  }
+}
+
+@keyframes ground-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+@keyframes segment-now {
+  50% {
+    opacity: 0.55;
   }
 }
 
@@ -231,9 +314,19 @@ label {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .way-in path,
-  .nav-sheet {
+  .station-sheet,
+  .station-in,
+  .trip-search,
+  .pin-drop,
+  .ground-pulse,
+  .segment-now,
+  .map-loading,
+  .arrive-button::after {
     animation: none;
+  }
+
+  .map-badge {
+    transition: none;
   }
 
   .route-draw,

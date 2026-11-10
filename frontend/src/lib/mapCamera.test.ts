@@ -1,88 +1,104 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  cameraTransform,
-  followAnchor,
-  followZoom,
-  onView,
-  parseViewBox,
-  unitsPerMetre,
-  uprightAngle,
-} from "./mapCamera";
+import { boundsOf, easeInOutCubic, flight, formatViewBox, frameFocus, parseViewBox, toScreen, unitsPerPixel } from "./mapCamera";
 
-const VIEW = parseViewBox("-0.4 -0.4 30.8 22.8");
+// A phone: 390 by 844, with a header over the top 110 px and the station sheet over the bottom 300.
+const SCREEN = { width: 390, height: 844 };
+const INSETS = { top: 110, right: 18, bottom: 300, left: 18 };
 
-describe("the navigation camera", () => {
-  it("reads the SVG's viewBox", () => {
-    expect(VIEW).toEqual({ x: -0.4, y: -0.4, width: 30.8, height: 22.8 });
+describe("reading and writing a viewBox", () => {
+  it("round-trips", () => {
+    const view = parseViewBox("-0.4 -0.4 30.8 22.8");
+    expect(view).toEqual({ x: -0.4, y: -0.4, width: 30.8, height: 22.8 });
+    expect(formatViewBox(view)).toBe("-0.4 -0.4 30.8 22.8");
+  });
+});
+
+describe("boundsOf", () => {
+  it("is the box round the points, with the margin on every side", () => {
+    expect(boundsOf([{ x: 2, y: 3 }, { x: 6, y: 1 }], 1)).toEqual({ x: 1, y: 0, width: 6, height: 4 });
+  });
+});
+
+describe("framing a walk", () => {
+  const walk = boundsOf([{ x: 10, y: 4 }, { x: 10, y: 16 }, { x: 14, y: 16 }], 1.6);
+
+  it("keeps the screen's proportions, so the map is never stretched or letterboxed", () => {
+    const view = frameFocus(walk, SCREEN, INSETS);
+    expect(view.width / view.height).toBeCloseTo(SCREEN.width / SCREEN.height);
   });
 
-  it("zooms to about sixteen metres across, whatever a tile measures", () => {
-    // 30.8 units of 0.8 m tiles is 24.6 m: 16 m of it is 20 tiles.
-    expect(followZoom(VIEW, 1 / 0.8)).toBeCloseTo(30.8 / 20);
-    // A store narrower than that is shown whole, never zoomed out.
-    expect(followZoom(parseViewBox("0 0 10 10"), 1)).toBe(1);
-  });
-
-  it("is no transform at all before it moves in", () => {
-    const camera = { zoom: 2, rotation: 90, blend: 0 };
-    const point = { x: 7, y: 3 };
-    expect(onView(VIEW, { x: 20, y: 15 }, camera, point)).toEqual(point);
-  });
-
-  it("puts the shopper at the follow point, below the middle, once in", () => {
-    const spot = { x: 20, y: 15 };
-    const placed = onView(VIEW, spot, { zoom: 1.5, rotation: 37, blend: 1 }, spot);
-    const anchor = followAnchor(VIEW);
-    expect(placed.x).toBeCloseTo(anchor.x);
-    expect(placed.y).toBeCloseTo(anchor.y);
-    expect(anchor.y).toBeGreaterThan(VIEW.y + VIEW.height / 2);
-  });
-
-  it("turns the map so the way the shopper faces points up the screen", () => {
-    const spot = { x: 10, y: 10 };
-    // Facing east (90): the point one unit east of them must show one unit straight up.
-    const ahead = onView(VIEW, spot, { zoom: 1, rotation: 90, blend: 1 }, { x: 11, y: 10 });
-    const anchor = followAnchor(VIEW);
-    expect(ahead.x).toBeCloseTo(anchor.x);
-    expect(ahead.y).toBeCloseTo(anchor.y - 1);
-    // Facing up the map (0), nothing turns: north stays up.
-    const north = onView(VIEW, spot, { zoom: 1, rotation: 0, blend: 1 }, { x: 10, y: 9 });
-    expect(north.y).toBeCloseTo(anchor.y - 1);
-  });
-
-  it("scales distances by the zoom", () => {
-    const spot = { x: 10, y: 10 };
-    const a = onView(VIEW, spot, { zoom: 2, rotation: 0, blend: 1 }, { x: 10, y: 10 });
-    const b = onView(VIEW, spot, { zoom: 2, rotation: 0, blend: 1 }, { x: 13, y: 10 });
-    expect(b.x - a.x).toBeCloseTo(6);
-  });
-
-  it("writes the same transform it works out", () => {
-    const transform = cameraTransform(VIEW, { x: 20, y: 15 }, { zoom: 1.5, rotation: 30, blend: 1 });
-    const anchor = followAnchor(VIEW);
-    expect(transform).toBe(`translate(${anchor.x} ${anchor.y}) rotate(-30) scale(1.5) translate(-20 -15)`);
-  });
-
-  it("keeps labels along their shelf but never upside down", () => {
-    // A shelf name across the map, the map turned 30°: it turns with the map.
-    expect(uprightAngle(0, 30)).toBe(0);
-    // The map turned half round: the name flips to stay readable.
-    expect(uprightAngle(0, 180)).toBe(180);
-    expect(uprightAngle(0, 170)).toBe(180);
-    // A name drawn up a shelf stays as drawn while the map faces north.
-    expect(uprightAngle(-90, 0)).toBe(-90);
-    // On screen it always ends within a quarter turn of level.
-    for (const rotation of [0, 45, 90, 135, 200, 271, 359]) {
-      for (const base of [0, -90]) {
-        const screen = ((uprightAngle(base, rotation) - rotation + 540) % 360) - 180;
-        expect(Math.abs(screen)).toBeLessThanOrEqual(90);
-      }
+  it("shows the whole walk inside the part of the map the header and sheet leave clear", () => {
+    const view = frameFocus(walk, SCREEN, INSETS);
+    for (const corner of [
+      { x: walk.x, y: walk.y },
+      { x: walk.x + walk.width, y: walk.y + walk.height },
+    ]) {
+      const at = toScreen(corner, view, SCREEN);
+      expect(at.x).toBeGreaterThanOrEqual(INSETS.left - 1e-6);
+      expect(at.x).toBeLessThanOrEqual(SCREEN.width - INSETS.right + 1e-6);
+      expect(at.y).toBeGreaterThanOrEqual(INSETS.top - 1e-6);
+      expect(at.y).toBeLessThanOrEqual(SCREEN.height - INSETS.bottom + 1e-6);
     }
   });
 
-  it("knows how many SVG units a metre is", () => {
-    expect(unitsPerMetre((point) => point)).toBe(1);
-    expect(unitsPerMetre(({ x, y }) => ({ x: x / 0.8, y: 10 - y / 0.8 }))).toBeCloseTo(1.25);
+  it("centres it there, and fills it the tighter way", () => {
+    const view = frameFocus(walk, SCREEN, INSETS);
+    const middle = toScreen({ x: walk.x + walk.width / 2, y: walk.y + walk.height / 2 }, view, SCREEN);
+    expect(middle.x).toBeCloseTo((INSETS.left + SCREEN.width - INSETS.right) / 2);
+    expect(middle.y).toBeCloseTo((INSETS.top + SCREEN.height - INSETS.bottom) / 2);
+    // The walk is tall: it fills the clear height exactly.
+    const top = toScreen({ x: walk.x, y: walk.y }, view, SCREEN);
+    const bottom = toScreen({ x: walk.x, y: walk.y + walk.height }, view, SCREEN);
+    expect(bottom.y - top.y).toBeCloseTo(SCREEN.height - INSETS.top - INSETS.bottom);
+  });
+
+  it("never comes closer than the minimum span, for a station a step away", () => {
+    const step = boundsOf([{ x: 5, y: 5 }, { x: 5.5, y: 5 }], 0.2);
+    const view = frameFocus(step, SCREEN, INSETS, { minSpan: 9 });
+    const clearWidthInUnits = (SCREEN.width - INSETS.left - INSETS.right) * unitsPerPixel(view, SCREEN);
+    expect(clearWidthInUnits).toBeCloseTo(9);
+  });
+
+  it("knows how big a pixel is, for keeping markers one size on screen", () => {
+    const view = { x: 0, y: 0, width: 39, height: 84.4 };
+    expect(unitsPerPixel(view, SCREEN)).toBeCloseTo(0.1);
+  });
+});
+
+describe("the flight between two shots", () => {
+  const from = { x: 0, y: 0, width: 10, height: 20 };
+  const to = { x: 30, y: 10, width: 20, height: 40 };
+  const path = flight(from, to);
+
+  it("starts exactly at one and ends exactly at the other", () => {
+    expect(path(0)).toEqual(from);
+    expect(path(1)).toEqual(to);
+  });
+
+  it("keeps the screen's proportions all the way", () => {
+    for (const t of [0.1, 0.3, 0.5, 0.8]) {
+      const view = path(t);
+      expect(view.width / view.height).toBeCloseTo(0.5);
+    }
+  });
+
+  it("rises a little on the way across, to show where it's going", () => {
+    const middle = path(0.5);
+    // Plain interpolation in scale would give sqrt(10 * 20) wide halfway.
+    expect(middle.width).toBeGreaterThan(Math.sqrt(10 * 20) * 1.1);
+  });
+
+  it("doesn't rise for a zoom on the spot", () => {
+    const spot = flight({ x: 0, y: 0, width: 10, height: 10 }, { x: 2.5, y: 2.5, width: 5, height: 5 });
+    expect(spot(0.5).width).toBeCloseTo(Math.sqrt(50));
+  });
+
+  it("eases in and out", () => {
+    expect(easeInOutCubic(0)).toBe(0);
+    expect(easeInOutCubic(1)).toBe(1);
+    expect(easeInOutCubic(0.5)).toBeCloseTo(0.5);
+    expect(easeInOutCubic(0.1)).toBeLessThan(0.1);
+    expect(easeInOutCubic(0.9)).toBeGreaterThan(0.9);
   });
 });

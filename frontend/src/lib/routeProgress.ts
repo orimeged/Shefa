@@ -20,9 +20,38 @@ export function remainingLegs(route: Route, found: FoundSet): RouteLeg[] {
   return route.legs.slice(firstLegToWalk(route, found));
 }
 
-/** The leg walked to the last found stop. Null until a stop on this route is found. */
-export function lastWalkedLeg(route: Route, found: FoundSet): RouteLeg | null {
-  return route.legs[firstLegToWalk(route, found) - 1] ?? null;
+/** The legs already walked on this route, to every station reached, in order. */
+export function walkedLegs(route: Route, found: FoundSet): RouteLeg[] {
+  return route.legs.slice(0, firstLegToWalk(route, found));
+}
+
+/**
+ * The walk behind the shopper, kept across re-plans: a new route starts where
+ * the shopper stands, so the old one's walked legs would vanish from the map.
+ */
+export interface Trail {
+  route: Route | null;
+  /** Walked on routes since replaced. */
+  carried: readonly RouteLeg[];
+  /** Walked on `route`. */
+  walked: readonly RouteLeg[];
+}
+
+export const NO_TRAIL: Trail = { route: null, carried: [], walked: [] };
+
+/** The trail after `route` and `found` change. A trip with nothing found has none. */
+export function advanceTrail(trail: Trail, route: Route | null, found: FoundSet): Trail {
+  if (!route || found.size === 0) {
+    return route === trail.route && trail.carried.length === 0 && trail.walked.length === 0
+      ? trail
+      : { route, carried: [], walked: [] };
+  }
+  const carried = route === trail.route ? trail.carried : [...trail.carried, ...trail.walked];
+  return { route, carried, walked: walkedLegs(route, found) };
+}
+
+export function trailLegs(trail: Trail): RouteLeg[] {
+  return [...trail.carried, ...trail.walked];
 }
 
 export function pendingStops(route: Route, found: FoundSet): RouteStop[] {

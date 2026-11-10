@@ -1,6 +1,6 @@
 # פריסה לענן: Render ו-Vercel
 
-השרת (FastAPI) ומסד הנתונים (PostgreSQL) על Render, והאתר (React) על Vercel. Vercel ו-Render נותנים HTTPS אוטומטית. HTTPS נחוץ למיקום חי, להכתבה ולמניעת כיבוי המסך בקיוסק.
+השרת (FastAPI) ומסד הנתונים (PostgreSQL) על Render, והאתר (React) על Vercel. Vercel ו-Render נותנים HTTPS אוטומטית. HTTPS נחוץ להכתבה ולמניעת כיבוי המסך בקיוסק.
 
 ## לפני שמתחילים
 

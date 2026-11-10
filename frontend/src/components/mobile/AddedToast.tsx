@@ -7,10 +7,11 @@ interface AddedToastProps {
   notice: AddNotice;
   onDismiss: () => void;
   aboveAction: boolean;
+  offsetPx?: number;
 }
 
 /** Says where a new item is, so nobody has to look for it on the list while walking. */
-export function AddedToast({ notice, onDismiss, aboveAction }: AddedToastProps) {
+export function AddedToast({ notice, onDismiss, aboveAction, offsetPx }: AddedToastProps) {
   const { t } = useLanguage();
   const where = usePlace();
 
@@ -24,5 +25,5 @@ export function AddedToast({ notice, onDismiss, aboveAction }: AddedToastProps) 
         )
       : t.addedUnknown(single.text);
 
-  return <Toast message={message} onDismiss={onDismiss} aboveAction={aboveAction} />;
+  return <Toast message={message} onDismiss={onDismiss} aboveAction={aboveAction} offsetPx={offsetPx} />;
 }

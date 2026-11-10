@@ -9,7 +9,6 @@ import {
   fitZoneLabel,
   polylinePoints,
   stopPins,
-  walkKeyframes,
   zoneElementId,
 } from "./mapGeometry";
 
@@ -98,23 +97,6 @@ describe("polylinePoints", () => {
     ];
 
     expect(polylinePoints(legs, layout)).toBe("2,10 5,5 10,5");
-  });
-});
-
-describe("walkKeyframes", () => {
-  it("paces by distance, so a long aisle takes longer than a short turn", () => {
-    const frames = walkKeyframes([
-      { x: 0, y: 0 },
-      { x: 0, y: 3 },
-      { x: 1, y: 3 },
-    ]);
-    expect(frames.map((frame) => frame.offset)).toEqual([0, 0.75, 1]);
-    expect(frames[1]!.transform).toBe("translate(0px, 3px)");
-  });
-
-  it("has nothing to play on a path of no length", () => {
-    expect(walkKeyframes([{ x: 2, y: 2 }, { x: 2, y: 2 }])).toEqual([]);
-    expect(walkKeyframes([{ x: 2, y: 2 }])).toEqual([]);
   });
 });
 

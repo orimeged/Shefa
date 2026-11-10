@@ -16,6 +16,11 @@ export interface Rect extends Point {
   height: number;
 }
 
+/** A block of shelving; on a drawn plan, with the department painted on it. */
+export interface ShelfRect extends Rect {
+  label?: string;
+}
+
 export interface Line {
   key: string;
   from: Point;
@@ -49,7 +54,7 @@ export interface ShelfName extends Point {
 export interface MapLayout {
   viewBox: string;
   floor: Rect;
-  shelves: Rect[];
+  shelves: ShelfRect[];
   zones: ZoneShape[];
   walkways: Line[];
   sectionDots: Point[];
@@ -201,30 +206,6 @@ export function polylinePoints(legs: readonly RouteLeg[], layout: MapLayout): st
     .map(layout.toSvg)
     .map(({ x, y }) => `${x},${y}`)
     .join(" ");
-}
-
-export function translateTo({ x, y }: Point): string {
-  return `translate(${x}px, ${y}px)`;
-}
-
-/**
- * Keyframes that carry a marker along a path at a steady pace, around the
- * shelves rather than through them. Empty for a path of no length.
- */
-export function walkKeyframes(points: readonly Point[]): Keyframe[] {
-  const lengths = points
-    .slice(1)
-    .map((point, index) => Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y));
-  const total = lengths.reduce((sum, length) => sum + length, 0);
-  if (total === 0) {
-    return [];
-  }
-
-  let walked = 0;
-  return points.map((point, index) => {
-    walked += index > 0 ? lengths[index - 1]! : 0;
-    return { offset: walked / total, transform: translateTo(point) };
-  });
 }
 
 /** One numbered pin per stop, set against the shelf it is on. */

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Route, RouteRequest, RouteStop } from "../api/types";
-import type { Point } from "../lib/mapGeometry";
 import type { FoundSet } from "../lib/routeProgress";
 import { applyToggle, currentPoint, pendingStops } from "../lib/routeProgress";
 import type { PlanRoute } from "./useShopperStore";
@@ -12,8 +11,6 @@ interface Options {
   setFound: (found: FoundSet) => void;
   /** Where a reloaded trip left off. */
   restoredNodeId: string | null;
-  /** The node nearest the live dot, when live location is on. */
-  liveNodeId: () => string | null;
   sessionId: string;
   /** The graph's planner or the drawn plan's; both answer with the same route shape. */
   planRoute: PlanRoute;
@@ -32,7 +29,6 @@ export function useShoppingRoute({
   found,
   setFound,
   restoredNodeId,
-  liveNodeId,
   sessionId,
   planRoute,
 }: Options) {
@@ -41,8 +37,6 @@ export function useShoppingRoute({
   const [knownStops, setKnownStops] = useState<ReadonlyMap<string, RouteStop>>(() => new Map());
   const [isUpdating, setIsUpdating] = useState(false);
   const [failed, setFailed] = useState(false);
-  /** The last position known for sure, from a ticked shelf. */
-  const [fix, setFix] = useState<Point | null>(null);
   const inFlight = useRef<AbortController | null>(null);
 
   const latest = useRef({ route, found, sessionId, planRoute });
@@ -83,8 +77,8 @@ export function useShoppingRoute({
   const planFromHere = useCallback(
     (ids: readonly string[]) => {
       const { route: current, found: ticked } = latest.current;
-      const start =
-        liveNodeId() ?? (current ? currentPoint(current, ticked).node_id : restoredNodeId);
+      // The last station reached: the shopper is standing at it.
+      const start = current ? currentPoint(current, ticked).node_id : restoredNodeId;
       const remaining = ids.filter((id) => !ticked.has(id));
 
       if (remaining.length > 0) {
@@ -94,7 +88,7 @@ export function useShoppingRoute({
         plan({ category_ids: [ids.at(-1)!], start_node_id: start ?? undefined });
       }
     },
-    [liveNodeId, plan, restoredNodeId],
+    [plan, restoredNodeId],
   );
 
   const categoryKey = categoryIds.join(",");
@@ -106,7 +100,6 @@ export function useShoppingRoute({
     inFlight.current?.abort();
     setRoute(null);
     setKnownStops(new Map());
-    setFix(null);
     setFailed(false);
     setIsUpdating(false);
   }, [categoryKey, planFromHere]);
@@ -127,9 +120,6 @@ export function useShoppingRoute({
         nodeId: stop.node_id,
         routeIsStale: failed || inFlight.current !== null,
       });
-      if (!found.has(categoryId)) {
-        setFix({ x: stop.x, y: stop.y });
-      }
       setFound(result.found);
       if (result.replan) {
         plan(result.replan);
@@ -150,5 +140,5 @@ export function useShoppingRoute({
       : [];
   }, [route, found, categoryIds]);
 
-  return { route, pending, fix, isUpdating, failed, toggleFound, retry };
+  return { route, pending, knownStops, isUpdating, failed, toggleFound, retry };
 }

@@ -37,6 +37,22 @@ export interface Strings {
   foundHeading: string;
   foundIt: string;
   notFoundHere: string;
+  /** "Station 2 of 5". */
+  stationOf: (number: number, total: number) => string;
+  /** The station sheet's one big action: at the shelf, on to the next. */
+  arrivedNext: string;
+  /** The same at the last station, when what follows is the checkout. */
+  arrivedLast: string;
+  /** Under it, the station after this one. */
+  thenStation: (name: string) => string;
+  metersLeft: (meters: number) => string;
+  stationSheet: string;
+  showStations: (count: number) => string;
+  hideStations: string;
+  wholeStore: string;
+  backToRoute: string;
+  searchMore: string;
+  closeSearch: string;
   notFoundShort: string;
   notFoundItem: (name: string) => string;
   whichItemMissing: string;
@@ -54,19 +70,6 @@ export interface Strings {
   checkout: string;
   mapLabel: string;
 
-  liveRequesting: string;
-  liveDenied: string;
-  navTitle: string;
-  navFacingHint: string;
-  navStart: string;
-  navNotNow: string;
-  navActive: string;
-  navAiming: string;
-  navEnd: string;
-  navAddItem: string;
-  liveNoData: string;
-  liveInsecure: string;
-  liveUnsupported: string;
 
   otherLanguageShort: string;
   searchMobilePlaceholder: string;
@@ -205,8 +208,6 @@ export interface Strings {
   floorUnreachable: (label: string) => string;
   floorUnlinked: (label: string) => string;
   floorTileSize: string;
-  floorWayIn: string;
-  floorWayInHint: string;
   floorTileSizeHint: (width: number, height: number) => string;
   floorTileSizeInvalid: (min: number, max: number) => string;
   metres: string;
@@ -293,6 +294,18 @@ export const strings: Record<Language, Strings> = {
     foundHeading: "נמצאו",
     foundIt: "נמצא",
     notFoundHere: "לא מצאתי כאן",
+    stationOf: (number, total) => `תחנה ${number} מתוך ${total}`,
+    arrivedNext: "הגעתי · הבא",
+    arrivedLast: "הגעתי · לקופות",
+    thenStation: (name) => `ואחריה: ${name}`,
+    metersLeft: (meters) => `עוד ${meters} מ׳`,
+    stationSheet: "התחנה הנוכחית",
+    showStations: (count) => `כל התחנות (${count})`,
+    hideStations: "הסתרת התחנות",
+    wholeStore: "כל החנות",
+    backToRoute: "חזרה למסלול",
+    searchMore: "הוספת מוצר",
+    closeSearch: "סגירת החיפוש",
     notFoundShort: "לא כאן",
     notFoundItem: (name) => `לא מצאתי כאן: ${name}`,
     whichItemMissing: "מה חסר במדף?",
@@ -310,19 +323,6 @@ export const strings: Record<Language, Strings> = {
     checkout: "קופות",
     mapLabel: "מפת הסניף עם המסלול",
 
-    liveRequesting: "מחכים להרשאה",
-    liveDenied: "אין הרשאה לחיישני תנועה",
-    navTitle: "ניווט חי בחנות",
-    navFacingHint: "עמדו בכניסה עם הפנים לתוך החנות, לכיוון החץ הכחול, ולחצו.",
-    navStart: "התחלת ניווט",
-    navNotNow: "בלי ניווט חי",
-    navActive: "ניווט חי",
-    navAiming: "מכוונים לפי הכיוון שלכם",
-    navEnd: "סיום",
-    navAddItem: "הוספת מוצר",
-    liveNoData: "לא מתקבלים נתוני תנועה",
-    liveInsecure: "מיקום חי דורש HTTPS",
-    liveUnsupported: "הטלפון לא תומך במיקום חי",
 
     otherLanguageShort: "EN",
     searchMobilePlaceholder: "מה מחפשים?",
@@ -475,8 +475,6 @@ export const strings: Record<Language, Strings> = {
     floorUnlinked: (label) =>
       `"${label}" לא תואם לאף מחלקה בקטלוג, ולכן רשימות של לקוחות לא יובילו אליו.`,
     floorTileSize: "גודל משבצת אחת בסניף",
-    floorWayIn: "הכיוון פנימה מהכניסה",
-    floorWayInHint: "החץ הכחול בכניסה הוא הכיוון פנימה. לקוח שמתחיל ניווט עומד כך, ואם החץ לא נכון, ציירו את הכניסה צמודה לקיר החיצוני.",
     floorTileSizeHint: (width, height) =>
       `הסניף בציור: ${formatMetres(width, "he")} × ${formatMetres(height, "he")} מטרים`,
     floorTileSizeInvalid: (min, max) => `בין ${min} ל-${max} מטרים`,
@@ -561,6 +559,18 @@ export const strings: Record<Language, Strings> = {
     foundHeading: "Found",
     foundIt: "Found it",
     notFoundHere: "Not found here",
+    stationOf: (number, total) => `Station ${number} of ${total}`,
+    arrivedNext: "I'm here · Next",
+    arrivedLast: "I'm here · Checkout",
+    thenStation: (name) => `Then: ${name}`,
+    metersLeft: (meters) => `${meters} m to go`,
+    stationSheet: "Current station",
+    showStations: (count) => `All stations (${count})`,
+    hideStations: "Hide the stations",
+    wholeStore: "Whole store",
+    backToRoute: "Back to the route",
+    searchMore: "Add an item",
+    closeSearch: "Close search",
     notFoundShort: "Not here",
     notFoundItem: (name) => `Not found here: ${name}`,
     whichItemMissing: "What's missing from the shelf?",
@@ -578,19 +588,6 @@ export const strings: Record<Language, Strings> = {
     checkout: "Checkout",
     mapLabel: "Store map with your route",
 
-    liveRequesting: "Waiting for permission",
-    liveDenied: "No access to motion sensors",
-    navTitle: "Live in-store navigation",
-    navFacingHint: "Stand at the entrance facing into the store, along the blue arrow, and tap.",
-    navStart: "Start navigation",
-    navNotNow: "Not now",
-    navActive: "Live navigation",
-    navAiming: "Taking your bearings",
-    navEnd: "End",
-    navAddItem: "Add an item",
-    liveNoData: "No motion data received",
-    liveInsecure: "Live location needs HTTPS",
-    liveUnsupported: "Live location isn't supported",
 
     otherLanguageShort: "עב",
     searchMobilePlaceholder: "Find a product",
@@ -739,8 +736,6 @@ export const strings: Record<Language, Strings> = {
     floorUnlinked: (label) =>
       `"${label}" doesn't match a catalog department, so shoppers' lists won't lead there.`,
     floorTileSize: "One tile on the store floor",
-    floorWayIn: "The way in from the entrance",
-    floorWayInHint: "The blue arrow at the entrance is the way in: shoppers face that way to start navigation. If it is wrong, draw the entrance against the outside wall.",
     floorTileSizeHint: (width, height) =>
       `The drawing covers ${formatMetres(width, "en")} × ${formatMetres(height, "en")} metres`,
     floorTileSizeInvalid: (min, max) => `Between ${min} and ${max} metres`,

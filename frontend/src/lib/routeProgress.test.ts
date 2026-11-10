@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import type { Route, RouteLeg, RouteStop } from "../api/types";
 import {
+  advanceTrail,
   applyToggle,
   completesList,
   currentPoint,
   distanceToNextStop,
   isNextStop,
-  lastWalkedLeg,
+  NO_TRAIL,
   pendingStops,
   remainingDistance,
   remainingLegs,
+  trailLegs,
+  walkedLegs,
 } from "./routeProgress";
 import type { FoundSet } from "./routeProgress";
 
@@ -78,22 +81,62 @@ describe("position", () => {
   });
 });
 
-describe("lastWalkedLeg", () => {
-  it("is null until something is found", () => {
-    expect(lastWalkedLeg(route, found())).toBeNull();
+describe("walkedLegs", () => {
+  it("is nothing until a station is reached", () => {
+    expect(walkedLegs(route, found())).toEqual([]);
   });
 
-  it("is the leg into the last found stop", () => {
-    expect(lastWalkedLeg(route, found("a"))?.to_node_id).toBe("n1");
-    expect(lastWalkedLeg(route, found("a", "b"))?.to_node_id).toBe("n2");
+  it("is every leg up to the last station reached", () => {
+    expect(walkedLegs(route, found("a")).map((walked) => walked.to_node_id)).toEqual(["n1"]);
+    expect(walkedLegs(route, found("a", "b")).map((walked) => walked.to_node_id)).toEqual(["n1", "n2"]);
   });
 
-  it("stays put for the second stop on a shared node", () => {
-    expect(lastWalkedLeg(route, found("a", "b", "c"))).toBe(lastWalkedLeg(route, found("a", "b")));
+  it("stays put for the second station on a shared node", () => {
+    expect(walkedLegs(route, found("a", "b", "c"))).toEqual(walkedLegs(route, found("a", "b")));
   });
 
-  it("is the leg into the final stop once the list is done", () => {
-    expect(lastWalkedLeg(route, found("a", "b", "c", "d"))?.to_node_id).toBe("n3");
+  it("leaves the walk to the checkout once the list is done", () => {
+    expect(walkedLegs(route, found("a", "b", "c", "d")).map((walked) => walked.to_node_id)).toEqual(["n1", "n2", "n3"]);
+  });
+});
+
+describe("the trail behind the shopper", () => {
+  // A re-plan after A: from n1, through D, then the checkout.
+  const replanned: Route = {
+    ...route,
+    start_node_id: "n1",
+    stops: [stop(0, "d", "n3", 0)],
+    legs: [leg("n1", "n3", 25), leg("n3", "checkout", 40)],
+  };
+
+  it("is nothing at the start of a trip", () => {
+    expect(trailLegs(advanceTrail(NO_TRAIL, route, found()))).toEqual([]);
+  });
+
+  it("grows with each station reached on one route", () => {
+    let trail = advanceTrail(NO_TRAIL, route, found());
+    trail = advanceTrail(trail, route, found("a"));
+    trail = advanceTrail(trail, route, found("a", "b"));
+    expect(trailLegs(trail).map((walked) => walked.to_node_id)).toEqual(["n1", "n2"]);
+  });
+
+  it("keeps what was walked when a re-plan starts the route where the shopper stands", () => {
+    let trail = advanceTrail(NO_TRAIL, route, found("a"));
+    trail = advanceTrail(trail, replanned, found("a"));
+    expect(trailLegs(trail).map((walked) => walked.to_node_id)).toEqual(["n1"]);
+    // And goes on growing on the new route.
+    trail = advanceTrail(trail, replanned, found("a", "d"));
+    expect(trailLegs(trail).map((walked) => walked.to_node_id)).toEqual(["n1", "n3"]);
+  });
+
+  it("gives the same trail however often it's asked, as React may ask twice", () => {
+    const once = advanceTrail(advanceTrail(NO_TRAIL, route, found("a")), replanned, found("a"));
+    expect(trailLegs(advanceTrail(once, replanned, found("a")))).toEqual(trailLegs(once));
+  });
+
+  it("is cleared by a new trip", () => {
+    const walked = advanceTrail(NO_TRAIL, route, found("a", "b"));
+    expect(trailLegs(advanceTrail(walked, route, found()))).toEqual([]);
   });
 });
 

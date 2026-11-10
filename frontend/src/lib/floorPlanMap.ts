@@ -14,7 +14,7 @@
 import type { GridPoint, GridRoute, Route, SavedFloorPlan } from "../api/types";
 import type { FloorGrid, Tile, TileKind } from "./admin/floorGrid";
 import { fromPayload, readCellSize } from "./admin/floorGrid";
-import type { MapLayout, Point, Rect, ShelfName } from "./mapGeometry";
+import type { MapLayout, Point, ShelfName, ShelfRect } from "./mapGeometry";
 import { fitZoneLabel } from "./mapGeometry";
 
 const CELL_PREFIX = "cell:";
@@ -178,9 +178,9 @@ function columnRuns(grid: FloorGrid): Run[] {
  * drawn as one block: a shelf running down the map is one shelf, not a stack of
  * one-row bricks with seams between them.
  */
-function blocks(runs: readonly Run[], kind: TileKind): Rect[] {
-  const open = new Map<string, Rect>();
-  const done: Rect[] = [];
+function blocks(runs: readonly Run[], kind: TileKind): ShelfRect[] {
+  const open = new Map<string, ShelfRect>();
+  const done: ShelfRect[] = [];
   for (const run of runs) {
     if (run.tile.kind !== kind) {
       continue;
@@ -191,7 +191,11 @@ function blocks(runs: readonly Run[], kind: TileKind): Rect[] {
       above.height += 1;
     } else {
       if (above) done.push(above);
-      open.set(key, { x: run.col, y: run.row, width: run.length, height: 1 });
+      const block: ShelfRect = { x: run.col, y: run.row, width: run.length, height: 1 };
+      if (run.tile.label) {
+        block.label = run.tile.label;
+      }
+      open.set(key, block);
     }
   }
   return [...done, ...open.values()].sort((a, b) => a.y - b.y || a.x - b.x);
