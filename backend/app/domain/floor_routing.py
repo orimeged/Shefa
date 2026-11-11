@@ -60,6 +60,8 @@ class FloorDepartment(Model):
     tiles: int
     # The catalog department it stands for, matched by name; None if nothing matches.
     category_id: str | None
+    # Set when the name is one of that department's subcategories, a shelf finer than it.
+    subcategory: str | None = None
     # False when no open tile beside it can be reached from the entrance.
     reachable: bool
 
@@ -101,6 +103,10 @@ class GridRoute(Model):
     stops: tuple[GridRouteStop, ...]
     legs: tuple[GridRouteLeg, ...]
     unplaced_category_ids: tuple[str, ...] = ()
+
+
+# Joins the places a split department may use into one stop's key; no label holds it.
+_GROUP = "\u241f"
 
 
 @dataclass(frozen=True)
@@ -154,25 +160,44 @@ class GridRouter:
     def routable(self) -> bool:
         return not self.problems
 
-    def placements(self, categories: Mapping[str, Category]) -> dict[str, str]:
-        """The drawn department every category and placed product would be routed to.
+    def placements(
+        self,
+        categories: Mapping[str, Category],
+        subcategories: Mapping[str, Sequence[str]] | None = None,
+    ) -> dict[str, str]:
+        """The drawn place every category and placed product would be routed to.
 
         The same matching a route uses, so the shopper apps can say where something
-        stands without repeating it. Anything not drawn, or walled off, is absent.
+        stands without repeating it. A department drawn only as its subcategories
+        names the first of them; the route itself goes to whichever it passes best.
+        Anything not drawn, or walled off, is absent.
         """
         found: dict[str, str] = {}
         for category in categories.values():
-            department = self._department_for(category, categories)
-            if department is not None and department.stop is not None:
-                found[category.id] = department.label
+            areas = self._areas_for(category, categories, subcategories or {})
+            if areas:
+                found[category.id] = areas[0].label
         return found
 
-    def check(self, categories: Iterable[Category]) -> FloorPlanCheck:
+    def check(
+        self,
+        categories: Iterable[Category],
+        subcategories: Mapping[str, Sequence[str]] | None = None,
+    ) -> FloorPlanCheck:
         """What a manager should know about the plan before shoppers walk it."""
-        linked: dict[str, str] = {}
-        for category in categories:
-            for name in _names(category):
-                linked.setdefault(normalize(name), category.id)
+        # A department's own names first, then its subcategories, and search's
+        # aliases last: produce's alias "פירות" is also its fruit subcategory.
+        targets = list(categories)
+        linked: dict[str, tuple[str, str | None]] = {}
+        for category in targets:
+            for name in _own_names(category):
+                linked.setdefault(normalize(name), (category.id, None))
+        for department_id, names in (subcategories or {}).items():
+            for name in names:
+                linked.setdefault(normalize(name), (department_id, name))
+        for category in targets:
+            for name in category.aliases:
+                linked.setdefault(normalize(name), (category.id, None))
         return FloorPlanCheck(
             routable=self.routable,
             problems=self.problems,
@@ -180,7 +205,8 @@ class GridRouter:
                 FloorDepartment(
                     label=department.label,
                     tiles=len(department.shelf_tiles),
-                    category_id=linked.get(department.key),
+                    category_id=linked.get(department.key, (None, None))[0],
+                    subcategory=linked.get(department.key, (None, None))[1],
                     reachable=department.stop is not None,
                 )
                 for department in self._departments
@@ -193,28 +219,39 @@ class GridRouter:
         category_ids: Sequence[str],
         categories: Mapping[str, Category],
         start: Cell | None = None,
+        subcategories: Mapping[str, Sequence[str]] | None = None,
     ) -> GridRoute:
-        """Route through `category_ids` to the checkout, from `start` or the entrance."""
+        """Route through `category_ids` to the checkout, from `start` or the entrance.
+
+        Each goes to the most specific place drawn for it: a product's own shelf,
+        its subcategory's, then its department's. A department drawn only as its
+        subcategories goes to whichever of them the walk passes best.
+        """
         if not self.routable or self.entrance is None:
             raise FloorPlanNotRoutableError(self.problems)
         origin = start or self.entrance
         if origin not in self._reachable:
             raise InvalidStartError(f"Not an open tile reachable from the entrance: {origin}")
 
+        # One stop per drawn place, or per set of places a split department may use.
         stops_by_label: dict[str, list[Category]] = {}
+        areas_of: dict[str, tuple[_Department, ...]] = {}
         unplaced: list[str] = []
         for category_id in dict.fromkeys(category_ids):
             category = categories.get(category_id)
-            department = self._department_for(category, categories) if category else None
-            if department is None or department.stop is None:
+            areas = self._areas_for(category, categories, subcategories or {}) if category else ()
+            if not areas:
                 unplaced.append(category_id)
                 continue
-            stops_by_label.setdefault(department.label, []).append(category)
+            key = areas[0].label if len(areas) == 1 else _GROUP.join(area.label for area in areas)
+            areas_of[key] = areas
+            stops_by_label.setdefault(key, []).append(category)
 
+        start_flood = self.flood(origin)
         stop_cells = {
-            department.label: department.stop
-            for department in self._departments
-            if department.label in stops_by_label and department.stop is not None
+            # Of several places, the one nearest where the walk starts; sides refine it below.
+            key: min((area.stop for area in areas if area.stop), key=lambda cell: (start_flood[cell], cell))
+            for key, areas in areas_of.items()
         }
         distances = _Distances(self, origin, {
             f"{_STOP_PREFIX}{label}": cell for label, cell in stop_cells.items()
@@ -224,7 +261,19 @@ class GridRouter:
             for stop_id in order_stops(distances, _START, list(distances.cells), _END)
         ]
 
-        self._choose_sides(origin, order, stop_cells)
+        sides = {
+            key: tuple(dict.fromkeys(cell for area in areas for cell in area.sides))
+            for key, areas in areas_of.items()
+        }
+        self._choose_sides(origin, order, stop_cells, sides)
+        # The drawn place each stop ended at, which the apps name and light up.
+        reached = {
+            key: next(
+                (area.label for area in areas if stop_cells[key] in (area.stop, *area.sides)),
+                areas[0].label,
+            )
+            for key, areas in areas_of.items()
+        }
         places = [origin, *(stop_cells[label] for label in order)]
         flood_from_last = self.flood(places[-1])
         end = min(self._checkout_access, key=lambda cell: (flood_from_last[cell], cell))
@@ -238,7 +287,7 @@ class GridRouter:
                 category_id=category.id,
                 category_name=category.name,
                 category_name_en=category.name_en,
-                department=label,
+                department=reached[label],
                 row=stop_cells[label][0],
                 col=stop_cells[label][1],
                 leg_index=leg_index,
@@ -275,15 +324,21 @@ class GridRouter:
                 self._start_floods[cell] = kept
         return kept
 
-    def _choose_sides(self, origin: Cell, order: list[str], stop_cells: dict[str, Cell]) -> None:
+    def _choose_sides(
+        self,
+        origin: Cell,
+        order: list[str],
+        stop_cells: dict[str, Cell],
+        sides: Mapping[str, Sequence[Cell]],
+    ) -> None:
         """Moves each stop to the side of its shelf the walk passes, in place.
 
         The order is found with each department's middle tile; a shelf can also
         be reached from its other side, and walking round it to the far one is
-        what a shopper would notice. Each pass keeps a change only if it shortens
-        the way in from the stop before plus the way on to the next.
+        what a shopper would notice. A split department's stop may move to any side
+        of any of its places. Each pass keeps a change only if it shortens the way
+        in from the stop before plus the way on to the next.
         """
-        sides = {department.label: department.sides for department in self._departments}
         for _ in range(3):
             changed = False
             for index, label in enumerate(order):
@@ -316,19 +371,41 @@ class GridRouter:
             cells=tuple(GridPoint(row=row, col=col) for row, col in path),
         )
 
-    def _department_for(
-        self, category: Category, categories: Mapping[str, Category]
-    ) -> _Department | None:
-        """By name: a placed product goes where its department is drawn."""
-        owner = categories.get(category.department_id) if category.department_id else None
-        for candidate in (category, owner):
-            if candidate is None:
-                continue
-            for name in _names(candidate):
-                department = self._by_key.get(normalize(name))
-                if department is not None:
-                    return department
-        return None
+    def _areas_for(
+        self,
+        category: Category,
+        categories: Mapping[str, Category],
+        subcategories: Mapping[str, Sequence[str]],
+    ) -> tuple[_Department, ...]:
+        """Where a shopper is sent for `category`, by name, the most specific place first.
+
+        A placed product's own name, then its subcategory, then its department. A
+        department not drawn under its own name but drawn as its subcategories has
+        all of those, for the route to choose between; search's aliases come last,
+        since produce's alias "פירות" is also the name of just its fruit. Walled-off
+        places don't count, so a finer one that can't be reached falls back.
+        """
+
+        def drawn(names: Iterable[str]) -> tuple[_Department, ...]:
+            found = (self._by_key.get(normalize(name)) for name in names)
+            return tuple(dict.fromkeys(area for area in found if area is not None and area.stop is not None))
+
+        if category.department_id is not None:
+            owner = categories.get(category.department_id)
+            levels: list[Iterable[str]] = [_names(category)]
+            if category.subcategory:
+                levels.append((category.subcategory,))
+            if owner is not None:
+                levels += [_own_names(owner), owner.aliases]
+            for names in levels:
+                if areas := drawn(names):
+                    return areas[:1]
+            return ()
+        if areas := drawn(_own_names(category)):
+            return areas[:1]
+        if areas := drawn(subcategories.get(category.id, ())):
+            return areas
+        return drawn(category.aliases)[:1]
 
     def _find_departments(self) -> tuple[_Department, ...]:
         """One per name as search reads it, so "Dairy" and "dairy" are one department."""
@@ -432,3 +509,8 @@ def grid_route_edges(route: GridRoute) -> tuple[tuple[str, str], ...]:
 
 def _names(category: Category) -> tuple[str, ...]:
     return (category.name, category.name_en, *category.aliases)
+
+
+def _own_names(category: Category) -> tuple[str, ...]:
+    """Its names without search's aliases, which may be narrower than it."""
+    return (category.name, category.name_en)

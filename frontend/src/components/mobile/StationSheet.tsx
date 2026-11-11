@@ -96,11 +96,12 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold tracking-wide text-muted">{t.stationOf(number, total)}</p>
-              <h2 className="truncate text-2xl leading-tight font-bold tracking-tight">
+              <h2 className="line-clamp-2 text-2xl leading-tight font-bold tracking-tight">
                 {pick(stop.category_name, stop.category_name_en)}
               </h2>
               <p className="truncate text-sm font-medium text-muted">
-                <span>{where(stop.category_id, stop.aisle_no, stop.side)}</span>
+                {/* On a drawn plan, the exact place the route goes: a subcategory's shelf, say. */}
+                <span>{stop.department ? t.onShelf(stop.department) : where(stop.category_id, stop.aisle_no, stop.side)}</span>
                 {distance && (
                   <>
                     <span aria-hidden className="mx-1.5 text-line">●</span>

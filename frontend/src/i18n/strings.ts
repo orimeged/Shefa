@@ -51,6 +51,8 @@ export interface Strings {
   hideStations: string;
   wholeStore: string;
   backToRoute: string;
+  /** Back to the frame after the map was moved by hand, in the whole-store view. */
+  recenter: string;
   searchMore: string;
   closeSearch: string;
   notFoundShort: string;
@@ -206,6 +208,8 @@ export interface Strings {
   floorReady: string;
   floorProblems: { no_entrance: string; no_checkout: string; checkout_unreachable: string };
   floorUnreachable: (label: string) => string;
+  /** A subcategory among the names to paint with: whose it is. */
+  floorWithin: (department: string) => string;
   floorUnlinked: (label: string) => string;
   floorTileSize: string;
   floorTileSizeHint: (width: number, height: number) => string;
@@ -304,6 +308,7 @@ export const strings: Record<Language, Strings> = {
     hideStations: "הסתרת התחנות",
     wholeStore: "כל החנות",
     backToRoute: "חזרה למסלול",
+    recenter: "מרכוז המפה",
     searchMore: "הוספת מוצר",
     closeSearch: "סגירת החיפוש",
     notFoundShort: "לא כאן",
@@ -472,6 +477,7 @@ export const strings: Record<Language, Strings> = {
       checkout_unreachable: "אין דרך מהכניסה אל הקופות.",
     },
     floorUnreachable: (label) => `אין גישה מהכניסה אל "${label}".`,
+    floorWithin: (department) => `תת־קטגוריה של ${department}`,
     floorUnlinked: (label) =>
       `"${label}" לא תואם לאף מחלקה בקטלוג, ולכן רשימות של לקוחות לא יובילו אליו.`,
     floorTileSize: "גודל משבצת אחת בסניף",
@@ -569,6 +575,7 @@ export const strings: Record<Language, Strings> = {
     hideStations: "Hide the stations",
     wholeStore: "Whole store",
     backToRoute: "Back to the route",
+    recenter: "Recenter",
     searchMore: "Add an item",
     closeSearch: "Close search",
     notFoundShort: "Not here",
@@ -733,6 +740,7 @@ export const strings: Record<Language, Strings> = {
       checkout_unreachable: "There's no way from the entrance to the checkouts.",
     },
     floorUnreachable: (label) => `"${label}" can't be reached from the entrance.`,
+    floorWithin: (department) => `Within ${department}`,
     floorUnlinked: (label) =>
       `"${label}" doesn't match a catalog department, so shoppers' lists won't lead there.`,
     floorTileSize: "One tile on the store floor",

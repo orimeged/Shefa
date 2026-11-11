@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import type { RouteStop, SearchHit } from "../api/types";
+import { ProductDepartmentsProvider } from "../components/CategoryIcon";
 import { AddedToast } from "../components/mobile/AddedToast";
 import { DictationOverlay } from "../components/mobile/DictationOverlay";
 import { FoundBurst } from "../components/mobile/FoundBurst";
@@ -89,6 +90,21 @@ export default function MobileView() {
       markUnplaced(route.unplaced_category_ids);
     }
   }, [route, markUnplaced]);
+
+  // On the trip a pinch zooms the map, never the page: Safari pinches the page
+  // with gestures of its own, which the stage's touch-action doesn't reach.
+  useEffect(() => {
+    if (!isShopping) {
+      return;
+    }
+    const keep = (event: Event) => event.preventDefault();
+    document.addEventListener("gesturestart", keep, { passive: false });
+    document.addEventListener("gesturechange", keep, { passive: false });
+    return () => {
+      document.removeEventListener("gesturestart", keep);
+      document.removeEventListener("gesturechange", keep);
+    };
+  }, [isShopping]);
 
   // A new trip starts on its route, with the search and the list put away.
   useEffect(() => {
@@ -295,7 +311,9 @@ export default function MobileView() {
   if (isShopping) {
     return (
       <PlacementsProvider placements={floor?.placements ?? null}>
-        <div className="fixed inset-0 overflow-hidden bg-paper">
+      <ProductDepartmentsProvider productStops={map?.product_stops}>
+        {/* Scrolling inside the sheet still works; pinching the page doesn't. */}
+        <div className="trip-stage fixed inset-0 overflow-hidden bg-paper">
           <h1 className="sr-only">{t.routeTitle}</h1>
 
           {layout && hasRoute ? (
@@ -400,12 +418,14 @@ export default function MobileView() {
 
           {overlays}
         </div>
+      </ProductDepartmentsProvider>
       </PlacementsProvider>
     );
   }
 
   return (
     <PlacementsProvider placements={floor?.placements ?? null}>
+      <ProductDepartmentsProvider productStops={map?.product_stops}>
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
         <div ref={stickyTop} className="sticky top-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
           {searchBar}
@@ -464,6 +484,7 @@ export default function MobileView() {
 
         {overlays}
       </div>
-    </PlacementsProvider>
+    </ProductDepartmentsProvider>
+      </PlacementsProvider>
   );
 }

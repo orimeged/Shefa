@@ -63,12 +63,16 @@ class Category(Model):
     other_section_ids: tuple[str, ...] = ()
     aliases: tuple[str, ...] = ()
     department_id: str | None = None
+    # A placed product's subcategory, such as "פירות" in produce: a drawn plan may
+    # have a shelf for it, finer than the department's.
+    subcategory: str | None = None
 
 
 class Product(Model):
     barcode: str
     name: str
     category_id: str
+    subcategory: str | None = None
 
 
 class StoreMap(Model):

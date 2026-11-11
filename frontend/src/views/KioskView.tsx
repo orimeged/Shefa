@@ -6,6 +6,7 @@ import { QuickSearchPanel } from "../components/kiosk/QuickSearchPanel";
 import type { CartItem } from "../components/kiosk/types";
 import { Notice } from "../components/Notice";
 import { useIdleReset } from "../hooks/useIdleReset";
+import { ProductDepartmentsProvider } from "../components/CategoryIcon";
 import { PlacementsProvider } from "../hooks/usePlace";
 import type { PlanRoute } from "../hooks/useShopperStore";
 import { useShopperStore } from "../hooks/useShopperStore";
@@ -42,6 +43,7 @@ export default function KioskView() {
     <div className="flex h-dvh flex-col select-none">
       {failed && !map && <Notice message={t.searchFailed} onRetry={retry} className="m-3" />}
       <PlacementsProvider placements={floor?.placements ?? null}>
+      <ProductDepartmentsProvider productStops={map?.product_stops}>
         <KioskVisit
           key={visit}
           map={map}
@@ -50,6 +52,7 @@ export default function KioskView() {
           planRoute={planRoute}
           screenCanStayOn={screenCanStayOn}
         />
+      </ProductDepartmentsProvider>
       </PlacementsProvider>
     </div>
   );

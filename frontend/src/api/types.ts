@@ -29,6 +29,10 @@ export interface Category {
   name_en: string;
   section_id: string;
   aliases: string[];
+  /** A placed product: the department it belongs to, whose icon it shows. */
+  department_id?: string | null;
+  /** A placed product's subcategory, which a drawn plan may give a shelf of its own. */
+  subcategory?: string | null;
 }
 
 export interface StoreMap {
@@ -143,6 +147,8 @@ export interface CatalogCategory {
   slug: string;
   name: string;
   name_en: string;
+  /** Its products' subcategories, which a drawn plan can give shelves of their own. */
+  subcategories?: string[];
 }
 
 export interface ZoneItem {

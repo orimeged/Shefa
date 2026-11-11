@@ -59,6 +59,18 @@ class NavigationService:
     def store_map(self) -> StoreMap:
         return self._map
 
+    @property
+    def subcategories(self) -> dict[str, tuple[str, ...]]:
+        """Each department's subcategories, from every product, placed or shelved."""
+        found: dict[str, dict[str, None]] = {}
+        for product in self._store.product_stops:
+            if product.department_id and product.subcategory:
+                found.setdefault(product.department_id, {})[product.subcategory] = None
+        for product in self._store.products:
+            if product.subcategory:
+                found.setdefault(product.category_id, {})[product.subcategory] = None
+        return {department: tuple(names) for department, names in found.items()}
+
     def is_on_map(self, x: float, y: float) -> bool:
         return 0 <= x <= self._map.width_m and 0 <= y <= self._map.height_m
 

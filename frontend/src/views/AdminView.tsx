@@ -295,10 +295,18 @@ function FloorEditorPanel({
   onSaved: (saved: SavedFloorPlan) => void;
 }) {
   const { t, pick } = useLanguage();
-  const suggestions = useMemo(
-    () => [...new Set(categories.map((category) => pick(category.name, category.name_en)))],
-    [categories, pick],
-  );
+  // Departments, each followed by its subcategories: a shelf can be as fine as "פירות".
+  const suggestions = useMemo(() => {
+    const seen = new Map<string, string | undefined>();
+    for (const category of categories) {
+      const department = pick(category.name, category.name_en);
+      seen.set(department, seen.get(department));
+      for (const sub of category.subcategories ?? []) {
+        if (!seen.has(sub)) seen.set(sub, department);
+      }
+    }
+    return [...seen].map(([value, within]) => ({ value, within }));
+  }, [categories, pick]);
   // Only read when the editor first appears; it keeps its own state after that.
   const start = useMemo(() => {
     const grid = saved ? fromPayload(saved.floor_plan) : null;

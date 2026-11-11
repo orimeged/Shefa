@@ -60,6 +60,8 @@ class CatalogCategory(Model):
     slug: str
     name: str
     name_en: str
+    # Its products' subcategories, which a drawn plan can give shelves of their own.
+    subcategories: tuple[str, ...] = ()
 
 
 class ZoneItem(Model):

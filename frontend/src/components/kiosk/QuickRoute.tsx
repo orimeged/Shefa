@@ -119,6 +119,7 @@ export function QuickRoute({
             focus="overview"
             emphasis="all"
             markerScale={1.25}
+            interactive={false}
             className="block h-full w-full"
           />
         ) : (

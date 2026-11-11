@@ -100,7 +100,9 @@ def plan_floor_route(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No floor plan saved for this store yet")
     start = (body.start.row, body.start.col) if body.start else None
     try:
-        route = loaded.router.plan_route(store_id, body.category_ids, _targets(navigation), start)
+        route = loaded.router.plan_route(
+            store_id, body.category_ids, _targets(navigation), start, navigation.subcategories
+        )
     except FloorPlanNotRoutableError as error:
         raise HTTPException(
             status.HTTP_409_CONFLICT, {"problems": [problem.value for problem in error.problems]}
@@ -125,8 +127,9 @@ def _saved(store_id: str, loaded: LoadedFloorPlan, navigation: NavigationService
         store_id=store_id,
         floor_plan=loaded.plan,
         updated_at=loaded.saved_at,
-        check=loaded.router.check(navigation.store_map.categories),
-        placements=loaded.router.placements(_targets(navigation)),
+        # Products drawn by name count as linked, after the departments.
+        check=loaded.router.check(_targets(navigation).values(), navigation.subcategories),
+        placements=loaded.router.placements(_targets(navigation), navigation.subcategories),
     )
 
 

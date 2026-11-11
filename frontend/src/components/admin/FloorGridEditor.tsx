@@ -74,7 +74,8 @@ interface FloorGridEditorProps {
   /** Metres one tile stands for on the real floor, as last saved. */
   initialCellSize: number;
   /** Department names to offer for shelves. */
-  suggestions: readonly string[];
+  /** Names to paint with: departments, and subcategories, each with the department it's within. */
+  suggestions: readonly { value: string; within?: string }[];
   /** Sends the payload to the server: its check of the plan, or null if saving failed. */
   onSave: (payload: FloorGridPayload, json: string) => Promise<FloorPlanCheck | null>;
 }
@@ -447,8 +448,10 @@ export function FloorGridEditor({
                 className="h-11 rounded-xl bg-white px-3 font-normal text-slate-900 ring-1 ring-slate-300 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:bg-slate-50"
               />
               <datalist id={labelList}>
-                {suggestions.map((name) => (
-                  <option key={name} value={name} />
+                {suggestions.map(({ value, within }) => (
+                  <option key={value} value={value}>
+                    {within ? t.floorWithin(within) : undefined}
+                  </option>
                 ))}
               </datalist>
             </label>

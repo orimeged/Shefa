@@ -1,4 +1,4 @@
-import { DoorOpen, ShoppingCart } from "lucide-react";
+import { DoorOpen, LocateFixed, ShoppingCart } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useMemo, useRef } from "react";
 
@@ -15,7 +15,7 @@ import type { ScreenBox } from "../../lib/mapLabels";
 import { BADGE_HEIGHT_PX, badgeWidth, COMPACT_BADGE_PX, placeBadges } from "../../lib/mapLabels";
 import type { FoundSet, Trail } from "../../lib/routeProgress";
 import { advanceTrail, currentPoint, NO_TRAIL, pendingStops, remainingLegs, trailLegs } from "../../lib/routeProgress";
-import { hasCategoryIcon } from "../CategoryIcon";
+import { hasCategoryIcon, useIconId } from "../CategoryIcon";
 import { BLOCK_LIFT, MapFloor } from "../MapFloor";
 import {
   CheckoutPin,
@@ -70,6 +70,8 @@ interface StoreMapViewProps {
   zoneBadges?: ReadonlyMap<string, { code: string; tone: number }>;
   /** Markers and badges larger than on a phone, for a big screen. */
   markerScale?: number;
+  /** A finger drags it, two pinch it, a wheel or a double tap zooms it. */
+  interactive?: boolean;
   className?: string;
 }
 
@@ -90,6 +92,7 @@ export function StoreMapView({
   firstNumber = 1,
   zoneBadges,
   markerScale = 1,
+  interactive = true,
   className = "block h-full w-full",
 }: StoreMapViewProps) {
   const { t } = useLanguage();
@@ -126,19 +129,29 @@ export function StoreMapView({
     return boundsOf(points, FRAME_MARGIN);
   }, [isFraming, current, next, layout, overview]);
   const cameraInsets = isFraming ? { ...insets, top: insets.top + PIN_HEADROOM_PX } : insets;
-  const { screen, resting } = useMapCamera(svg, target, {
+  const { screen, resting, isFree, recenter } = useMapCamera(svg, target, {
     insets: cameraInsets,
     minSpan: isFraming ? ROUTE_MIN_SPAN : 0.01,
+    bounds: overview,
+    interactive,
   });
 
+  // A placed product shows its department's icon, so a shelf of products still wears one.
+  const iconId = useIconId();
   const departmentOf = useMemo(
-    () => (placements ? departmentCategories(placements, hasCategoryIcon) : new Map<string, string>()),
-    [placements],
+    () =>
+      placements
+        ? departmentCategories(placements, (id) => hasCategoryIcon(iconId(id)))
+        : new Map<string, string>(),
+    [placements, iconId],
   );
   const colours = useMemo(() => departmentColours(layout.shelfNames?.map((name) => name.key) ?? []), [layout]);
-  const nextDepartment = next && placements ? (placements[next.category_id] ?? null) : null;
+  // The drawn place the route goes to: as fine as a subcategory's shelf, and for a
+  // department drawn as several, the one the route chose.
+  const placeOf = (stop: RouteStop) => stop.department ?? placements?.[stop.category_id] ?? null;
+  const nextDepartment = next ? placeOf(next) : null;
   const comingDepartments = useMemo(
-    () => new Set(pending.slice(1).flatMap((stop) => placements?.[stop.category_id] ?? [])),
+    () => new Set(pending.slice(1).flatMap((stop) => stop.department ?? placements?.[stop.category_id] ?? [])),
     [pending, placements],
   );
 
@@ -275,6 +288,7 @@ export function StoreMapView({
   const laterPoints = polylinePoints(later, layout);
 
   return (
+    <div className={`relative ${className}`}>
     <svg
       ref={svg}
       viewBox={layout.viewBox}
@@ -282,7 +296,8 @@ export function StoreMapView({
       aria-label={t.mapLabel}
       data-map={layout.kind ?? "graph"}
       data-focus={isFraming ? "route" : "overview"}
-      className={className}
+      data-free={isFree || undefined}
+      className={`absolute inset-0 block h-full w-full ${interactive ? "map-surface" : ""}`}
       style={{ "--marker-scale": markerScale } as CSSProperties}
     >
       <MapFloor layout={layout} highlight={nextDepartment} showShelfNames={false} />
@@ -360,6 +375,18 @@ export function StoreMapView({
         <CheckoutPin at={layout.toSvg(current[0].points.at(-1)!)} icon={ShoppingCart} />
       )}
     </svg>
+    {interactive && isFree && (
+      <button
+        type="button"
+        onClick={recenter}
+        className="recenter absolute end-3 z-10 flex h-11 items-center gap-2 rounded-full bg-surface/95 px-4 text-sm font-semibold text-ink shadow-lg ring-1 ring-black/5 backdrop-blur-md transition active:scale-95"
+        style={{ bottom: insets.bottom + 12 }}
+      >
+        <LocateFixed aria-hidden className="size-4.5 text-brand" />
+        {isFraming ? t.backToRoute : t.recenter}
+      </button>
+    )}
+    </div>
   );
 }
 

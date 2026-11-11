@@ -218,6 +218,7 @@ class SqlInventoryRepository:
                         section_id=sections[0],
                         other_section_ids=tuple(sections[1:]),
                         department_id=department,
+                        subcategory=product.subcategory or None,
                     )
                 )
             elif department in located:
@@ -226,6 +227,7 @@ class SqlInventoryRepository:
                         barcode=product.barcode or product_stop_id(product.id),
                         name=product.name,
                         category_id=department,
+                        subcategory=product.subcategory or None,
                     )
                 )
 
@@ -289,8 +291,24 @@ class SqlInventoryRepository:
             rows = session.scalars(
                 select(Category).where(Category.store_id == store_id).order_by(Category.name)
             ).all()
+            pairs = session.execute(
+                select(Product.category_id, Product.subcategory)
+                .where(Product.store_id == store_id, Product.subcategory.is_not(None))
+                .distinct()
+                .order_by(Product.subcategory)
+            ).all()
+        subcategories: dict[int, list[str]] = defaultdict(list)
+        for category_id, name in pairs:
+            if name:
+                subcategories[category_id].append(name)
         return [
-            CatalogCategory(id=row.id, slug=row.slug, name=row.name, name_en=row.name_en)
+            CatalogCategory(
+                id=row.id,
+                slug=row.slug,
+                name=row.name,
+                name_en=row.name_en,
+                subcategories=tuple(subcategories[row.id]),
+            )
             for row in rows
         ]
 

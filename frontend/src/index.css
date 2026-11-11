@@ -108,6 +108,30 @@ label {
   animation: ground-pulse 1.8s ease-out infinite;
 }
 
+/* The map a finger moves: no text picked up, no callout, no page scroll or zoom of its own. */
+.map-surface {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: grab;
+}
+
+.map-surface:active {
+  cursor: grabbing;
+}
+
+/* The trip's stage: lists inside it scroll, but a pinch never zooms the page. */
+.trip-stage {
+  touch-action: pan-x pan-y;
+  overscroll-behavior: none;
+}
+
+.recenter {
+  animation: search-drop 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Department badges come and go as the camera makes room for them. */
 .map-badge {
   transition: opacity 0.35s ease;
@@ -316,6 +340,7 @@ label {
 @media (prefers-reduced-motion: reduce) {
   .station-sheet,
   .station-in,
+  .recenter,
   .trip-search,
   .pin-drop,
   .ground-pulse,
