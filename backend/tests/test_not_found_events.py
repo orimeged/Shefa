@@ -359,3 +359,20 @@ def test_a_resolved_report_is_kept_for_the_record(tmp_path: Path) -> None:
     row = only_row(path)
     assert row["item_query"] == "קטשופ"
     assert row["resolved_at"] == "2026-11-01T12:00:00.000000Z"
+
+
+def test_on_a_drawn_plan_larger_than_the_graph_a_report_from_its_far_side_is_kept(client: TestClient) -> None:
+    from tests.conftest import ADMIN_TOKEN
+    from tests.floor_plans import plan_payload
+
+    # 60 tiles of a metre across, far wider than the graph's 33 m store.
+    rows = ["#" * 60, *("#" + "." * 58 + "#" for _ in range(6)), "E" + "." * 56 + "CC" + "#", "#" * 60]
+    saved = client.put(
+        "/api/v1/stores/demo/floor-plan",
+        json=plan_payload(rows),
+        headers={"Authorization": f"Bearer {ADMIN_TOKEN}"},
+    )
+    assert saved.status_code == 200 and saved.json()["check"]["routable"]
+    assert client.post(URL, json=report(x_coord=55.0, y_coord=3.0)).status_code == 201
+    # Off the plan is still off the store.
+    assert client.post(URL, json=report(x_coord=61.0, y_coord=3.0)).status_code == 422

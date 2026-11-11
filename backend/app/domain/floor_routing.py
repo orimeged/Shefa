@@ -308,6 +308,11 @@ class GridRouter:
             unplaced_category_ids=tuple(unplaced),
         )
 
+    def stop_for(self, label: str) -> Cell | None:
+        """Where a shopper stands for the shelf drawn as `label`, or None: not drawn, or walled off."""
+        area = self._by_key.get(normalize(label))
+        return area.stop if area is not None else None
+
     def distance_to_checkout(self, cell: Cell) -> float:
         return self._to_checkout[cell]
 
