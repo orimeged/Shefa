@@ -5,6 +5,9 @@ import { ApiError, STORE_ID } from "./client";
 import type {
   CatalogCategory,
   CatalogEntry,
+  CatalogProduct,
+  ProductChanges,
+  ProductDraft,
   DashboardCounts,
   EntityType,
   HeatmapReport,
@@ -93,6 +96,23 @@ export function createAdminApi(token: string, onUnauthorized: () => void) {
 
     remove: async (nodeId: number, entityType: EntityType, entityId: number) => {
       await send(`${assignments(nodeId)}/${entityType}/${entityId}`, { method: "DELETE" });
+    },
+
+    /** Every product in the store, with the drawn shelf each reaches. */
+    products: (signal?: AbortSignal) => json<CatalogProduct[]>(`${STORE}/products`, { signal }),
+
+    createProduct: (draft: ProductDraft) =>
+      json<CatalogProduct>(`${STORE}/products`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(draft) }),
+
+    updateProduct: (productId: number, changes: ProductChanges) =>
+      json<CatalogProduct>(`${STORE}/products/${productId}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(changes),
+      }),
+
+    deleteProduct: async (productId: number) => {
+      await send(`${STORE}/products/${productId}`, { method: "DELETE" });
     },
 
     notFoundReport: (signal?: AbortSignal) =>

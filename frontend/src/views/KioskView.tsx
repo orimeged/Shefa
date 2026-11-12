@@ -43,7 +43,7 @@ export default function KioskView() {
     <div className="flex h-dvh flex-col select-none">
       {failed && !map && <Notice message={t.searchFailed} onRetry={retry} className="m-3" />}
       <PlacementsProvider placements={floor?.placements ?? null}>
-      <ProductDepartmentsProvider productStops={map?.product_stops}>
+      <ProductDepartmentsProvider productStops={map?.product_stops} departments={map?.categories}>
         <KioskVisit
           key={visit}
           map={map}

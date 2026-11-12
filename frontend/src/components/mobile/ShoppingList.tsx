@@ -48,6 +48,7 @@ export function ShoppingList({
                   <ListRow
                     key={stop.category_id}
                     group={group}
+                    place={stop.department}
                     order={index + 1}
                     checked={false}
                     onToggle={onToggle}
@@ -112,6 +113,8 @@ export function ShoppingList({
 
 interface ListRowProps {
   group: ListGroup;
+  /** On a drawn plan, the shelf the route chose for it: a department may have several. */
+  place?: string;
   order?: number;
   checked: boolean;
   onToggle: (categoryId: string) => void;
@@ -119,7 +122,7 @@ interface ListRowProps {
   onNotFound?: () => void;
 }
 
-function ListRow({ group, order, checked, onToggle, onRemove, onNotFound }: ListRowProps) {
+function ListRow({ group, place, order, checked, onToggle, onRemove, onNotFound }: ListRowProps) {
   const { t, pick } = useLanguage();
   const where = usePlace();
   const name = pick(group.name, group.nameEn);
@@ -152,7 +155,7 @@ function ListRow({ group, order, checked, onToggle, onRemove, onNotFound }: List
             {name}
           </span>
           <span className="block truncate text-sm text-muted">
-            {where(group.categoryId, group.aisleNo, group.side)}
+            {place ? t.onShelf(place) : where(group.categoryId, group.aisleNo, group.side)}
           </span>
           {group.itemTexts.length > 0 && (
             <span className="block truncate text-sm font-medium text-brand-strong">

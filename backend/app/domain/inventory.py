@@ -18,6 +18,10 @@ class InventoryError(Exception):
     """A request named something this store doesn't have."""
 
 
+class DuplicateItemError(InventoryError):
+    """Another product in the store already has this name or barcode."""
+
+
 class InvalidItemError(InventoryError):
     """An item can't be saved as it was written."""
 
@@ -100,3 +104,49 @@ class DictatedItem(Model):
     normalized_name: str = Field(min_length=1, max_length=MAX_ITEM_NAME)
     # A category slug, or "none" when no category fits.
     inferred_category: str
+
+
+class CatalogProduct(Model):
+    """A product as the catalog screen lists it."""
+
+    id: int
+    name: str
+    barcode: str | None
+    brand: str | None
+    size: str | None
+    # The department's slug, which routes and reports know it by.
+    department: str
+    subcategory: str | None
+    # "pos" for a row a catalog import brought, which the next import may change.
+    source: str | None
+    # How many of the graph's shelf zones it stands in.
+    zones: int
+    # The drawn plan's shelf a shopper is sent to for it; None with no plan, or none for it.
+    shelf: str | None = None
+
+
+class ProductDraft(Model):
+    """A new product, as a manager types it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=MAX_ITEM_NAME)
+    barcode: str | None = Field(default=None, max_length=14)
+    brand: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+    size: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+    department: str = Field(min_length=1, max_length=64)
+    # The shelf it stands on, finer than its department: one of the plan's, as the screen offers them.
+    subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+
+
+class ProductChanges(Model):
+    """What a manager changed about a product; a field left out stays as it was, a null clears it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=MAX_ITEM_NAME)
+    barcode: str | None = Field(default=None, max_length=14)
+    brand: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+    size: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+    department: str | None = Field(default=None, min_length=1, max_length=64)
+    subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)

@@ -176,6 +176,48 @@ export interface Strings {
   mapPanelTitle: string;
   adminTabAlerts: string;
   adminTabFloorEditor: string;
+  adminTabCatalog: string;
+  catalogSummary: (count: number, offMap: number) => string;
+  catalogSearch: string;
+  catalogAllDepartments: string;
+  catalogOffMapOnly: string;
+  catalogAdd: string;
+  catalogEmpty: string;
+  catalogColumns: { name: string; barcode: string; department: string; shelf: string; actions: string };
+  catalogNotOnMap: string;
+  catalogNoPlan: string;
+  catalogEdit: (name: string) => string;
+  catalogDelete: (name: string) => string;
+  catalogDeleteConfirm: (name: string) => string;
+  catalogImported: string;
+  productNew: string;
+  productEdit: string;
+  productFields: { name: string; barcode: string; brand: string; size: string; department: string; shelf: string; subcategory: string };
+  productShelfHint: string;
+  productWholeDepartment: string;
+  productShelfNotDrawn: (name: string) => string;
+  productBarcodeInvalid: string;
+  productDuplicate: string;
+  productInvalid: string;
+  productSave: string;
+  productCancel: string;
+  productSaved: (name: string) => string;
+  productDeleted: (name: string) => string;
+  shelvesHint: string;
+  shelfProducts: (count: number) => string;
+  shelfEmpty: string;
+  shelfAddHere: string;
+  shelfOf: (department: string) => string;
+  shelfOpen: (shelf: string, count: number) => string;
+  shelfPlaceHere: (item: string) => string;
+  shelfMoveHere: string;
+  shelfMove: (name: string) => string;
+  shelfAddAsNew: (item: string) => string;
+  shelfMatches: string;
+  shelfNoMatches: string;
+  shelfNone: string;
+  shelvesListTitle: string;
+  shelfCurrently: (shelf: string) => string;
   floorEditorTitle: string;
   floorEditorHint: string;
   floorTools: string;
@@ -440,6 +482,48 @@ export const strings: Record<Language, Strings> = {
     mapPanelTitle: "מפת הסניף",
     adminTabAlerts: "התראות מלאי על המדף",
     adminTabFloorEditor: "עורך מפה",
+    adminTabCatalog: "קטלוג מוצרים",
+    catalogSummary: (count, offMap) => `${count} מוצרים${offMap > 0 ? ` · ${offMap} לא על המפה` : ""}`,
+    catalogSearch: "חיפוש לפי שם או ברקוד",
+    catalogAllDepartments: "כל המחלקות",
+    catalogOffMapOnly: "רק מה שלא על המפה",
+    catalogAdd: "הוספת מוצר",
+    catalogEmpty: "אין מוצרים שמתאימים לחיפוש.",
+    catalogColumns: { name: "מוצר", barcode: "ברקוד", department: "מחלקה", shelf: "מדף במפה", actions: "פעולות" },
+    catalogNotOnMap: "לא על המפה",
+    catalogNoPlan: "אין עדיין מפה מצוירת: מוצרים ינותבו לפי אזורי המדף הישנים.",
+    catalogEdit: (name) => `עריכת ${name}`,
+    catalogDelete: (name) => `מחיקת ${name}`,
+    catalogDeleteConfirm: (name) => `למחוק את "${name}" מהקטלוג? קונים לא ימצאו אותו יותר.`,
+    catalogImported: "מיובא",
+    productNew: "מוצר חדש",
+    productEdit: "עריכת מוצר",
+    productFields: { name: "שם המוצר", barcode: "ברקוד", brand: "מותג", size: "גודל", department: "מחלקה", shelf: "מדף במפה", subcategory: "תת־קטגוריה" },
+    productShelfHint: "המדף שאליו הקונים יגיעו. אלה המדפים שצוירו במפה למחלקה הזאת.",
+    productWholeDepartment: "מדף המחלקה, בלי מדף מדויק",
+    productShelfNotDrawn: (name) => `${name} (לא מצויר במפה)`,
+    productBarcodeInvalid: "ברקוד לא תקין: 8 עד 14 ספרות, וספרת ביקורת נכונה בברקוד של 13 ספרות.",
+    productDuplicate: "כבר יש בקטלוג מוצר בשם הזה או עם הברקוד הזה.",
+    productInvalid: "חלק מהפרטים לא תקינים. בדקו ונסו שוב.",
+    productSave: "שמירה",
+    productCancel: "ביטול",
+    productSaved: (name) => `נשמר: ${name}`,
+    productDeleted: (name) => `נמחק: ${name}`,
+    shelvesHint: "לחצו על מדף כדי לראות את המוצרים שבו, להוסיף מוצר או להעביר מוצר למדף אחר.",
+    shelfProducts: (count) => (count === 1 ? "מוצר אחד במדף" : `${count} מוצרים במדף`),
+    shelfEmpty: "אין עדיין מוצרים במדף הזה.",
+    shelfAddHere: "הוספת מוצר למדף הזה",
+    shelfOf: (department) => `מחלקת ${department}`,
+    shelfOpen: (shelf, count) => `${shelf}, ${count} מוצרים`,
+    shelfPlaceHere: (item) => `שמים את "${item}" במדף הזה`,
+    shelfMoveHere: "העברה לכאן",
+    shelfMove: (name) => `העברת ${name} למדף הזה`,
+    shelfAddAsNew: (item) => `הוספת "${item}" כמוצר חדש`,
+    shelfMatches: "מוצרים דומים בקטלוג",
+    shelfNoMatches: "אין בקטלוג מוצר בשם הזה.",
+    shelfNone: "אף מדף במפה לא נקרא בשם של מחלקה או תת־קטגוריה. בעורך המפה נותנים למדפים את השמות האלה.",
+    shelvesListTitle: "המדפים במפה",
+    shelfCurrently: (shelf) => `כרגע ב${shelf}`,
     floorEditorTitle: "עורך מפת הסניף",
     floorEditorHint: "בוחרים כלי וצובעים משבצות. גרירה צובעת ברצף, ולחיצה ימנית מוחקת.",
     floorTools: "כלים",
@@ -488,7 +572,7 @@ export const strings: Record<Language, Strings> = {
     floorViewLabel: "איזו מפה להציג",
     floorViewDrawn: "המפה המצוירת",
     floorViewZones: "אזורי מדף",
-    floorMapHint: "תנועה ודיווחי \"לא מצאתי\" על המפה שציירתם. הצבת מוצרים נעשית באזורי המדף.",
+    floorMapHint: "תנועה ודיווחי \"לא מצאתי\" על המפה שציירתם. את המוצרים מציבים על המדפים בלשונית \"אזורי מדף\" או בקטלוג.",
     alertsHint: "מה לקוחות לא מצאו על המדף ב-7 הימים האחרונים.",
     alertsSummary: (count) =>
       count === 1 ? "פריט אחד דווח 3 פעמים או יותר." : `${count} פריטים דווחו 3 פעמים או יותר.`,
@@ -703,6 +787,48 @@ export const strings: Record<Language, Strings> = {
     mapPanelTitle: "Store map",
     adminTabAlerts: "Shelf Stock Alerts",
     adminTabFloorEditor: "Map Editor",
+    adminTabCatalog: "Product catalog",
+    catalogSummary: (count, offMap) => `${count} products${offMap > 0 ? ` · ${offMap} not on the map` : ""}`,
+    catalogSearch: "Search by name or barcode",
+    catalogAllDepartments: "All departments",
+    catalogOffMapOnly: "Only what's not on the map",
+    catalogAdd: "Add a product",
+    catalogEmpty: "No products match.",
+    catalogColumns: { name: "Product", barcode: "Barcode", department: "Department", shelf: "Shelf on the map", actions: "Actions" },
+    catalogNotOnMap: "Not on the map",
+    catalogNoPlan: "No floor plan drawn yet: products are routed by the old shelf zones.",
+    catalogEdit: (name) => `Edit ${name}`,
+    catalogDelete: (name) => `Delete ${name}`,
+    catalogDeleteConfirm: (name) => `Delete "${name}" from the catalog? Shoppers won't find it any more.`,
+    catalogImported: "Imported",
+    productNew: "New product",
+    productEdit: "Edit product",
+    productFields: { name: "Product name", barcode: "Barcode", brand: "Brand", size: "Size", department: "Department", shelf: "Shelf on the map", subcategory: "Subcategory" },
+    productShelfHint: "Where shoppers are sent: the shelves drawn on the map for this department.",
+    productWholeDepartment: "The department's shelf, no exact one",
+    productShelfNotDrawn: (name) => `${name} (not drawn on the map)`,
+    productBarcodeInvalid: "Not a barcode: 8 to 14 digits, with a correct check digit for 13.",
+    productDuplicate: "The catalog already has a product with this name or barcode.",
+    productInvalid: "Some details aren't valid. Check them and try again.",
+    productSave: "Save",
+    productCancel: "Cancel",
+    productSaved: (name) => `Saved: ${name}`,
+    productDeleted: (name) => `Deleted: ${name}`,
+    shelvesHint: "Click a shelf to see its products, add one, or move one to another shelf.",
+    shelfProducts: (count) => (count === 1 ? "1 product on the shelf" : `${count} products on the shelf`),
+    shelfEmpty: "Nothing on this shelf yet.",
+    shelfAddHere: "Add a product to this shelf",
+    shelfOf: (department) => `${department} department`,
+    shelfOpen: (shelf, count) => `${shelf}, ${count} products`,
+    shelfPlaceHere: (item) => `Putting "${item}" on this shelf`,
+    shelfMoveHere: "Move here",
+    shelfMove: (name) => `Move ${name} to this shelf`,
+    shelfAddAsNew: (item) => `Add "${item}" as a new product`,
+    shelfMatches: "Similar products in the catalog",
+    shelfNoMatches: "No product by that name in the catalog.",
+    shelfNone: "No shelf on the map is named after a department or subcategory. Name them in the map editor.",
+    shelvesListTitle: "Shelves on the map",
+    shelfCurrently: (shelf) => `Now on ${shelf}`,
     floorEditorTitle: "Store layout editor",
     floorEditorHint: "Pick a tool and paint tiles. Drag to paint a run; right-click erases.",
     floorTools: "Tools",
@@ -751,7 +877,7 @@ export const strings: Record<Language, Strings> = {
     floorViewLabel: "Which map to show",
     floorViewDrawn: "Drawn map",
     floorViewZones: "Shelf zones",
-    floorMapHint: "Traffic and \"not found\" reports on the map you drew. Products are placed in the shelf zones.",
+    floorMapHint: "Traffic and \"not found\" reports on the map you drew. Put products on its shelves under \"Shelf zones\" or in the catalog.",
     alertsHint: "What shoppers couldn't find on the shelf in the last 7 days.",
     alertsSummary: (count) =>
       count === 1 ? "1 item reported 3 times or more." : `${count} items reported 3 times or more.`,

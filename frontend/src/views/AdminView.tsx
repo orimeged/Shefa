@@ -6,6 +6,7 @@ import type { AdminApi } from "../api/adminClient";
 import { createAdminApi } from "../api/adminClient";
 import type { CatalogCategory, NotFoundReportRow, SavedFloorPlan, Zone } from "../api/types";
 import { AdminLogin } from "../components/admin/AdminLogin";
+import { CatalogPanel } from "../components/admin/CatalogPanel";
 import { FloorGridEditor } from "../components/admin/FloorGridEditor";
 import { KpiRow } from "../components/admin/KpiRow";
 import { LostDemandWidget } from "../components/admin/LostDemandWidget";
@@ -15,10 +16,12 @@ import { StoreMapPanel } from "../components/admin/StoreMapPanel";
 import { ZoneManagementModal } from "../components/admin/ZoneManagementModal";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { Notice } from "../components/Notice";
+import { useCatalog } from "../hooks/useCatalog";
 import { usePolledReport } from "../hooks/usePolledReport";
 import { useStockAlerts } from "../hooks/useStockAlerts";
 import { useStoreMap } from "../hooks/useStoreMap";
 import { useLanguage } from "../i18n/LanguageProvider";
+import { planShelves } from "../lib/admin/catalog";
 import { createGrid, DEFAULT_CELL_SIZE_M, fromPayload, readCellSize } from "../lib/admin/floorGrid";
 import { countAlerts } from "../lib/admin/stockAlerts";
 import { readFloorMap } from "../lib/floorPlanMap";
@@ -26,7 +29,7 @@ import { readFloorMap } from "../lib/floorPlanMap";
 // For this tab only: a shared tablet shouldn't stay signed in overnight.
 const TOKEN_KEY = "admin-token";
 
-type Tab = "dashboard" | "alerts" | "floor";
+type Tab = "dashboard" | "alerts" | "catalog" | "floor";
 
 export default function AdminView() {
   const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY));
@@ -62,6 +65,8 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   const [tab, setTab] = useState<Tab>("dashboard");
   // The editor loads its plan on first opening, not with every visit to the dashboard.
   const [hasOpenedFloor, setHasOpenedFloor] = useState(false);
+  // Hundreds of rows: drawn once the tab is first opened, then kept with their filters.
+  const [hasOpenedCatalog, setHasOpenedCatalog] = useState(false);
   /** The alert whose item is getting a new shelf, while a manager picks one on the map. */
   const [placing, setPlacing] = useState<NotFoundReportRow | null>(null);
   const [outcome, setOutcome] = useState<AlertOutcome | null>(null);
@@ -70,6 +75,7 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   const mapSection = useRef<HTMLDivElement>(null);
 
   const alerts = useStockAlerts(api);
+  const catalog = useCatalog(api);
   const alertCount = alerts.rows ? countAlerts(alerts.rows) : 0;
   const counts = usePolledReport(api.dashboardCounts, closedAlerts);
   const lostDemand = usePolledReport(api.lostDemand);
@@ -85,7 +91,10 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
     setFloorFailed(false);
     api
       .floorPlan(controller.signal)
-      .then(setSavedFloor)
+      // The same plan again keeps its objects, so the maps over it don't redraw.
+      .then((next) =>
+        setSavedFloor((current) => (current && next && current.updated_at === next.updated_at ? current : next)),
+      )
       .catch(() => {
         if (!controller.signal.aborted) {
           setFloorFailed(true);
@@ -94,6 +103,21 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
     return () => controller.abort();
   }, [api, floorAttempt]);
   const floor = useMemo(() => (savedFloor ? readFloorMap(savedFloor) : null), [savedFloor]);
+  const shelves = useMemo(() => (floor && savedFloor ? planShelves(savedFloor.check) : null), [floor, savedFloor]);
+
+  // The plan and the catalog can change elsewhere, in another tab or by a seed
+  // script: both are read again whenever the dashboard comes back into view.
+  const refresh = useCallback(() => {
+    setFloorAttempt((current) => current + 1);
+    catalog.reload();
+  }, [catalog.reload]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refresh]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,6 +140,11 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
     setPlacing(null);
     if (next === "floor") {
       setHasOpenedFloor(true);
+    } else if (next === "catalog") {
+      setHasOpenedCatalog(true);
+    }
+    if (next !== tab && (next === "dashboard" || next === "catalog")) {
+      refresh();
     }
   };
 
@@ -143,14 +172,14 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   };
 
   // The location is already saved here, so a failed close only leaves a false alert open.
-  const finishPlacing = async (row: NotFoundReportRow) => {
-    const zone = zones?.find((candidate) => candidate.id === selectedNodeId);
+  const finishPlacing = async (row: NotFoundReportRow, shelf?: string) => {
+    const zone = shelf ?? zones?.find((candidate) => candidate.id === selectedNodeId)?.zone_name ?? "";
     setPlacing(null);
     setSelectedNodeId(null);
     setTab("alerts");
     setOutcome(
       (await closeAlert(row))
-        ? { ok: true, text: t.alertMoved(row.item_query, zone?.zone_name ?? "") }
+        ? { ok: true, text: t.alertMoved(row.item_query, zone) }
         : { ok: false, text: t.alertMovedStillOpen(row.item_query) },
     );
   };
@@ -196,6 +225,9 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
               </span>
             )}
           </TabButton>
+          <TabButton isSelected={tab === "catalog"} onSelect={() => openTab("catalog")}>
+            {t.adminTabCatalog}
+          </TabButton>
           <TabButton isSelected={tab === "floor"} onSelect={() => openTab("floor")}>
             {t.adminTabFloorEditor}
           </TabButton>
@@ -212,12 +244,16 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
                   api={api}
                   map={map}
                   floor={floor}
+                  shelves={shelves}
+                  catalog={catalog}
+                  categories={categories}
                   zones={zones}
                   selectedNodeId={selectedNodeId}
                   placing={placing}
                   refreshKey={closedAlerts}
                   onSelectZone={setSelectedNodeId}
                   onCancelPlacing={() => openTab("alerts")}
+                  onPlaced={(row, shelf) => void finishPlacing(row, shelf)}
                 />
               ) : (
                 !mapFailed &&
@@ -246,6 +282,10 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
           />
         </div>
 
+        <div role="tabpanel" hidden={tab !== "catalog"} aria-label={t.adminTabCatalog}>
+          {hasOpenedCatalog && <CatalogPanel catalog={catalog} categories={categories} shelves={shelves} />}
+        </div>
+
         {/* Mounted while hidden too, so a drawing and its undo steps survive a look at the alerts. */}
         <div role="tabpanel" hidden={tab !== "floor"} aria-label={t.adminTabFloorEditor}>
           {hasOpenedFloor && (
@@ -255,7 +295,11 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
               saved={savedFloor}
               failed={floorFailed}
               onRetry={() => setFloorAttempt((current) => current + 1)}
-              onSaved={setSavedFloor}
+              onSaved={(next) => {
+                setSavedFloor(next);
+                // Which shelf each product reaches depends on the plan.
+                catalog.reload();
+              }}
             />
           )}
         </div>
@@ -268,7 +312,10 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
             zones={zones}
             categories={categories}
             placing={placing}
-            onChanged={reload}
+            onChanged={() => {
+              reload();
+              catalog.reload();
+            }}
             onPlaced={(row) => void finishPlacing(row)}
             onClose={() => setSelectedNodeId(null)}
           />

@@ -21,6 +21,10 @@ from app.domain.inventory import (
     MAX_ITEM_NAME,
     CatalogCategory,
     CatalogEntry,
+    CatalogProduct,
+    DuplicateItemError,
+    ProductChanges,
+    ProductDraft,
     DictatedItem,
     EntityType,
     InvalidItemError,
@@ -31,7 +35,8 @@ from app.domain.inventory import (
 )
 from app.domain.search_text import normalize
 from app.domain.speech import SUPPORTED_AUDIO_TYPES, TranscriptionError, base_content_type
-from app.repositories.inventory_repository import SqlInventoryRepository
+from app.repositories.inventory_repository import CatalogEditing, SqlInventoryRepository, product_stop_id
+from app.services.floor_plans import FloorPlanRegistry
 from app.services.navigation import NavigationService
 from app.services.transcription import TranscriptionService
 
@@ -122,7 +127,7 @@ class MapAudioResponse(BaseModel):
 
 
 async def inventory_error_response(_request: Request, error: Exception) -> JSONResponse:
-    code = 422 if isinstance(error, InvalidItemError) else 404
+    code = 409 if isinstance(error, DuplicateItemError) else 422 if isinstance(error, InvalidItemError) else 404
     return JSONResponse({"detail": str(error)}, status_code=code)
 
 
@@ -193,6 +198,52 @@ def delete_assignment(
     store_id: str, node_id: int, entity_type: EntityType, entity_id: int, inventory: Inventory
 ) -> Response:
     inventory.unassign(store_id, node_id, entity_type, entity_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _with_shelves(request: Request, store_id: str, rows: list[CatalogProduct]) -> list[CatalogProduct]:
+    """Each product's shelf on the drawn plan, as a shopper's route would find it.
+
+    The same matching the routes use: the product's own name, its subcategory, then
+    its department. Nothing to fill without a plan that routes.
+    """
+    floor_plans: FloorPlanRegistry = request.app.state.floor_plans
+    loaded = floor_plans.get(store_id)
+    navigation: NavigationService | None = request.app.state.stores.get(store_id)
+    if loaded is None or not loaded.router.routable or navigation is None:
+        return rows
+    store = navigation.store_map
+    targets = {target.id: target for target in (*store.categories, *store.product_stops)}
+    placements = loaded.router.placements(targets, navigation.subcategories)
+    return [
+        row.model_copy(update={"shelf": placements.get(product_stop_id(row.id)) or placements.get(row.department)})
+        for row in rows
+    ]
+
+
+@stores_router.get("/products")
+def list_products(store_id: str, request: Request, inventory: Inventory) -> list[CatalogProduct]:
+    return _with_shelves(request, store_id, CatalogEditing(inventory).products(store_id))
+
+
+@stores_router.post("/products", status_code=status.HTTP_201_CREATED)
+def create_product(store_id: str, body: ProductDraft, request: Request, inventory: Inventory) -> CatalogProduct:
+    created = CatalogEditing(inventory).create(store_id, body)
+    return _with_shelves(request, store_id, [created])[0]
+
+
+@stores_router.patch("/products/{product_id}")
+def update_product(
+    store_id: str, product_id: int, body: ProductChanges, request: Request, inventory: Inventory
+) -> CatalogProduct:
+    # Only what was sent: a field left out stays, a null clears it.
+    changed = CatalogEditing(inventory).update(store_id, product_id, body.model_dump(exclude_unset=True))
+    return _with_shelves(request, store_id, [changed])[0]
+
+
+@stores_router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product(store_id: str, product_id: int, inventory: Inventory) -> Response:
+    CatalogEditing(inventory).delete(store_id, product_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

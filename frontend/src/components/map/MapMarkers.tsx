@@ -21,13 +21,25 @@ const TEARDROP = "M0 0 C-3 -7 -15 -13 -15 -26 A15 15 0 1 1 15 -26 C15 -13 3 -7 0
  * `--u` (map units per pixel) comes from the camera, `--marker-scale` from the
  * view, larger on the kiosk's big screen.
  */
-export function OnScreen({ at, className, children }: { at: Point; className?: string; children: ReactNode }) {
+export function OnScreen({
+  at,
+  className,
+  nudgePx = 0,
+  isLabel = false,
+  children,
+}: {
+  at: Point;
+  className?: string;
+  /** Pixels to the side, for markers that share a spot. */
+  nudgePx?: number;
+  /** A label keeps its size where the view enlarges markers: the names have to fit side by side. */
+  isLabel?: boolean;
+  children: ReactNode;
+}) {
+  const scale = isLabel ? "var(--u, 0.08)" : "calc(var(--u, 0.08) * var(--marker-scale, 1))";
   return (
-    <g
-      className={className}
-      style={{ transform: `translate(${at.x}px, ${at.y}px) scale(calc(var(--u, 0.08) * var(--marker-scale, 1)))` }}
-    >
-      {children}
+    <g className={className} style={{ transform: `translate(${at.x}px, ${at.y}px) scale(${scale})` }}>
+      {nudgePx ? <g transform={`translate(${nudgePx} 0)`}>{children}</g> : children}
     </g>
   );
 }
@@ -48,9 +60,9 @@ export function NextStationPin({ at, categoryId }: { at: Point; categoryId: stri
 }
 
 /** A station still to come, with its number in the trip. */
-export function StationPin({ at, number }: { at: Point; number: number }) {
+export function StationPin({ at, number, nudgePx = 0 }: { at: Point; number: number; nudgePx?: number }) {
   return (
-    <OnScreen at={at}>
+    <OnScreen at={at} nudgePx={nudgePx}>
       <g data-station="ahead" style={{ filter: "drop-shadow(0 1px 2px rgb(15 23 42 / 0.25))" }}>
         <circle r={11} fill="#ffffff" stroke={BRAND} strokeWidth={2.5} />
         <text
@@ -69,9 +81,9 @@ export function StationPin({ at, number }: { at: Point; number: number }) {
 }
 
 /** A station behind the shopper: ticked off, or given up as not on the shelf. */
-export function DoneStationPin({ at, missing = false }: { at: Point; missing?: boolean }) {
+export function DoneStationPin({ at, missing = false, nudgePx = 0 }: { at: Point; missing?: boolean; nudgePx?: number }) {
   return (
-    <OnScreen at={at}>
+    <OnScreen at={at} nudgePx={nudgePx}>
       <g data-station={missing ? "missing" : "done"}>
         <circle r={9} fill={missing ? "#fdecea" : DONE} stroke={missing ? DANGER : "#ffffff"} strokeWidth={2} />
         <path
@@ -120,7 +132,7 @@ function Pill({ at, text, isRtl, accent, children, dark = false, dropPx = 0, cla
   const iconX = isRtl ? half - 11 : -half + 11;
   const textX = isRtl ? half - 22 : -half + 22;
   return (
-    <OnScreen at={at} className={className}>
+    <OnScreen at={at} className={className} isLabel>
       <g
         transform={dropPx ? `translate(0 ${dropPx})` : undefined}
         style={{ filter: "drop-shadow(0 1px 3px rgb(15 23 42 / 0.22))" }}
@@ -176,7 +188,7 @@ export function DepartmentBadge({ at, name, categoryId, accent, isRtl, shown, co
       className={`map-badge ${shown ? "" : "is-hidden"}`}
     >
       {compact ? (
-        <OnScreen at={at}>
+        <OnScreen at={at} isLabel>
           <g style={{ filter: "drop-shadow(0 1px 3px rgb(15 23 42 / 0.25))" }}>
             <circle r={COMPACT_BADGE_PX / 2} fill="#ffffff" />
             <circle r={COMPACT_BADGE_PX / 2 - 2} fill={isNext ? NEXT : accent} />
@@ -226,5 +238,61 @@ export function EndpointBadge({ at, text, icon: Icon, isRtl, dropPx = 0, shown =
         <Icon size={11} color="#ffffff" strokeWidth={2.4} />
       </Pill>
     </g>
+  );
+}
+
+interface AisleNameProps {
+  /** The shelf's whole name, which identifies it. */
+  name: string;
+  /** As written: shortened if the gondola is too short for it. */
+  text: string;
+  /** A column's subcategory, close in; a gondola's department, further out. */
+  level: "subcategory" | "department";
+  /** The middle of the shelf's raised top, in map units. */
+  at: Point;
+  /** In map units, to fit across the shelf. */
+  fontSize: number;
+  colour: string;
+  isNext: boolean;
+}
+
+/**
+ * A gondola's name written along it, as an aisle's sign would be: every gondola
+ * named the same way, whatever room the camera leaves between them.
+ */
+export function AisleName({ name, text, level, at, fontSize, colour, isNext }: AisleNameProps) {
+  return (
+    <text
+      data-badge={name}
+      data-shown=""
+      data-aisle={level}
+      aria-hidden
+      x={at.x}
+      y={at.y}
+      transform={`rotate(-90 ${at.x} ${at.y})`}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={fontSize}
+      fontWeight={isNext ? 800 : 650}
+      fill={isNext ? INK : colour}
+      className="pointer-events-none"
+    >
+      {text}
+    </text>
+  );
+}
+
+/** A department's icon over the top end of its gondola: a row of them along the store. */
+export function AisleSign({ at, categoryId, accent }: { at: Point; categoryId: string; accent: string }) {
+  return (
+    <OnScreen at={at} isLabel>
+      <g data-aisle-sign={categoryId} aria-hidden transform="translate(0 -13)" style={{ filter: "drop-shadow(0 1px 2px rgb(15 23 42 / 0.25))" }}>
+        <circle r={9.5} fill="#ffffff" />
+        <circle r={7.5} fill={accent} />
+        <g transform="translate(-5 -5)">
+          <CategoryIcon categoryId={categoryId} size={10} color="#ffffff" strokeWidth={2.4} />
+        </g>
+      </g>
+    </OnScreen>
   );
 }

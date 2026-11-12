@@ -75,6 +75,9 @@ export function QuickRoute({
     [items, codeOf],
   );
 
+  const placeOnRoute = (categoryId: string) =>
+    route?.stops.find((stop) => stop.category_id === categoryId)?.department;
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <ol className="grid shrink-0 auto-cols-fr grid-flow-col gap-2">
@@ -90,7 +93,8 @@ export function QuickRoute({
               <span className="min-w-0 flex-1">
                 <span className="line-clamp-2 text-lg leading-tight font-semibold">{name}</span>
                 <span className="block truncate text-sm font-medium text-muted">
-                  {where(item.categoryId, item.aisleNo, item.side, true)}
+                  {/* On a drawn plan, the shelf the route chose: a department may have several. */}
+                  {placeOnRoute(item.categoryId) ? t.onShelf(placeOnRoute(item.categoryId)!) : where(item.categoryId, item.aisleNo, item.side, true)}
                 </span>
               </span>
               {/* A full tap target that overlaps the corner, so the name keeps the width. */}

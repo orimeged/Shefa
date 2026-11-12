@@ -45,7 +45,7 @@ export function FloorAnalyticsMap({ floor, heat, cellEdges, legend }: FloorAnaly
 }
 
 /** Each step between two tiles, coloured and widened by how many trips took it. */
-function TileTrafficLayer({ edges }: { edges: readonly EdgeFlow[] }) {
+export function TileTrafficLayer({ edges }: { edges: readonly EdgeFlow[] }) {
   const { t } = useLanguage();
   const lines = useMemo(() => {
     const busiest = edges.reduce((most, edge) => Math.max(most, edge.trips), 0);

@@ -3,21 +3,28 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import type { AdminApi } from "../../api/adminClient";
-import type { NotFoundReportRow, StoreMap, Zone } from "../../api/types";
+import type { CatalogCategory, NotFoundReportRow, StoreMap, Zone } from "../../api/types";
+import type { Catalog } from "../../hooks/useCatalog";
 import { usePolledReport } from "../../hooks/usePolledReport";
 import { useLanguage } from "../../i18n/LanguageProvider";
+import type { ShelfOption } from "../../lib/admin/catalog";
 import type { FloorMap } from "../../lib/floorPlanMap";
 import { buildMapLayout } from "../../lib/mapGeometry";
 import { Notice } from "../Notice";
 import { AdminMapEditor } from "./AdminMapEditor";
-import { FloorAnalyticsMap } from "./FloorAnalyticsMap";
+import { FloorAnalyticsMap, TileTrafficLayer } from "./FloorAnalyticsMap";
 import { HeatLayer, MapLegend, TrafficLayer } from "./MapOverlays";
+import { ShelvesMap } from "./ShelvesMap";
 
 interface StoreMapPanelProps {
   api: AdminApi;
   map: StoreMap;
   /** The plan shoppers walk, once managers drew one that routes. */
   floor: FloorMap | null;
+  /** The drawn plan's shelves products can stand on; with `floor`, they replace the graph's zones. */
+  shelves: readonly ShelfOption[] | null;
+  catalog: Catalog;
+  categories: readonly CatalogCategory[];
   zones: readonly Zone[];
   selectedNodeId: number | null;
   /** The alert whose item is getting a new shelf. */
@@ -25,6 +32,8 @@ interface StoreMapPanelProps {
   refreshKey: number;
   onSelectZone: (nodeId: number) => void;
   onCancelPlacing: () => void;
+  /** A product went onto a drawn shelf for the alert being placed. */
+  onPlaced: (row: NotFoundReportRow, shelf: string) => void;
 }
 
 /** The floor plan a manager edits, with what shoppers did drawn over it. */
@@ -32,12 +41,16 @@ export function StoreMapPanel({
   api,
   map,
   floor,
+  shelves,
+  catalog,
+  categories,
   zones,
   selectedNodeId,
   placing,
   refreshKey,
   onSelectZone,
   onCancelPlacing,
+  onPlaced,
 }: StoreMapPanelProps) {
   const { t } = useLanguage();
   const layout = useMemo(() => buildMapLayout(map), [map]);
@@ -47,8 +60,23 @@ export function StoreMapPanel({
   const traffic = usePolledReport(api.trafficFlow, refreshKey);
   const layerFailed = (showHeat && heat.failed) || (showTraffic && traffic.failed);
   const [view, setView] = useState<"floor" | "zones">("floor");
-  // Products are still placed in the graph's zones, so placing one needs that view.
-  const showsFloor = floor !== null && view === "floor" && placing === null;
+  // A store with a drawn plan keeps its products on that plan's shelves: the
+  // graph's zones are what shoppers walked before it, so they'd be stale here.
+  const showsShelves = floor !== null && shelves !== null && (view === "zones" || placing !== null);
+  const showsFloor = floor !== null && !showsShelves;
+  const tileLayers = (
+    <>
+      {showTraffic && traffic.data && <TileTrafficLayer edges={traffic.data.cell_edges ?? []} />}
+      {showHeat && heat.data && floor && <HeatLayer points={heat.data.points} layout={floor.layout} />}
+    </>
+  );
+  const floatingLegend = (
+    <MapLegend
+      heat={showHeat}
+      traffic={showTraffic}
+      className="absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 sm:flex"
+    />
+  );
 
   return (
     <section
@@ -120,18 +148,23 @@ export function StoreMapPanel({
         </div>
       )}
 
-      {showsFloor ? (
+      {showsShelves && floor && shelves ? (
+        <ShelvesMap
+          floor={floor}
+          shelves={shelves}
+          catalog={catalog}
+          categories={categories}
+          placing={placing}
+          layers={tileLayers}
+          legend={floatingLegend}
+          onPlaced={onPlaced}
+        />
+      ) : showsFloor && floor ? (
         <FloorAnalyticsMap
           floor={floor}
           heat={showHeat && heat.data ? heat.data.points : null}
           cellEdges={showTraffic && traffic.data ? (traffic.data.cell_edges ?? []) : null}
-          legend={
-            <MapLegend
-              heat={showHeat}
-              traffic={showTraffic}
-              className="absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 sm:flex"
-            />
-          }
+          legend={floatingLegend}
         />
       ) : (
         <AdminMapEditor
@@ -163,7 +196,9 @@ export function StoreMapPanel({
         className="flex self-center sm:hidden"
       />
 
-      <p className="text-sm text-slate-500">{showsFloor ? t.floorMapHint : t.adminMapHint}</p>
+      <p className="text-sm text-slate-500">
+        {showsShelves ? t.shelvesHint : showsFloor ? t.floorMapHint : t.adminMapHint}
+      </p>
     </section>
   );
 }

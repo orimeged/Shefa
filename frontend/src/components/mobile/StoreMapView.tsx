@@ -15,9 +15,11 @@ import type { ScreenBox } from "../../lib/mapLabels";
 import { BADGE_HEIGHT_PX, badgeWidth, COMPACT_BADGE_PX, placeBadges } from "../../lib/mapLabels";
 import type { FoundSet, Trail } from "../../lib/routeProgress";
 import { advanceTrail, currentPoint, NO_TRAIL, pendingStops, remainingLegs, trailLegs } from "../../lib/routeProgress";
-import { hasCategoryIcon, useIconId } from "../CategoryIcon";
+import { hasCategoryIcon, useDepartment, useIconId } from "../CategoryIcon";
 import { BLOCK_LIFT, MapFloor } from "../MapFloor";
 import {
+  AisleName,
+  AisleSign,
   CheckoutPin,
   DepartmentBadge,
   DoneStationPin,
@@ -42,6 +44,22 @@ const BADGE_CANDIDATES = 21;
 const BESIDE_PX = 13;
 /** The entrance and till badges sit this far below their point, clear of what stands on it. */
 const ENDPOINT_DROP_PX = 26;
+
+/** A shelf this many times longer than it's wide is a gondola: its name runs along it. */
+const AISLE_SHAPE = 3;
+/** A gondola's name: this share of its width across, no larger than the most, and not drawn below the least. */
+const AISLE_FONT_SHARE = 0.72;
+const AISLE_FONT_MAX_PX = 12;
+const AISLE_FONT_MIN_PX = 7;
+/**
+ * A column's own name, its subcategory, needs this much to read; below it each
+ * gondola is named once, for its department, across both its columns.
+ */
+const AISLE_DETAIL_PX = 9;
+const LETTER_EM = 0.56;
+/** Markers sharing a spot stand side by side, this far apart in pixels; the kiosk's discs, in map units. */
+const SIDE_BY_SIDE_PX = 24;
+const SIDE_BY_SIDE_ZONES = 2.8;
 
 /** A stroke this many pixels wide on screen at any zoom: `--u` is map units per pixel. */
 const px = (pixels: number) => ({ strokeWidth: `calc(var(--u, 0.08) * ${pixels}px)` });
@@ -167,9 +185,118 @@ export function StoreMapView({
           .sort((a, b) => b.width * b.height - a.width * a.height),
         // Where its name was, for before the camera has a view.
         at: { x: name.x, y: name.y - BLOCK_LIFT.shelf },
-      })),
+      })).map((badge) => {
+        const biggest = badge.tops[0];
+        return { ...badge, isAisle: !!biggest && biggest.height >= AISLE_SHAPE * biggest.width };
+      }),
     [layout],
   );
+  const aisles = useMemo(() => badges.filter((badge) => badge.isAisle), [badges]);
+  const flat = useMemo(() => badges.filter((badge) => !badge.isAisle), [badges]);
+
+  // One sign per gondola: its department's icon over the columns standing side by side.
+  const aisleSigns = useMemo(() => {
+    const signs: {
+      key: string;
+      categoryId: string;
+      accent: string;
+      left: number;
+      right: number;
+      top: number;
+      bottom: number;
+      columns: string[];
+    }[] = [];
+    for (const aisle of [...aisles].sort((a, b) => a.tops[0]!.x - b.tops[0]!.x)) {
+      const top = aisle.tops[0]!;
+      const categoryId = iconId(departmentOf.get(aisle.key) ?? "");
+      const last = signs.at(-1);
+      if (last && last.categoryId === categoryId && top.x - last.right < 0.01) {
+        last.right = top.x + top.width;
+        last.top = Math.min(last.top, top.y);
+        last.bottom = Math.max(last.bottom, top.y + top.height);
+        last.columns.push(aisle.key);
+      } else {
+        signs.push({
+          key: aisle.key,
+          categoryId,
+          accent: (colours.get(aisle.key) ?? PLAIN_SHELF).accent,
+          left: top.x,
+          right: top.x + top.width,
+          top: top.y,
+          bottom: top.y + top.height,
+          columns: [aisle.key],
+        });
+      }
+    }
+    return signs;
+  }, [aisles, departmentOf, iconId, colours]);
+
+  // The names along the gondolas, fitted as the camera last landed. Close in, each
+  // column has its subcategory's; further out, where those would be too small to
+  // read, each gondola has its department's, across both columns. Every gondola is
+  // named the same way at any one zoom. While the camera flies the names keep their
+  // size in map units, so they grow and shrink with the shelves under them.
+  const department = useDepartment();
+  const { pick } = useLanguage();
+  const aisleFit = useRef<AisleText[]>([]);
+  const aisleNames = useMemo(() => {
+    if (!resting || !screen) {
+      return aisleFit.current;
+    }
+    const perUnit = 1 / unitsPerPixel(resting, screen);
+    const fit = (key: string, name: string, x: number, width: number, top: number, bottom: number, level: AisleText["level"]) => {
+      const fontPx = Math.min(AISLE_FONT_MAX_PX, width * perUnit * AISLE_FONT_SHARE);
+      const letters = Math.floor(((bottom - top) * perUnit - 10) / (fontPx * LETTER_EM));
+      return {
+        key,
+        name,
+        text: name.length <= letters ? name : `${name.slice(0, Math.max(1, letters - 1))}…`,
+        fontSize: fontPx / perUnit,
+        at: { x, y: (top + bottom) / 2 },
+        level,
+        shelves: level === "subcategory" ? [key] : [],
+        fontPx,
+      };
+    };
+    const narrowest = Math.min(...aisles.map((aisle) => aisle.tops[0]!.width));
+    const detailed = aisles.length > 0 && Math.min(AISLE_FONT_MAX_PX, narrowest * perUnit * AISLE_FONT_SHARE) >= AISLE_DETAIL_PX;
+    const fitted: AisleText[] = detailed
+      ? aisles.map((aisle) => {
+          const top = aisle.tops[0]!;
+          return fit(aisle.key, aisle.key, top.x + top.width / 2, top.width, top.y, top.y + top.height, "subcategory");
+        })
+      : aisleSigns.map((sign) => {
+          const named = department(sign.categoryId);
+          const name = named ? pick(named.name, named.name_en) : sign.columns.join(" · ");
+          return {
+            ...fit(sign.key, name, (sign.left + sign.right) / 2, sign.right - sign.left, sign.top, sign.bottom, "department"),
+            shelves: sign.columns,
+          };
+        });
+    aisleFit.current = fitted.filter((text) => text.fontPx >= AISLE_FONT_MIN_PX);
+    return aisleFit.current;
+  }, [resting, screen, aisles, aisleSigns, department, pick]);
+
+  // Markers on one spot, such as two products on one shelf, side by side rather than one
+  // hiding the other: the next station's stays in the middle.
+  const sideBySide = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    const spot = ({ x, y }: Point) => `${x.toFixed(2)},${y.toFixed(2)}`;
+    const add = (point: Point, key: string) => groups.set(spot(point), [...(groups.get(spot(point)) ?? []), key]);
+    pins.forEach((pin) => add(pin, pin.key));
+    reached.forEach((stop) => add(layout.toSvg(stop), `done:${stop.category_id}`));
+    const steps = new Map<string, number>();
+    for (const keys of groups.values()) {
+      if (keys.length < 2) continue;
+      const nextAt = keys.indexOf(next?.category_id ?? "");
+      if (nextAt >= 0) {
+        keys.filter((key) => key !== keys[nextAt]).forEach((key, index) => steps.set(key, index + 1));
+      } else {
+        keys.forEach((key, index) => steps.set(key, index - (keys.length - 1) / 2));
+      }
+    }
+    return steps;
+  }, [pins, reached, layout, next]);
 
   // Where badges go once the camera lands: on the visible part of their shelves,
   // clear of each other and of the pins. None while it flies.
@@ -183,14 +310,16 @@ export function StoreMapView({
       const at = toScreen(point, resting, screen);
       return { x: at.x, y: at.y - lift * markerScale, width: width * markerScale, height: height * markerScale };
     };
-    const drop = (point: Point) => ({ x: point.x, y: point.y + ENDPOINT_DROP_PX * markerScale * perPixel });
+    // The entrance and till badges are labels: their own size, under their point.
+    const label = (point: Point, width: number): ScreenBox => ({ ...toScreen(point, resting, screen), width, height: BADGE_HEIGHT_PX });
+    const drop = (point: Point) => ({ x: point.x, y: point.y + ENDPOINT_DROP_PX * perPixel });
     const obstacles = [
       ...pins.map((pin) => (pin.key === next?.category_id ? box(pin, 34, 46, 24) : box(pin, 26, 26))),
       ...reached.map((stop) => box(layout.toSvg(stop), 22, 22)),
       ...(emphasis === "next" ? [box(here, 24, 24)] : []),
       ...(emphasis === "next" && !next && current[0] ? [box(layout.toSvg(current[0].points.at(-1)!), 34, 46, 24)] : []),
-      box(drop(layout.entrance), badgeWidth(t.entrance), BADGE_HEIGHT_PX),
-      box(drop(layout.checkout), badgeWidth(t.checkout), BADGE_HEIGHT_PX),
+      label(drop(layout.entrance), badgeWidth(t.entrance)),
+      label(drop(layout.checkout), badgeWidth(t.checkout)),
     ];
     // The part of the map the header and the sheet leave clear, in map units.
     const clear: Rect = {
@@ -200,12 +329,13 @@ export function StoreMapView({
       height: (screen.height - insetTop - insetBottom) * perPixel,
     };
     const placed = placeBadges(
-      badges.map((badge) => ({
+      flat.map((badge) => ({
         key: badge.key,
         priority: badge.key === nextDepartment ? 3 : comingDepartments.has(badge.key) ? 2 : 1,
-        width: badgeWidth(badge.text) * markerScale,
-        height: BADGE_HEIGHT_PX * markerScale,
-        compactSize: COMPACT_BADGE_PX * markerScale,
+        // Labels keep their size where the view enlarges markers.
+        width: badgeWidth(badge.text),
+        height: BADGE_HEIGHT_PX,
+        compactSize: COMPACT_BADGE_PX,
         candidates: badge.tops
           .flatMap((top) => {
             const part = overlap(top, clear);
@@ -234,7 +364,7 @@ export function StoreMapView({
   }, [
     resting,
     screen,
-    badges,
+    flat,
     pins,
     reached,
     here,
@@ -259,14 +389,14 @@ export function StoreMapView({
     }
     const whole = (point: Point, text: string) => {
       const at = toScreen(point, resting, screen);
-      const half = (badgeWidth(text) * markerScale) / 2;
-      const top = at.y + (ENDPOINT_DROP_PX - BADGE_HEIGHT_PX / 2) * markerScale;
+      const half = badgeWidth(text) / 2;
+      const top = at.y + ENDPOINT_DROP_PX - BADGE_HEIGHT_PX / 2;
       // Whole, and clear of the header and the sheet floating over the map.
       return (
         at.x - half >= insetLeft &&
         at.x + half <= screen.width - insetRight &&
         top >= insetTop &&
-        top + BADGE_HEIGHT_PX * markerScale <= screen.height - insetBottom
+        top + BADGE_HEIGHT_PX <= screen.height - insetBottom
       );
     };
     return { entrance: whole(layout.entrance, t.entrance), checkout: whole(layout.checkout, t.checkout) };
@@ -277,10 +407,11 @@ export function StoreMapView({
       zoneBadges
         ? pins.flatMap((pin) => {
             const badge = zoneBadges.get(pin.key);
-            return badge ? [{ key: pin.key, x: pin.x, y: pin.y, ...badge }] : [];
+            const x = pin.x + (sideBySide.get(pin.key) ?? 0) * SIDE_BY_SIDE_ZONES;
+            return badge ? [{ key: pin.key, x, y: pin.y, ...badge }] : [];
           })
         : null,
-    [pins, zoneBadges],
+    [pins, zoneBadges, sideBySide],
   );
 
   const walkedPoints = polylinePoints(trailLegs(trail), layout);
@@ -320,7 +451,28 @@ export function StoreMapView({
         )}
       </g>
 
-      {badges.map((badge) => (
+      {aisleNames.map((name) => (
+        <AisleName
+          key={`${name.level}:${name.key}`}
+          name={name.name}
+          text={name.text}
+          level={name.level}
+          at={name.at}
+          fontSize={name.fontSize}
+          colour={(colours.get(name.key) ?? PLAIN_SHELF).accent}
+          isNext={nextDepartment !== null && (name.shelves.includes(nextDepartment) || name.key === nextDepartment)}
+        />
+      ))}
+      {aisleSigns.map((sign) => (
+        <AisleSign
+          key={sign.key}
+          at={{ x: (sign.left + sign.right) / 2, y: sign.top }}
+          categoryId={sign.categoryId}
+          accent={sign.accent}
+        />
+      ))}
+
+      {flat.map((badge) => (
         <DepartmentBadge
           key={badge.key}
           at={placedBadges.get(badge.key) ?? badge.at}
@@ -352,7 +504,12 @@ export function StoreMapView({
       />
 
       {reached.map((stop) => (
-        <DoneStationPin key={stop.category_id} at={layout.toSvg(stop)} missing={missing?.has(stop.category_id)} />
+        <DoneStationPin
+          key={stop.category_id}
+          at={layout.toSvg(stop)}
+          missing={missing?.has(stop.category_id)}
+          nudgePx={(sideBySide.get(`done:${stop.category_id}`) ?? 0) * SIDE_BY_SIDE_PX}
+        />
       ))}
 
       {zonePins ? (
@@ -360,7 +517,12 @@ export function StoreMapView({
       ) : (
         pins.map((pin, index) =>
           pin.key === next?.category_id ? null : (
-            <StationPin key={pin.key} at={pin} number={firstNumber + index} />
+            <StationPin
+              key={pin.key}
+              at={pin}
+              number={firstNumber + index}
+              nudgePx={(sideBySide.get(pin.key) ?? 0) * SIDE_BY_SIDE_PX}
+            />
           ),
         )
       )}
@@ -426,4 +588,17 @@ function besidePart(part: Rect, gap: number): Point[] {
         { x: middle.x, y: part.y + part.height + gap },
         { x: middle.x, y: part.y - gap },
       ];
+}
+
+/** A name written along a gondola, as fitted for the view the camera rests on. */
+interface AisleText {
+  key: string;
+  name: string;
+  text: string;
+  fontSize: number;
+  fontPx: number;
+  at: Point;
+  level: "subcategory" | "department";
+  /** The shelves it names: one column's, or both of a gondola's. */
+  shelves: string[];
 }

@@ -265,6 +265,8 @@ export interface FloorPlanDepartment {
   tiles: number;
   /** The catalog department its name matched; null if none did. */
   category_id: string | null;
+  /** Set when the name is one of that department's subcategories, a shelf finer than it. */
+  subcategory?: string | null;
   /** False when no open tile beside it can be reached from the entrance. */
   reachable: boolean;
 }
@@ -323,3 +325,33 @@ export interface FloorRouteRequest {
   start?: GridPoint;
   session_id?: string;
 }
+
+/** A product as the catalog screen lists it. Mirrors CatalogProduct in backend/app/domain/inventory.py. */
+export interface CatalogProduct {
+  id: number;
+  name: string;
+  barcode: string | null;
+  brand: string | null;
+  size: string | null;
+  /** The department's slug. */
+  department: string;
+  subcategory: string | null;
+  /** "pos" for a row a catalog import brought, which the next import may change. */
+  source: string | null;
+  /** How many of the graph's shelf zones it stands in. */
+  zones: number;
+  /** The drawn plan's shelf a shopper is sent to for it; null with no plan, or none for it. */
+  shelf: string | null;
+}
+
+export interface ProductDraft {
+  name: string;
+  barcode?: string | null;
+  brand?: string | null;
+  size?: string | null;
+  department: string;
+  subcategory?: string | null;
+}
+
+/** A field left out stays as it was; null clears it. */
+export type ProductChanges = Partial<ProductDraft>;

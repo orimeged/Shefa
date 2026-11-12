@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 
 from app.domain import models
 from app.domain.inventory import (
+    CatalogProduct,
+    DuplicateItemError,
+    ProductDraft,
     CatalogCategory,
     CatalogEntry,
     CatalogRow,
@@ -22,6 +25,7 @@ from app.domain.inventory import (
     ZoneItem,
 )
 from app.domain.search_text import normalize
+from app.services.pos_import import ean13_is_valid
 from app.repositories.inventory_tables import Category, MapNode, NodeAssignment, Product, StoreRecord
 
 _SIDE_NAMES = {models.Side.LEFT: "שמאל", models.Side.RIGHT: "ימין"}
@@ -206,9 +210,15 @@ class SqlInventoryRepository:
 
         stops: list[models.Category] = []
         shelved: list[models.Product] = []
+        by_slug = {department.id: department for department in departments}
         for product in products:
             department = slugs[product.category_id]
             sections = sections_of.get((EntityType.PRODUCT, product.id))
+            if not sections and product.subcategory and department in by_slug:
+                # A shelf of its own on a drawn plan: a stop of its own, standing with its
+                # department on the graph's map, which has no finer place for it.
+                owner = by_slug[department]
+                sections = [owner.section_id, *owner.other_section_ids]
             if sections:
                 stops.append(
                     models.Category(
@@ -715,3 +725,154 @@ class SqlInventoryRepository:
         if assignment is None:
             raise InventoryError(f"Not in zone {node_id}: {entity_type.value} {entity_id}")
         return assignment
+
+
+def _clean(value: str | None) -> str | None:
+    """Spaces collapsed, and nothing at all for an empty field."""
+    if value is None:
+        return None
+    cleaned = " ".join(value.split())
+    return cleaned or None
+
+
+def _checked_barcode(value: str | None) -> str | None:
+    barcode = _clean(value)
+    if barcode is None:
+        return None
+    barcode = barcode.replace(" ", "")
+    if not barcode.isascii() or not barcode.isdecimal() or not 8 <= len(barcode) <= 14:
+        raise InvalidItemError(f"Not a barcode: {value}")
+    if len(barcode) == 13 and not ean13_is_valid(barcode):
+        raise InvalidItemError(f"The barcode's check digit is wrong: {barcode}")
+    return barcode
+
+
+class CatalogEditing:
+    """The catalog screen's reads and writes, on the same database as the rest of the inventory."""
+
+    def __init__(self, repository: SqlInventoryRepository) -> None:
+        self._repository = repository
+
+    def products(self, store_id: str) -> list[CatalogProduct]:
+        repository = self._repository
+        with Session(repository._engine) as session:
+            repository._require_store(session, store_id)
+            slugs = {
+                category.id: category.slug
+                for category in session.scalars(select(Category).where(Category.store_id == store_id))
+            }
+            placed = defaultdict(int)
+            for (entity_id,) in session.execute(
+                select(NodeAssignment.entity_id).where(NodeAssignment.entity_type == EntityType.PRODUCT.value)
+            ):
+                placed[entity_id] += 1
+            rows = session.scalars(
+                select(Product).where(Product.store_id == store_id).order_by(Product.name)
+            ).all()
+            return [self._row(product, slugs, placed[product.id]) for product in rows]
+
+    def create(self, store_id: str, draft: ProductDraft) -> CatalogProduct:
+        repository = self._repository
+        with repository._writing(store_id) as session:
+            category = self._department(session, store_id, draft.department)
+            name = _clean(draft.name)
+            if name is None:
+                raise InvalidItemError("A product needs a name")
+            barcode = _checked_barcode(draft.barcode)
+            self._require_unique(session, store_id, normalize(name), barcode)
+            product = Product(
+                store_id=store_id,
+                name=name,
+                name_key=normalize(name),
+                category_id=category.id,
+                barcode=barcode,
+                brand=_clean(draft.brand),
+                size=_clean(draft.size),
+                subcategory=_clean(draft.subcategory),
+            )
+            session.add(product)
+            session.flush()
+            return self._row(product, {category.id: category.slug}, 0)
+
+    def update(self, store_id: str, product_id: int, changes: dict[str, str | None]) -> CatalogProduct:
+        repository = self._repository
+        with repository._writing(store_id) as session:
+            product = session.scalar(
+                select(Product).where(Product.store_id == store_id, Product.id == product_id)
+            )
+            if product is None:
+                raise InventoryError(f"Unknown product: {product_id}")
+            if "department" in changes:
+                if changes["department"] is None:
+                    raise InvalidItemError("A product needs a department")
+                product.category_id = self._department(session, store_id, changes["department"]).id
+            if "name" in changes:
+                name = _clean(changes["name"])
+                if name is None:
+                    raise InvalidItemError("A product needs a name")
+                self._require_unique(session, store_id, normalize(name), None, but=product.id)
+                product.name, product.name_key = name, normalize(name)
+            if "barcode" in changes:
+                barcode = _checked_barcode(changes["barcode"])
+                self._require_unique(session, store_id, None, barcode, but=product.id)
+                product.barcode = barcode
+            for field in ("brand", "size", "subcategory"):
+                if field in changes:
+                    setattr(product, field, _clean(changes[field]))
+            session.flush()
+            slugs = {
+                category.id: category.slug
+                for category in session.scalars(select(Category).where(Category.store_id == store_id))
+            }
+            zones = session.scalar(
+                select(func.count()).select_from(NodeAssignment).where(
+                    NodeAssignment.entity_type == EntityType.PRODUCT.value,
+                    NodeAssignment.entity_id == product.id,
+                )
+            )
+            return self._row(product, slugs, zones or 0)
+
+    def delete(self, store_id: str, product_id: int) -> None:
+        repository = self._repository
+        with repository._writing(store_id) as session:
+            found = session.scalar(
+                select(Product.id).where(Product.store_id == store_id, Product.id == product_id)
+            )
+            if found is None:
+                raise InventoryError(f"Unknown product: {product_id}")
+            repository._delete_products(session, [product_id])
+
+    @staticmethod
+    def _department(session: Session, store_id: str, slug: str) -> Category:
+        category = session.scalar(
+            select(Category).where(Category.store_id == store_id, Category.slug == slug)
+        )
+        if category is None:
+            raise InvalidItemError(f"Unknown department: {slug}")
+        return category
+
+    @staticmethod
+    def _require_unique(
+        session: Session, store_id: str, name_key: str | None, barcode: str | None, *, but: int | None = None
+    ) -> None:
+        clashes = select(Product).where(Product.store_id == store_id)
+        if but is not None:
+            clashes = clashes.where(Product.id != but)
+        if name_key is not None and session.scalar(clashes.where(Product.name_key == name_key)) is not None:
+            raise DuplicateItemError("A product by this name is already in the catalog")
+        if barcode is not None and session.scalar(clashes.where(Product.barcode == barcode)) is not None:
+            raise DuplicateItemError("A product with this barcode is already in the catalog")
+
+    @staticmethod
+    def _row(product: Product, slugs: dict[int, str], zones: int) -> CatalogProduct:
+        return CatalogProduct(
+            id=product.id,
+            name=product.name,
+            barcode=product.barcode,
+            brand=product.brand,
+            size=product.size,
+            department=slugs[product.category_id],
+            subcategory=product.subcategory,
+            source=product.source,
+            zones=zones,
+        )

@@ -311,7 +311,7 @@ export default function MobileView() {
   if (isShopping) {
     return (
       <PlacementsProvider placements={floor?.placements ?? null}>
-      <ProductDepartmentsProvider productStops={map?.product_stops}>
+      <ProductDepartmentsProvider productStops={map?.product_stops} departments={map?.categories}>
         {/* Scrolling inside the sheet still works; pinching the page doesn't. */}
         <div className="trip-stage fixed inset-0 overflow-hidden bg-paper">
           <h1 className="sr-only">{t.routeTitle}</h1>
@@ -425,7 +425,7 @@ export default function MobileView() {
 
   return (
     <PlacementsProvider placements={floor?.placements ?? null}>
-      <ProductDepartmentsProvider productStops={map?.product_stops}>
+      <ProductDepartmentsProvider productStops={map?.product_stops} departments={map?.categories}>
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
         <div ref={stickyTop} className="sticky top-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
           {searchBar}
