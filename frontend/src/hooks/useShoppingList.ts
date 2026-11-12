@@ -182,7 +182,11 @@ export function useShoppingList(map: StoreMap | null, seedIds: readonly string[]
 
   const clear = useCallback(() => startNewTrip([], seedKey), [seedKey, startNewTrip]);
 
-  const startShopping = useCallback(() => setPhase("shopping"), []);
+  // The last "added" notice belongs to building the list: left up, it would cover the first station.
+  const startShopping = useCallback(() => {
+    setNotice(null);
+    setPhase("shopping");
+  }, []);
 
   const pendingItems = useMemo(() => items.filter((item) => item.status === "pending"), [items]);
   const unmatchedItems = useMemo(

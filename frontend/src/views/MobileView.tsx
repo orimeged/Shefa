@@ -396,6 +396,7 @@ export default function MobileView() {
                   />
                   <ShoppingList
                     pending={pending}
+                    firstNumber={foundCount + 1}
                     foundIds={[...found]}
                     groups={groups}
                     onToggle={handleFound}

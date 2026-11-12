@@ -8,6 +8,11 @@ import { CategoryIcon } from "../CategoryIcon";
 
 interface ShoppingListProps {
   pending: readonly RouteStop[];
+  /**
+   * The trip's number for the first stop still to find, counting the ones done,
+   * so a row says the same "3" as its station card and its pin on the map.
+   */
+  firstNumber?: number;
   foundIds: readonly string[];
   groups: ReadonlyMap<string, ListGroup>;
   onToggle: (categoryId: string) => void;
@@ -18,6 +23,7 @@ interface ShoppingListProps {
 
 export function ShoppingList({
   pending,
+  firstNumber = 1,
   foundIds,
   groups,
   onToggle,
@@ -49,7 +55,7 @@ export function ShoppingList({
                     key={stop.category_id}
                     group={group}
                     place={stop.department}
-                    order={index + 1}
+                    order={firstNumber + index}
                     checked={false}
                     onToggle={onToggle}
                     onRemove={onRemove}
