@@ -117,9 +117,21 @@ export interface Strings {
 
   kioskScanTitle: string;
   kioskScanItems: string;
-  quickSearchTitle: string;
   quickFull: string;
   quickClear: string;
+  kioskWelcome: string;
+  kioskWelcomeHint: string;
+  kioskRouteTitle: string;
+  kioskRouteSummary: (stops: number, metres: number, minutes: number) => string;
+  kioskRouteEnds: string;
+  kioskAddMore: string;
+  kioskQrKicker: string;
+  kioskQrKickerItems: string;
+  kioskScanHow: string;
+  kioskMapIdle: string;
+  kioskMapShowing: (place: string) => string;
+  kioskIdleWarning: string;
+  kioskMoreOnPhone: string;
   screenMaySleep: string;
 
   adminTitle: string;
@@ -422,9 +434,22 @@ export const strings: Record<Language, Strings> = {
 
     kioskScanTitle: "סורקים לרשימת הקניות המלאה ולמסלול. בלי להוריד אפליקציה!",
     kioskScanItems: "הפריטים שנבחרו יעברו לטלפון.",
-    quickSearchTitle: "חיפוש מהיר (1 עד 3 פריטים)",
     quickFull: "הגעתם ל-3 פריטים. לעוד, סורקים את הקוד",
     quickClear: "מתחילים מחדש",
+    kioskWelcome: "מה מחפשים היום?",
+    kioskWelcomeHint: "מקלידים שם של מוצר, ורואים על המפה בדיוק איפה הוא.",
+    kioskRouteTitle: "המסלול שלכם",
+    kioskRouteSummary: (stops, metres, minutes) =>
+      `${stops === 1 ? "עצירה אחת" : `${stops} עצירות`} · כ־${metres} מטר · ${minutes === 1 ? "כדקה" : `כ־${minutes} דקות`} הליכה`,
+    kioskRouteEnds: "מתחילים בכניסה ומסיימים בקופות",
+    kioskAddMore: "מוסיפים עוד מוצר",
+    kioskQrKicker: "רשימה ארוכה?",
+    kioskQrKickerItems: "ממשיכים בטלפון",
+    kioskScanHow: "מכוונים את המצלמה של הטלפון לקוד",
+    kioskMapIdle: "בוחרים מוצר, והמסלול יצויר כאן",
+    kioskMapShowing: (place) => `מסומן במפה: ${place}`,
+    kioskIdleWarning: "עוד רגע המסך יתחיל מחדש. נוגעים כדי להמשיך",
+    kioskMoreOnPhone: "יש עוד ברשימה? סורקים את הקוד, והמסלול ממשיך בטלפון עם כל הפריטים",
     screenMaySleep: "המסך עלול לכבות: שמירה על מסך דלוק דורשת HTTPS.",
 
     adminTitle: "ניהול הסניף",
@@ -727,9 +752,22 @@ export const strings: Record<Language, Strings> = {
 
     kioskScanTitle: "Scan for your full shopping list & route - No App Needed!",
     kioskScanItems: "The items you picked come along to your phone.",
-    quickSearchTitle: "Quick Search (1-3 items)",
     quickFull: "That's 3 items. For more, scan the code",
     quickClear: "Start over",
+    kioskWelcome: "What are you looking for today?",
+    kioskWelcomeHint: "Type a product and see exactly where it is on the map.",
+    kioskRouteTitle: "Your route",
+    kioskRouteSummary: (stops, metres, minutes) =>
+      `${stops === 1 ? "1 stop" : `${stops} stops`} · about ${metres} m · about ${minutes} min walk`,
+    kioskRouteEnds: "From the entrance to the checkout",
+    kioskAddMore: "Add another item",
+    kioskQrKicker: "Got a longer list?",
+    kioskQrKickerItems: "Take it with you",
+    kioskScanHow: "Point your phone's camera at the code",
+    kioskMapIdle: "Pick an item and its route appears here",
+    kioskMapShowing: (place) => `On the map: ${place}`,
+    kioskIdleWarning: "The screen starts over in a moment. Touch it to keep going",
+    kioskMoreOnPhone: "More on your list? Scan the code and carry on with every item on your phone",
     screenMaySleep: "The screen may turn off: keeping it on needs HTTPS.",
 
     adminTitle: "Store management",

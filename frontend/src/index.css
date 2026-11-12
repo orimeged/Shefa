@@ -274,6 +274,20 @@ label {
   }
 }
 
+/* The kiosk's "starting over" notice: the bar runs out as the screen's time does. */
+.idle-bar {
+  animation: idle-bar 10s linear both;
+}
+
+@keyframes idle-bar {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
 @keyframes card-in {
   from {
     transform: translateY(8px) scale(0.97);

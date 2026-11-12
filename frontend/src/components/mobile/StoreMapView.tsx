@@ -67,7 +67,8 @@ const px = (pixels: number) => ({ strokeWidth: `calc(var(--u, 0.08) * ${pixels}p
 interface StoreMapViewProps {
   /** The graph's aisles or a drawn floor plan; the route's points are in metres on either. */
   layout: MapLayout;
-  route: Route;
+  /** Null before anything is picked: the store alone, as the kiosk shows it waiting. */
+  route: Route | null;
   found: FoundSet;
   /** Stations already reached, wherever later routes go; drawn ticked off. */
   reached?: readonly RouteStop[];
@@ -90,6 +91,13 @@ interface StoreMapViewProps {
   markerScale?: number;
   /** A finger drags it, two pinch it, a wheel or a double tap zooms it. */
   interactive?: boolean;
+  /** A drawn shelf to pick out while no station is next, such as a search's first hit. */
+  highlight?: string | null;
+  /**
+   * Screen pixels the camera keeps free under the store, so the entrance's name
+   * fits below its door when a wide screen leaves no height to spare.
+   */
+  footRoom?: number;
   className?: string;
 }
 
@@ -111,6 +119,8 @@ export function StoreMapView({
   zoneBadges,
   markerScale = 1,
   interactive = true,
+  highlight = null,
+  footRoom = 0,
   className = "block h-full w-full",
 }: StoreMapViewProps) {
   const { t } = useLanguage();
@@ -126,13 +136,13 @@ export function StoreMapView({
     return trailRef.current;
   }, [route, found]);
 
-  const ahead = remainingLegs(route, found);
-  const pending = useMemo(() => pendingStops(route, found), [route, found]);
+  const ahead = route ? remainingLegs(route, found) : [];
+  const pending = useMemo(() => (route ? pendingStops(route, found) : []), [route, found]);
   const pins = useMemo(() => stopPins(pending, layout), [pending, layout]);
   const next = emphasis === "next" ? pending[0] : undefined;
   const current = emphasis === "next" ? ahead.slice(0, 1) : ahead;
   const later = emphasis === "next" ? ahead.slice(1) : [];
-  const here = layout.toSvg(currentPoint(route, found));
+  const here = route ? layout.toSvg(currentPoint(route, found)) : layout.entrance;
   const isFraming = focus === "route" && emphasis === "next";
 
   const overview = useMemo(() => parseViewBox(layout.viewBox), [layout]);
@@ -148,7 +158,7 @@ export function StoreMapView({
   }, [isFraming, current, next, layout, overview]);
   const cameraInsets = isFraming ? { ...insets, top: insets.top + PIN_HEADROOM_PX } : insets;
   const { screen, resting, isFree, recenter } = useMapCamera(svg, target, {
-    insets: cameraInsets,
+    insets: footRoom ? { ...cameraInsets, bottom: cameraInsets.bottom + footRoom } : cameraInsets,
     minSpan: isFraming ? ROUTE_MIN_SPAN : 0.01,
     bounds: overview,
     interactive,
@@ -431,7 +441,7 @@ export function StoreMapView({
       className={`absolute inset-0 block h-full w-full ${interactive ? "map-surface" : ""}`}
       style={{ "--marker-scale": markerScale } as CSSProperties}
     >
-      <MapFloor layout={layout} highlight={nextDepartment} showShelfNames={false} />
+      <MapFloor layout={layout} highlight={nextDepartment ?? highlight} showShelfNames={false} />
 
       <g className="pointer-events-none" fill="none" strokeLinecap="round" strokeLinejoin="round">
         {walkedPoints && (

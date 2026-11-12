@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { IdleTimer } from "../lib/kiosk/idleTimer";
 
 // Pointer events cover touch. Keys and input cover the tablet's on-screen keyboard.
-const ACTIVITY_EVENTS = ["pointerdown", "keydown", "input", "scroll"] as const;
+export const ACTIVITY_EVENTS = ["pointerdown", "keydown", "input", "scroll"] as const;
 
 /** Calls `onIdle` when the screen has gone untouched for `timeoutMs`. */
 export function useIdleReset(timeoutMs: number, onIdle: () => void): void {

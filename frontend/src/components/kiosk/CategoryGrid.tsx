@@ -33,7 +33,7 @@ export function CategoryGrid({ map, cartIds, onAdd }: CategoryGridProps) {
   };
 
   return (
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-[1.1vh]">
       {map.categories.map((category) => {
         const added = cartIds.has(category.id);
         const name = pick(category.name, category.name_en);
@@ -44,13 +44,15 @@ export function CategoryGrid({ map, cartIds, onAdd }: CategoryGridProps) {
               disabled={added}
               onClick={() => addCategory(category)}
               aria-label={added ? t.alreadyAdded(name) : t.addItem(name)}
-              className="relative flex h-30 w-full flex-col items-center gap-2 rounded-3xl bg-surface px-2 pt-5 text-center ring-1 ring-line transition-colors hover:bg-brand-soft disabled:bg-brand-soft"
+              className="flex h-[clamp(4rem,8.2vh,5.5rem)] portrait:h-[clamp(3.5rem,5.4vh,4.5rem)] w-full items-center gap-2.5 rounded-2xl bg-surface ps-2.5 pe-2 text-start shadow-sm ring-1 ring-line transition hover:ring-2 hover:ring-brand active:scale-[0.98] disabled:bg-brand-soft disabled:ring-2 disabled:ring-brand"
             >
-              <CategoryIcon categoryId={category.id} className="size-8 text-brand" />
-              <span className="text-lg leading-tight font-medium">{name}</span>
-              {added && (
-                <Check aria-hidden className="absolute end-3 top-3 size-6 text-brand" />
-              )}
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+                <CategoryIcon categoryId={category.id} className="size-6" />
+              </span>
+              <span className="line-clamp-2 min-w-0 flex-1 text-[clamp(1rem,2vh,1.2rem)] leading-tight font-medium">
+                {name}
+              </span>
+              {added && <Check aria-hidden className="size-6 shrink-0 text-brand" />}
             </button>
           </li>
         );
