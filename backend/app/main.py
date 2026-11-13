@@ -14,17 +14,20 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app.api.admin import inventory_error_response
 from app.api.admin import router as admin_router
 from app.api.analytics import router as analytics_router
+from app.api.staff import router as staff_router
 from app.api.events import router as events_router
 from app.api.floor_plan import router as floor_plan_router
 from app.api.list_photo import router as list_photo_router
 from app.api.routes import router
-from app.api.transcription import router as transcription_router
 from app.config import Settings
 from app.domain.classifier import ItemClassifier
 from app.domain.inventory import InventoryError
 from app.domain.list_photo import ListPhotoReader
 from app.domain.speech import SpeechToText
 from app.repositories.analytics_store import SqlAnalyticsStore
+from app.repositories.pick_store import SqlPickSessions
+from app.repositories.push_store import SqlPushSubscriptions
+from app.services.push import AlertNotifier, WebPushSender
 from app.repositories.database import create_database_engine, migrate, printable_url
 from app.repositories.event_store import SqlEventStore
 from app.repositories.floor_plan_repository import SqlFloorPlanRepository
@@ -84,7 +87,7 @@ def build_list_photo_reader(settings: Settings) -> ListPhotoReader | None:
 def build_speech_engine(
     settings: Settings, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
 ) -> SpeechToText | None:
-    """With none, the app tells the phone to use the keyboard's own microphone."""
+    """For the dashboard's spoken inventory; with none, managers type instead."""
     match settings.stt_engine:
         case "openai":
             model = settings.stt_model or DEFAULT_STT_MODEL
@@ -95,6 +98,23 @@ def build_speech_engine(
         case _:
             logger.info("Speech-to-text is off")
             return None
+
+
+def build_notifier(settings: Settings, subscriptions: SqlPushSubscriptions) -> AlertNotifier:
+    """Push alerts to staff phones only with a whole VAPID key pair and a contact."""
+    keys = (settings.vapid_public_key, settings.vapid_private_key, settings.vapid_subject)
+    if not all(keys):
+        if any(keys):
+            logger.warning("Push alerts are off: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT are all needed")
+        else:
+            logger.info("Push alerts are off: no VAPID key; staff see alerts while their app is open")
+        return AlertNotifier(subscriptions, None, None)
+    logger.info("Push alerts to staff phones are on")
+    return AlertNotifier(
+        subscriptions,
+        WebPushSender(settings.vapid_private_key or "", settings.vapid_subject or ""),
+        settings.vapid_public_key,
+    )
 
 
 def log_cors(settings: Settings) -> None:
@@ -131,8 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.floor_plans = FloorPlanRegistry(SqlFloorPlanRepository(database))
 
-        engine = build_speech_engine(resolved)
-        app.state.transcription = TranscriptionService(engine) if engine else None
+        # Spoken inventory in the dashboard. Shoppers speak through their keyboard's own microphone.
         inventory_engine = build_speech_engine(resolved, _INVENTORY_SPEECH_TIMEOUT_SECONDS)
         app.state.inventory_transcription = (
             TranscriptionService(inventory_engine, _INVENTORY_SPEECH_CALLS_PER_MINUTE)
@@ -142,6 +161,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.inventory_extractor = build_inventory_extractor(resolved)
         app.state.list_photo_reader = build_list_photo_reader(resolved)
         app.state.admin_token = resolved.admin_token
+        app.state.staff_token = resolved.staff_token
+        app.state.push_subscriptions = SqlPushSubscriptions(database)
+        app.state.notifier = build_notifier(resolved, app.state.push_subscriptions)
+        app.state.picks = SqlPickSessions(database)
         app.state.allowed_origins = resolved.cors_origins
         app.state.allowed_origin_regex = resolved.cors_origin_regex
         app.state.events = SqlEventStore(database)
@@ -163,12 +186,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(GZipMiddleware, minimum_size=2048)
     app.add_exception_handler(InventoryError, inventory_error_response)
     app.include_router(router)
-    app.include_router(transcription_router)
     app.include_router(list_photo_router)
     app.include_router(events_router)
     app.include_router(floor_plan_router)
     app.include_router(admin_router)
     app.include_router(analytics_router)
+    app.include_router(staff_router)
     return app
 
 

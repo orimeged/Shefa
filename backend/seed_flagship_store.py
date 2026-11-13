@@ -40,6 +40,7 @@ from app.domain.inventory import CatalogRow
 from app.domain.models import Category, Store
 from app.repositories.analytics_store import SqlAnalyticsStore
 from app.repositories.database import create_database_engine, migrate, printable_url
+from app.repositories.pick_store import SqlPickSessions
 from app.repositories.event_store import DEMO_SESSION_PREFIX, SqlEventStore
 from app.repositories.floor_plan_repository import SqlFloorPlanRepository
 from app.repositories.inventory_repository import SqlInventoryRepository
@@ -148,6 +149,38 @@ def plan_reports(
     return events
 
 
+def plan_report_maker(
+    router: GridRouter,
+    plan: FloorPlan,
+    store_id: str,
+    subcategory_of: Mapping[str, str],
+    now: datetime,
+    rng: random.Random,
+) -> demo.MakeReport:
+    """A report at the item's own shelf on the plan, for alerts the seed marks closed."""
+    size = plan.cell_size_m
+
+    def make(category_id: str, item: str, moment: datetime, tag: str) -> NotFoundEvent:
+        stop = router.stop_for(subcategory_of[item])
+        if stop is None:
+            raise FlagshipError(f"no shelf on the plan for {item}")
+        row, col = stop
+        return NotFoundEvent.from_report(
+            NotFoundReport(
+                store_id=store_id,
+                session_id=f"{DEMO_SESSION_PREFIX}flagship-closed-{tag}",
+                item_query=item,
+                category_id=category_id,
+                x_coord=(col + 0.5) * size + rng.uniform(-REPORT_SPREAD_M, REPORT_SPREAD_M),
+                y_coord=(plan.rows - row - 0.5) * size + rng.uniform(-REPORT_SPREAD_M, REPORT_SPREAD_M),
+                timestamp=moment,
+            ),
+            now,
+        )
+
+    return make
+
+
 def plan_trips(
     router: GridRouter,
     layout: Store,
@@ -238,6 +271,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.clear:
             events.replace_demo_events([])
             analytics.replace_demo_data([], [])
+            SqlPickSessions(database).replace_demo_sessions([])
             inventory.remove_imported_catalog(layout)
             print(f"Removed the demo activity and catalog from {where}. The floor plan stays; --restore-plan puts back an older one.")
             return 0
@@ -254,15 +288,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             router, plan, layout.id, subcategory_of,
             (*demo.PROBLEM_REPORTS, *demo.BACKGROUND_REPORTS), demo._open_hours(now), now, rng, "",
         )
-        earlier = plan_reports(
-            router, plan, layout.id, subcategory_of, demo.PREVIOUS_WEEK_REPORTS,
-            demo._open_hours(now, oldest=2 * demo.WEEK_HOURS - 24, newest=demo.WEEK_HOURS + 24),
-            now, rng, "previous-",
-        )
+        make = plan_report_maker(router, plan, layout.id, subcategory_of, now, rng)
+        closed = [
+            *demo.closed_reports(demo.CLOSED_THIS_WEEK, demo.closed_this_week_hours(now), rng, make, "week-"),
+            *demo.closed_reports(demo.PREVIOUS_WEEK_REPORTS, demo.previous_week_hours(now), rng, make, "previous-"),
+        ]
         misses = demo.build_misses(now, rng)
         trips = plan_trips(router, layout, catalog, now, rng)
-        events.replace_demo_events([*reports, *earlier])
+        events.replace_demo_events(reports, closed)
         analytics.replace_demo_data(misses, trips)
+        SqlPickSessions(database).replace_demo_sessions(demo.build_pick_sessions(layout.id, now, rng))
     finally:
         database.dispose()
 

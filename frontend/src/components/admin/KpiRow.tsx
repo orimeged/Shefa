@@ -1,13 +1,15 @@
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 
-import type { CountPair, DashboardCounts } from "../../api/types";
+import type { DashboardCounts, LostSalesReport } from "../../api/types";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { Trend } from "../../lib/admin/analytics";
 import { trendOf } from "../../lib/admin/analytics";
+import { formatShekels } from "../../lib/admin/money";
 import { Notice } from "../Notice";
 
 interface KpiRowProps {
   counts: DashboardCounts | null;
+  lostSales: LostSalesReport | null;
   failed: boolean;
   onRetry: () => void;
   onOpenAlerts: () => void;
@@ -22,71 +24,101 @@ const TONE_CLASSES = {
 const CARD =
   "rounded-2xl bg-white p-5 text-start shadow-sm ring-1 ring-slate-200 transition duration-200 hover:-translate-y-0.5 hover:shadow-md";
 
-export function KpiRow({ counts, failed, onRetry, onOpenAlerts }: KpiRowProps) {
-  const { t } = useLanguage();
+/**
+ * The money first: what went missing this week at shelf prices, and how fast the
+ * shelves came back. Then the alerts still open, and how many shoppers used it.
+ */
+export function KpiRow({ counts, lostSales, failed, onRetry, onOpenAlerts }: KpiRowProps) {
+  const { t, language } = useLanguage();
 
-  if (!counts) {
+  if (!counts || !lostSales) {
     return failed ? (
       <Notice message={t.loadFailed} onRetry={onRetry} />
     ) : (
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[0, 1, 2].map((slot) => (
-          <div key={slot} className="h-32 animate-pulse rounded-2xl bg-slate-200/70" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((slot) => (
+          <div key={slot} className="h-36 animate-pulse rounded-2xl bg-slate-200/70" />
         ))}
       </div>
     );
   }
 
+  const restock = lostSales.restock_median_minutes;
+  const previousRestock = lostSales.previous_restock_median_minutes;
+
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <KpiCard
-        label={t.kpiRoutesToday}
-        pair={counts.routes_today}
-        upIsGood
-        comparison={t.kpiVsSameHours}
+        id="lost-value"
+        label={t.kpiLostValue}
+        value={formatShekels(lostSales.value_agorot, language, true)}
+        trend={trendOf({ current: lostSales.value_agorot, previous: lostSales.previous_value_agorot }, false)}
+        comparison={t.kpiVsPreviousWeek}
+        detail={t.kpiLostValueDetail(lostSales.reports)}
       />
       <KpiCard
+        id="restock-time"
+        label={t.kpiRestockTime}
+        value={restock === null ? "—" : t.durationMinutes(restock)}
+        trend={restock !== null && previousRestock !== null ? trendOf({ current: restock, previous: previousRestock }, false) : null}
+        comparison={t.kpiVsPreviousWeek}
+        detail={restock === null ? t.kpiRestockNone : t.kpiRestockDetail(lostSales.restocked_alerts)}
+      />
+      <KpiCard
+        id="open-alerts"
         label={t.kpiMissingAlerts}
-        pair={counts.missing_alerts}
-        upIsGood={false}
+        value={counts.missing_alerts.current.toLocaleString()}
+        trend={trendOf(counts.missing_alerts, false)}
         comparison={t.kpiVsLastWeek}
+        detail={
+          lostSales.open_value_agorot > 0
+            ? t.kpiOpenValue(formatShekels(lostSales.open_value_agorot, language, true))
+            : undefined
+        }
         onClick={onOpenAlerts}
       />
       <KpiCard
-        label={t.kpiUnfulfilled}
-        pair={counts.unfulfilled_searches}
-        upIsGood={false}
-        comparison={t.kpiVsPreviousWeek}
+        id="routes-today"
+        label={t.kpiRoutesToday}
+        value={counts.routes_today.current.toLocaleString()}
+        trend={trendOf(counts.routes_today, true)}
+        comparison={t.kpiVsSameHours}
       />
     </div>
   );
 }
 
 interface KpiCardProps {
+  id: string;
   label: string;
-  pair: CountPair;
-  upIsGood: boolean;
+  value: string;
+  /** Null when there is nothing to compare with. */
+  trend: Trend | null;
   comparison: string;
+  detail?: string;
   onClick?: () => void;
 }
 
-function KpiCard({ label, pair, upIsGood, comparison, onClick }: KpiCardProps) {
+function KpiCard({ id, label, value, trend, comparison, detail, onClick }: KpiCardProps) {
   const body = (
     <>
       <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-900">
-        {pair.current.toLocaleString()}
+      <p data-kpi-value className="mt-1 text-4xl font-semibold tracking-tight text-slate-900 tabular-nums">
+        {value}
       </p>
-      <TrendLine trend={trendOf(pair, upIsGood)} comparison={comparison} />
+      {trend && <TrendLine trend={trend} comparison={comparison} />}
+      {detail && <p className="mt-1 text-sm text-slate-500">{detail}</p>}
     </>
   );
 
   return onClick ? (
-    <button type="button" onClick={onClick} className={`${CARD} block w-full`}>
+    <button type="button" data-kpi={id} onClick={onClick} className={`${CARD} block w-full`}>
       {body}
     </button>
   ) : (
-    <div className={CARD}>{body}</div>
+    <div data-kpi={id} className={CARD}>
+      {body}
+    </div>
   );
 }
 

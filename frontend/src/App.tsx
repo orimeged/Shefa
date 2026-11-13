@@ -8,6 +8,7 @@ import { LanguageProvider } from "./i18n/LanguageProvider";
 const AdminView = lazy(() => import("./views/AdminView"));
 const KioskView = lazy(() => import("./views/KioskView"));
 const MobileView = lazy(() => import("./views/MobileView"));
+const StaffView = lazy(() => import("./views/StaffView"));
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
             <Route path="/kiosk" element={<KioskView />} />
             <Route path="/mobile" element={<MobileView />} />
             <Route path="/admin" element={<AdminView />} />
+            <Route path="/staff" element={<StaffView />} />
             <Route path="*" element={<Navigate to="/kiosk" replace />} />
           </Routes>
         </Suspense>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { AdminApi } from "../api/adminClient";
 import { ApiError } from "../api/client";
-import type { CatalogProduct, ProductChanges, ProductDraft } from "../api/types";
+import type { CatalogProduct, PriceImport, ProductChanges, ProductDraft } from "../api/types";
 
 /** Why a save didn't go through, in words a manager can act on. */
 export type CatalogProblem = "duplicate" | "invalid" | "failed";
@@ -69,7 +69,21 @@ export function useCatalog(api: AdminApi) {
     [api],
   );
 
-  return { products, failed, reload, create, update, remove };
+  /** A chain's price file; on success the catalog reloads with the new prices. */
+  const importPrices = useCallback(
+    async (file: Blob): Promise<PriceImport | null> => {
+      try {
+        const result = await api.importPrices(file);
+        reload();
+        return result;
+      } catch {
+        return null;
+      }
+    },
+    [api, reload],
+  );
+
+  return { products, failed, reload, create, update, remove, importPrices };
 }
 
 export type Catalog = ReturnType<typeof useCatalog>;

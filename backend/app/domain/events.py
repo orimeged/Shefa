@@ -1,19 +1,29 @@
 """Facts recorded about what shoppers did. Events are appended and never changed."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Protocol
+from typing import Annotated, Literal, Protocol
 from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
 
 # One report can be a mistake. The dashboard treats this many as a real problem.
 ALERT_THRESHOLD = 3
+# How far back an open report still counts toward an item's alert.
+ALERT_WINDOW = timedelta(days=7)
 
 # A phone's clock can be wrong. An event can't have happened in the future.
 _MAX_CLOCK_SKEW = timedelta(minutes=5)
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 ShortId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
+
+# What a manager found on closing a report. The first is stock that ran out; the
+# other two mean the item was there and the shopper couldn't find it.
+Resolution = Literal["restocked", "relocated", "on_shelf"]
+RESTOCKED: Resolution = "restocked"
+
+# Who reported it. Only staff can send "picker" reports, through their own endpoint.
+Source = Literal["shopper", "picker"]
 
 
 class NotFoundReport(BaseModel):
@@ -46,9 +56,12 @@ class NotFoundEvent(BaseModel):
     x_coord: float
     y_coord: float
     timestamp: datetime
+    source: Source = "shopper"
 
     @classmethod
-    def from_report(cls, report: NotFoundReport, now: datetime | None = None) -> "NotFoundEvent":
+    def from_report(
+        cls, report: NotFoundReport, now: datetime | None = None, source: Source = "shopper"
+    ) -> "NotFoundEvent":
         received_at = now or datetime.now(UTC)
         happened_at = (report.timestamp or received_at).astimezone(UTC)
         if happened_at > received_at + _MAX_CLOCK_SKEW:
@@ -62,6 +75,7 @@ class NotFoundEvent(BaseModel):
             x_coord=report.x_coord,
             y_coord=report.y_coord,
             timestamp=happened_at,
+            source=source,
         )
 
 
@@ -76,6 +90,20 @@ class NotFoundTally(BaseModel):
     last_reported_at: datetime
 
 
+class ReportRecord(BaseModel):
+    """One report as stored, with how it was closed, for the reports that add them up."""
+
+    model_config = ConfigDict(frozen=True)
+
+    item_query: str
+    category_id: str | None
+    timestamp: datetime
+    resolved_at: datetime | None
+    # None on a report closed before closing said why, or one still open.
+    resolution: Resolution | None
+    source: Source
+
+
 class EventStore(Protocol):
     def append(self, event: NotFoundEvent) -> bool:
         """Stores `event`. False means this event_id was already recorded."""
@@ -86,7 +114,20 @@ class EventStore(Protocol):
         ...
 
     def resolve_not_found(
-        self, store_id: str, item_query: str, category_id: str | None, at: datetime
+        self,
+        store_id: str,
+        item_query: str,
+        category_id: str | None,
+        at: datetime,
+        resolution: Resolution = RESTOCKED,
     ) -> int:
         """Closes an item's open reports and returns how many. A later report opens a new alert."""
+        ...
+
+    def report_records(self, store_id: str, since: datetime) -> list[ReportRecord]:
+        """Every report made since `since`, open or closed, oldest first."""
+        ...
+
+    def open_reports(self, store_id: str, item_query: str, category_id: str | None, since: datetime) -> int:
+        """An item's reports still open since `since`."""
         ...

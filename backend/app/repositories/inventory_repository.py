@@ -4,6 +4,7 @@ from collections import defaultdict
 from collections.abc import Collection, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import Engine, delete, func, select, update
 from sqlalchemy.orm import Session
@@ -11,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.domain import models
 from app.domain.inventory import (
     CatalogProduct,
+    PriceImport,
+    PriceLine,
+    PricedProduct,
     DuplicateItemError,
     ProductDraft,
     CatalogCategory,
@@ -23,14 +27,19 @@ from app.domain.inventory import (
     StagedItem,
     Zone,
     ZoneItem,
+    product_stop_id,
 )
+from app.domain.inventory import product_id_of_stop as _product_id_of
 from app.domain.search_text import normalize
 from app.services.pos_import import ean13_is_valid
 from app.repositories.inventory_tables import Category, MapNode, NodeAssignment, Product, StoreRecord
 
 _SIDE_NAMES = {models.Side.LEFT: "שמאל", models.Side.RIGHT: "ימין"}
-_PRODUCT_STOP_PREFIX = "product-"
 _POS_SOURCE = "pos"
+
+
+def _barcode_key(barcode: str) -> str:
+    return barcode.strip().lstrip("0")
 
 
 def zone_element_id(section_id: str) -> str:
@@ -38,13 +47,6 @@ def zone_element_id(section_id: str) -> str:
     return f"zone-{section_id}"
 
 
-def product_stop_id(product_id: int) -> str:
-    return f"{_PRODUCT_STOP_PREFIX}{product_id}"
-
-
-def _product_id_of(stop_id: str) -> int | None:
-    number = stop_id.removeprefix(_PRODUCT_STOP_PREFIX)
-    return int(number) if number != stop_id and number.isdecimal() else None
 
 
 def _zone_names(layout: models.Store) -> dict[str, str]:
@@ -521,6 +523,9 @@ class SqlInventoryRepository:
                 product.subcategory = row.subcategory
                 product.source = _POS_SOURCE
                 product.category_id = categories[row.department].id
+                if row.price_agorot is not None and row.price_agorot != product.price_agorot:
+                    product.price_agorot = row.price_agorot
+                    product.price_updated_at = datetime.now(UTC)
                 session.flush()
 
                 self._place(session, zones[row.zone].id, EntityType.PRODUCT, product.id)
@@ -789,12 +794,14 @@ class CatalogEditing:
                 brand=_clean(draft.brand),
                 size=_clean(draft.size),
                 subcategory=_clean(draft.subcategory),
+                price_agorot=draft.price_agorot,
+                price_updated_at=datetime.now(UTC) if draft.price_agorot is not None else None,
             )
             session.add(product)
             session.flush()
             return self._row(product, {category.id: category.slug}, 0)
 
-    def update(self, store_id: str, product_id: int, changes: dict[str, str | None]) -> CatalogProduct:
+    def update(self, store_id: str, product_id: int, changes: dict[str, Any]) -> CatalogProduct:
         repository = self._repository
         with repository._writing(store_id) as session:
             product = session.scalar(
@@ -819,6 +826,9 @@ class CatalogEditing:
             for field in ("brand", "size", "subcategory"):
                 if field in changes:
                     setattr(product, field, _clean(changes[field]))
+            if "price_agorot" in changes and changes["price_agorot"] != product.price_agorot:
+                product.price_agorot = changes["price_agorot"]
+                product.price_updated_at = datetime.now(UTC) if product.price_agorot is not None else None
             session.flush()
             slugs = {
                 category.id: category.slug
@@ -841,6 +851,75 @@ class CatalogEditing:
             if found is None:
                 raise InventoryError(f"Unknown product: {product_id}")
             repository._delete_products(session, [product_id])
+
+    def apply_prices(self, store_id: str, lines: Sequence[PriceLine], at: datetime) -> PriceImport:
+        """Sets each product's price from a price file, matched by barcode. Nothing else changes.
+
+        Barcodes are compared without leading zeros: chains write the same EAN with and
+        without them. A product the file doesn't mention keeps its price.
+        """
+        prices = {_barcode_key(line.barcode): line.price_agorot for line in lines}
+        repository = self._repository
+        with repository._writing(store_id) as session:
+            products = session.scalars(
+                select(Product).where(Product.store_id == store_id, Product.barcode.is_not(None))
+            ).all()
+            matched = updated = 0
+            for product in products:
+                price = prices.get(_barcode_key(product.barcode or ""))
+                if price is None:
+                    continue
+                matched += 1
+                if product.price_agorot != price:
+                    product.price_agorot = price
+                    product.price_updated_at = at
+                    updated += 1
+            unpriced = session.scalar(
+                select(func.count()).select_from(Product).where(
+                    Product.store_id == store_id, Product.price_agorot.is_(None)
+                )
+            )
+        return PriceImport(
+            lines=len(lines), matched=matched, updated=updated, products_without_price=unpriced or 0
+        )
+
+    def find_by_barcode(self, store_id: str, barcode: str) -> CatalogProduct | None:
+        """The product a scanner read, with or without the leading zeros a UPC code drops."""
+        key = _barcode_key(barcode)
+        if not key:
+            return None
+        repository = self._repository
+        with Session(repository._engine) as session:
+            repository._require_store(session, store_id)
+            product = session.scalar(
+                select(Product).where(Product.store_id == store_id, func.ltrim(Product.barcode, "0") == key)
+            )
+            if product is None:
+                return None
+            slugs = {
+                category.id: category.slug
+                for category in session.scalars(select(Category).where(Category.store_id == store_id))
+            }
+            zones = session.scalar(
+                select(func.count()).select_from(NodeAssignment).where(
+                    NodeAssignment.entity_type == EntityType.PRODUCT.value,
+                    NodeAssignment.entity_id == product.id,
+                )
+            )
+            return self._row(product, slugs, zones or 0)
+
+    def priced_products(self, store_id: str) -> list[PricedProduct]:
+        """Every product with what a report needs to value it: its name, department and price."""
+        with Session(self._repository._engine) as session:
+            rows = session.execute(
+                select(Product.id, Product.name, Product.name_key, Category.slug, Product.price_agorot)
+                .join(Category, Category.id == Product.category_id)
+                .where(Product.store_id == store_id)
+            ).all()
+        return [
+            PricedProduct(id=id_, name=name, name_key=name_key, department=slug, price_agorot=price)
+            for id_, name, name_key, slug, price in rows
+        ]
 
     @staticmethod
     def _department(session: Session, store_id: str, slug: str) -> Category:
@@ -875,4 +954,11 @@ class CatalogEditing:
             subcategory=product.subcategory,
             source=product.source,
             zones=zones,
+            price_agorot=product.price_agorot,
+            # SQLite hands timestamps back without their zone; they were written in UTC.
+            price_updated_at=(
+                product.price_updated_at.replace(tzinfo=UTC)
+                if product.price_updated_at and product.price_updated_at.tzinfo is None
+                else product.price_updated_at
+            ),
         )

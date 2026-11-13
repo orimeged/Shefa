@@ -1,4 +1,4 @@
-import { LoaderCircle, MapPin, PackageCheck, TriangleAlert } from "lucide-react";
+import { Eye, LoaderCircle, MapPin, PackageCheck, TriangleAlert } from "lucide-react";
 import { Fragment } from "react";
 
 import type { NotFoundReportRow } from "../../api/types";
@@ -9,6 +9,7 @@ import {
   needsAttention,
   reportRowKey,
 } from "../../lib/admin/stockAlerts";
+import { formatShekels } from "../../lib/admin/money";
 import { Notice } from "../Notice";
 
 export interface AlertOutcome {
@@ -23,6 +24,8 @@ interface ShelfStockAlertsProps {
   outcome: AlertOutcome | null;
   onRetry: () => void;
   onRestocked: (row: NotFoundReportRow) => void;
+  /** The item was on its shelf all along: closed as misplaced, not as an empty shelf. */
+  onOnShelf: (row: NotFoundReportRow) => void;
   onUpdateLocation: (row: NotFoundReportRow) => void;
 }
 
@@ -33,6 +36,7 @@ export function ShelfStockAlerts({
   outcome,
   onRetry,
   onRestocked,
+  onOnShelf,
   onUpdateLocation,
 }: ShelfStockAlertsProps) {
   const { t, pick, language } = useLanguage();
@@ -79,6 +83,9 @@ export function ShelfStockAlerts({
                 <th scope="col" className="px-2 py-3 text-center font-medium sm:px-4">
                   {t.alertTimes}
                 </th>
+                <th scope="col" className="hidden px-4 py-3 text-end font-medium md:table-cell">
+                  {t.alertValue}
+                </th>
                 <th scope="col" className="px-4 py-3 text-start font-medium">
                   {t.alertLastReported}
                 </th>
@@ -100,9 +107,11 @@ export function ShelfStockAlerts({
                     row={row}
                     isResolving={resolvingKey === key}
                     onRestocked={onRestocked}
+                    onOnShelf={onOnShelf}
                     onUpdateLocation={onUpdateLocation}
                   />
                 );
+                const estimated = row.price_basis !== null && row.price_basis !== "product";
 
                 return (
                   <Fragment key={key}>
@@ -131,6 +140,20 @@ export function ShelfStockAlerts({
                           </span>
                         )}
                       </td>
+                      <td
+                        data-value
+                        title={row.price_basis ? t.lostSalesBasis[row.price_basis] : t.lostSalesNoPrice}
+                        className="hidden px-4 pt-3 pb-1 text-end font-semibold whitespace-nowrap tabular-nums md:table-cell lg:py-3"
+                      >
+                        {row.unit_price_agorot === null ? (
+                          <span className="font-normal text-muted">—</span>
+                        ) : (
+                          <>
+                            {estimated && <span aria-hidden>≈ </span>}
+                            {formatShekels(row.value_agorot, language)}
+                          </>
+                        )}
+                      </td>
                       <td className="px-4 pt-3 pb-1 text-sm whitespace-nowrap text-muted lg:py-3">
                         {formatReportTime(row.last_reported_at, language)}
                       </td>
@@ -138,7 +161,7 @@ export function ShelfStockAlerts({
                     </tr>
                     {/* Too wide for a column on a phone, so it takes a line of its own. */}
                     <tr className={`border-b border-line last:border-b-0 lg:hidden ${background}`}>
-                      <td colSpan={5} className="px-4 pb-3">
+                      <td colSpan={6} className="px-4 pb-3">
                         {actions}
                       </td>
                     </tr>
@@ -157,10 +180,11 @@ interface RowActionsProps {
   row: NotFoundReportRow;
   isResolving: boolean;
   onRestocked: (row: NotFoundReportRow) => void;
+  onOnShelf: (row: NotFoundReportRow) => void;
   onUpdateLocation: (row: NotFoundReportRow) => void;
 }
 
-function RowActions({ row, isResolving, onRestocked, onUpdateLocation }: RowActionsProps) {
+function RowActions({ row, isResolving, onRestocked, onOnShelf, onUpdateLocation }: RowActionsProps) {
   const { t } = useLanguage();
 
   return (
@@ -188,6 +212,16 @@ function RowActions({ row, isResolving, onRestocked, onUpdateLocation }: RowActi
       >
         <MapPin aria-hidden className="size-4" />
         {t.alertUpdateLocation}
+      </button>
+      <button
+        type="button"
+        disabled={isResolving}
+        aria-label={`${t.alertOnShelf}: ${row.item_query}`}
+        onClick={() => onOnShelf(row)}
+        className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface px-3 text-sm font-semibold whitespace-nowrap text-ink ring-1 ring-line hover:bg-brand-soft disabled:opacity-60 lg:flex-none"
+      >
+        <Eye aria-hidden className="size-4" />
+        {t.alertOnShelf}
       </button>
     </div>
   );

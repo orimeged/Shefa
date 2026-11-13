@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CatalogProduct, FloorPlanCheck } from "../../api/types";
-import { barcodeProblem, filterCatalog, planShelves, shelfFor, shelvesOf } from "./catalog";
+import { barcodeProblem, draftOf, filterCatalog, planShelves, shelfFor, shelvesOf } from "./catalog";
 
 function check(departments: FloorPlanCheck["departments"], routable = true): FloorPlanCheck {
   return { routable, departments } as FloorPlanCheck;
@@ -22,6 +22,8 @@ function product(fields: Partial<CatalogProduct>): CatalogProduct {
     source: null,
     zones: 0,
     shelf: null,
+    price_agorot: null,
+    price_updated_at: null,
     ...fields,
   };
 }
@@ -100,5 +102,20 @@ describe("filterCatalog", () => {
   it("keeps one department, or only what isn't on the map", () => {
     expect(ids({ query: "", department: "drinks", offMapOnly: false })).toEqual([3]);
     expect(ids({ query: "", department: "", offMapOnly: true })).toEqual([2]);
+  });
+});
+
+describe("draftOf", () => {
+  it("opens an edit with every saved field, the price too, so saving never clears it", () => {
+    const draft = draftOf(product({ name: "חלב 3%", barcode: "7290000002200", price_agorot: 710, subcategory: "חלב וביצים" }));
+    expect(draft).toEqual({
+      name: "חלב 3%",
+      barcode: "7290000002200",
+      brand: null,
+      size: null,
+      department: "dairy",
+      subcategory: "חלב וביצים",
+      price_agorot: 710,
+    });
   });
 });

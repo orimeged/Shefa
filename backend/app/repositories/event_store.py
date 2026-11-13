@@ -6,12 +6,12 @@ from migration 0003 hold that line for anything that writes to the table.
 """
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Engine, text
 
-from app.domain.events import NotFoundEvent, NotFoundTally
+from app.domain.events import RESTOCKED, NotFoundEvent, NotFoundTally, ReportRecord, Resolution
 
 # Marks a made-up report from seed_demo_data.py, so it can't pass for a real one.
 DEMO_SESSION_PREFIX = "demo-seed-"
@@ -23,14 +23,20 @@ _INSERT = text(
     """
     INSERT INTO not_found_events (
         event_id, store_id, session_id, item_query,
-        category_id, x_coord, y_coord, timestamp
+        category_id, x_coord, y_coord, timestamp, source,
+        resolved_at, resolution
     ) VALUES (
         :event_id, :store_id, :session_id, :item_query,
-        :category_id, :x_coord, :y_coord, :timestamp
+        :category_id, :x_coord, :y_coord, :timestamp, :source,
+        :resolved_at, :resolution
     )
     ON CONFLICT (event_id) DO NOTHING
     """
 )
+
+
+def _time(text_value: str | None) -> datetime | None:
+    return datetime.fromisoformat(text_value) if text_value else None
 
 
 def _row(event: NotFoundEvent) -> dict[str, Any]:
@@ -43,6 +49,9 @@ def _row(event: NotFoundEvent) -> dict[str, Any]:
         "x_coord": event.x_coord,
         "y_coord": event.y_coord,
         "timestamp": event.timestamp.strftime(TIMESTAMP_FORMAT),
+        "source": event.source,
+        "resolved_at": None,
+        "resolution": None,
     }
 
 
@@ -79,14 +88,19 @@ class SqlEventStore:
         ]
 
     def resolve_not_found(
-        self, store_id: str, item_query: str, category_id: str | None, at: datetime
+        self,
+        store_id: str,
+        item_query: str,
+        category_id: str | None,
+        at: datetime,
+        resolution: Resolution = RESTOCKED,
     ) -> int:
         with self._engine.begin() as connection:
             return connection.execute(
                 text(
                     """
                     UPDATE not_found_events
-                    SET resolved_at = :at
+                    SET resolved_at = :at, resolution = :resolution
                     WHERE store_id = :store
                         AND item_query = :item
                         AND category_id IS NOT DISTINCT FROM :category
@@ -95,20 +109,75 @@ class SqlEventStore:
                 ),
                 {
                     "at": at.strftime(TIMESTAMP_FORMAT),
+                    "resolution": resolution,
                     "store": store_id,
                     "item": item_query,
                     "category": category_id,
                 },
             ).rowcount
 
-    def replace_demo_events(self, events: Sequence[NotFoundEvent]) -> None:
-        """Swaps the last demo seed's rows for `events`, in one transaction. Real reports aren't touched."""
-        if not all(event.session_id.startswith(DEMO_SESSION_PREFIX) for event in events):
+    def open_reports(self, store_id: str, item_query: str, category_id: str | None, since: datetime) -> int:
+        """An item's reports still open since `since`: what its alert stands at."""
+        with self._engine.connect() as connection:
+            return connection.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM not_found_events
+                    WHERE store_id = :store
+                        AND item_query = :item
+                        AND category_id IS NOT DISTINCT FROM :category
+                        AND timestamp >= :since
+                        AND resolved_at IS NULL
+                    """
+                ),
+                {"store": store_id, "item": item_query, "category": category_id, "since": since.strftime(TIMESTAMP_FORMAT)},
+            ).scalar_one()
+
+    def report_records(self, store_id: str, since: datetime) -> list[ReportRecord]:
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    """
+                    SELECT item_query, category_id, timestamp, resolved_at, resolution, source
+                    FROM not_found_events
+                    WHERE store_id = :store AND timestamp >= :since
+                    ORDER BY timestamp, event_id
+                    """
+                ),
+                {"store": store_id, "since": since.strftime(TIMESTAMP_FORMAT)},
+            ).all()
+        return [
+            ReportRecord(
+                item_query=item_query,
+                category_id=category_id,
+                timestamp=datetime.fromisoformat(timestamp),
+                resolved_at=_time(resolved_at),
+                resolution=resolution,
+                source=source,
+            )
+            for item_query, category_id, timestamp, resolved_at, resolution, source in rows
+        ]
+
+    def replace_demo_events(
+        self,
+        events: Sequence[NotFoundEvent],
+        closed: Sequence[tuple[NotFoundEvent, datetime, Resolution]] = (),
+    ) -> None:
+        """Swaps the last demo seed's rows for `events`, in one transaction. Real reports aren't touched.
+
+        `closed` are demo reports a manager already dealt with: when, and what they found.
+        """
+        every = [*events, *(event for event, _, _ in closed)]
+        if not all(event.session_id.startswith(DEMO_SESSION_PREFIX) for event in every):
             raise ValueError(f"demo events need a session id starting {DEMO_SESSION_PREFIX}")
+        rows = [_row(event) for event in events] + [
+            {**_row(event), "resolved_at": at.astimezone(UTC).strftime(TIMESTAMP_FORMAT), "resolution": resolution}
+            for event, at, resolution in closed
+        ]
         with self._engine.begin() as connection:
             connection.execute(
                 text("DELETE FROM not_found_events WHERE session_id LIKE :demo"),
                 {"demo": f"{DEMO_SESSION_PREFIX}%"},
             )
-            if events:
-                connection.execute(_INSERT, [_row(event) for event in events])
+            if rows:
+                connection.execute(_INSERT, rows)

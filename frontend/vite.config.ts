@@ -28,12 +28,10 @@ export default defineConfig(({ mode }) => {
   const backend = env.BACKEND_URL || "http://127.0.0.1:8000";
   const proxy = {
     "/api": { target: backend, changeOrigin: true },
-    // The backend compares a socket's Origin with its Host, so Host stays as the phone sent it.
-    "/ws": { target: backend, ws: true, changeOrigin: false },
   };
 
   return {
-    // The kiosk's screen wake lock and the microphone only work over HTTPS: `--mode https` on a LAN.
+    // The kiosk's screen wake lock, the camera and the microphone only work over HTTPS: `--mode https` on a LAN.
     plugins: [react(), tailwindcss(), ...(mode === "https" ? [basicSsl()] : [])],
     define: { __LAN_IP__: JSON.stringify(detectLanIp()) },
     server: { host: true, port: 5173, strictPort: true, proxy },

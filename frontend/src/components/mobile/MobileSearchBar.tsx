@@ -1,4 +1,4 @@
-import { Check, ClipboardPaste, Mic, Plus, Search, X } from "lucide-react";
+import { Check, ClipboardPaste, Plus, Search, X } from "lucide-react";
 import type { ClipboardEvent, FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -8,9 +8,9 @@ import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { readClipboard } from "../../lib/list/clipboard";
 import { CategoryIcon } from "../CategoryIcon";
-import { LanguageToggle } from "../LanguageToggle";
+import { LanguagePicker } from "../LanguagePicker";
 
-// What the backend takes. A list dictated into the field can be longer than a search.
+// What the backend takes. A list spoken into the field can be longer than a search.
 const MAX_SEARCH_LENGTH = 80;
 const MAX_LINE_LENGTH = 200;
 
@@ -19,31 +19,25 @@ interface MobileSearchBarProps {
   /** A list is built one item after another, so the keyboard stays up between them. */
   isBuilding: boolean;
   isListed: (hit: SearchHit) => boolean;
-  micUnavailable: boolean;
   onAddHit: (hit: SearchHit) => void;
   onAddText: (text: string) => void;
-  onDictate: () => void;
-  onDismissMicHint: () => void;
   /** Shown when the empty field gets focus. Null while the page shows it anyway. */
   quickAddPanel: ReactNode;
 }
 
 /**
  * The one way to add to a list, always at the top of the screen, where the
- * keyboard can't cover it. Reading the clipboard and server dictation both have
- * gaps (no HTTPS, a refused prompt, no speech engine), so each falls back on the
- * field: long-press paste and the keyboard's microphone work on every phone, and
- * both land in the same parser.
+ * keyboard can't cover it. Speaking is the keyboard's own microphone, which every
+ * phone has in Hebrew, free and private. Reading the clipboard has gaps (no HTTPS,
+ * a refused prompt), so it falls back on the field: long-press paste works on every
+ * phone, and lands in the same parser.
  */
 export function MobileSearchBar({
   sessionId,
   isBuilding,
   isListed,
-  micUnavailable,
   onAddHit,
   onAddText,
-  onDictate,
-  onDismissMicHint,
   quickAddPanel,
 }: MobileSearchBarProps) {
   const { t, pick } = useLanguage();
@@ -67,11 +61,10 @@ export function MobileSearchBar({
 
   const trimmed = term.trim();
   const showPanel = panelOpen && !trimmed && quickAddPanel !== null;
-  const hint = micUnavailable ? t.micHint : pasteFailed ? t.pasteHint : null;
+  const hint = pasteFailed ? t.pasteHint : null;
 
   const clearHint = () => {
     setPasteFailed(false);
-    onDismissMicHint();
   };
 
   const close = () => {
@@ -96,11 +89,6 @@ export function MobileSearchBar({
       onAddText(trimmed);
       finishAdding();
     }
-  };
-
-  const dictate = () => {
-    close();
-    onDictate();
   };
 
   const pasteFromClipboard = async () => {
@@ -181,15 +169,7 @@ export function MobileSearchBar({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={dictate}
-            aria-label={t.startDictation}
-            className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-strong"
-          >
-            <Mic aria-hidden className="size-6" />
-          </button>
-          <LanguageToggle compact className="size-11 shrink-0 text-sm" />
+          <LanguagePicker compact className="size-11 shrink-0 text-sm" />
         </form>
 
         {hint && (

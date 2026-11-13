@@ -4,7 +4,7 @@
  * subcategories; a product placed on a subcategory's shelf is routed to exactly it.
  */
 
-import type { CatalogProduct, FloorPlanCheck } from "../../api/types";
+import type { CatalogProduct, FloorPlanCheck, ProductDraft } from "../../api/types";
 
 export interface ShelfOption {
   /** The shelf's name on the plan. */
@@ -68,4 +68,20 @@ export function filterCatalog(products: readonly CatalogProduct[], { query, depa
       (!offMapOnly || product.shelf === null) &&
       words.every((word) => product.name.toLowerCase().includes(word) || (product.barcode ?? "").includes(word)),
   );
+}
+
+/**
+ * A product's details as its edit form opens with them. Every field the form saves
+ * is here, the price too: a form opened without one would save it as cleared.
+ */
+export function draftOf(product: CatalogProduct): ProductDraft {
+  return {
+    name: product.name,
+    barcode: product.barcode,
+    brand: product.brand,
+    size: product.size,
+    department: product.department,
+    subcategory: product.subcategory,
+    price_agorot: product.price_agorot,
+  };
 }

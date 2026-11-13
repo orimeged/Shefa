@@ -19,7 +19,7 @@ export function reportRowKey({ category_id, item_query }: NotFoundReportRow): st
   return JSON.stringify([category_id, item_query]);
 }
 
-const LOCALES: Record<Language, string> = { he: "he-IL", en: "en-GB" };
+const LOCALES: Record<Language, string> = { he: "he-IL", en: "en-GB", ar: "ar-IL-u-nu-latn", ru: "ru-RU" };
 
 export function formatReportTime(iso: string, language: Language, timeZone?: string): string {
   return new Intl.DateTimeFormat(LOCALES[language], {

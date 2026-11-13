@@ -2,10 +2,10 @@ import { CircleAlert, Navigation, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
+import { getShelfSpot } from "../api/client";
 import type { RouteStop, SearchHit } from "../api/types";
 import { ProductDepartmentsProvider } from "../components/CategoryIcon";
 import { AddedToast } from "../components/mobile/AddedToast";
-import { DictationOverlay } from "../components/mobile/DictationOverlay";
 import { FoundBurst } from "../components/mobile/FoundBurst";
 import { ListDraft } from "../components/mobile/ListDraft";
 import { ListEntry } from "../components/mobile/ListEntry";
@@ -19,7 +19,6 @@ import { Toast } from "../components/mobile/Toast";
 import { TripHeader } from "../components/mobile/TripHeader";
 import { UnmatchedItems } from "../components/mobile/UnmatchedItems";
 import { Notice } from "../components/Notice";
-import { useDictation } from "../hooks/useDictation";
 import { useElementBox } from "../hooks/useElementBox";
 import { useNotFoundReports } from "../hooks/useNotFoundReports";
 import { useShoppingList } from "../hooks/useShoppingList";
@@ -29,6 +28,7 @@ import { useShopperStore } from "../hooks/useShopperStore";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { buzz, FOUND_BUZZ, LIST_DONE_BUZZ } from "../lib/haptics";
 import type { ListItem } from "../lib/list/shoppingItems";
+import { cellId } from "../lib/floorPlanMap";
 import { completesList, currentPoint, distanceToNextStop, remainingDistance } from "../lib/routeProgress";
 import { parseCategoryIds } from "../lib/shareUrl";
 
@@ -38,9 +38,12 @@ const FINALE_MS = 1600;
 const SIDE_INSET_PX = 18;
 
 export default function MobileView() {
-  const { t, language } = useLanguage();
-  const [params] = useSearchParams();
+  const { t } = useLanguage();
+  const [params, setParams] = useSearchParams();
   const seedIds = useMemo(() => parseCategoryIds(params.get("categories")), [params]);
+  // An aisle-end sign's code: "you are here", by the shelf's name.
+  const signShelf = params.get("at");
+  const [anchor, setAnchor] = useState<{ nodeId: string; seq: number } | null>(null);
 
   const { map, floor, layout, planRoute, failed: mapFailed, retry: retryMap } = useShopperStore();
   const list = useShoppingList(map, seedIds);
@@ -63,9 +66,9 @@ export default function MobileView() {
     restoredNodeId: list.restoredNodeId,
     sessionId: list.sessionId,
     planRoute,
+    anchor,
   });
 
-  const dictation = useDictation({ language, onTranscript: addText });
   const reportNotFound = useNotFoundReports(list.sessionId);
   const [choosingAt, setChoosingAt] = useState<RouteStop | null>(null);
   const [tripMessage, setTripMessage] = useState<string | null>(null);
@@ -84,6 +87,36 @@ export default function MobileView() {
       rememberPosition(currentPoint(route, found).node_id);
     }
   }, [route, found, rememberPosition]);
+
+  // A scanned aisle sign: the trip starts, or carries on, from that shelf. The code
+  // leaves the address, so a reload later doesn't put the shopper back there.
+  const { placeShopperAt } = list;
+  useEffect(() => {
+    if (!signShelf || !floor) {
+      return;
+    }
+    const controller = new AbortController();
+    getShelfSpot(signShelf, controller.signal)
+      .then((spot) => {
+        const nodeId = cellId(spot.row, spot.col);
+        placeShopperAt(nodeId);
+        setAnchor((current) => ({ nodeId, seq: (current?.seq ?? 0) + 1 }));
+        setTripMessage(t.youAreHere(signShelf));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (controller.signal.aborted) return;
+        setParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.delete("at");
+            return next;
+          },
+          { replace: true },
+        );
+      });
+    return () => controller.abort();
+  }, [signShelf, floor, placeShopperAt, setParams, t]);
 
   useEffect(() => {
     if (route && route.unplaced_category_ids.length > 0) {
@@ -206,10 +239,6 @@ export default function MobileView() {
   const total = categoryIds.length;
   const foundCount = categoryIds.filter((id) => found.has(id)).length;
   const missingCount = list.items.filter((item) => item.missing).length;
-  const isDictating =
-    dictation.status === "starting" ||
-    dictation.status === "listening" ||
-    dictation.status === "finishing";
 
   // The stations behind the shopper, ticked or given up, wherever later routes go.
   const reached = useMemo(
@@ -281,16 +310,6 @@ export default function MobileView() {
         />
       )}
 
-      {isDictating && (
-        <DictationOverlay
-          status={dictation.status}
-          transcript={dictation.transcript}
-          isSpeaking={dictation.isSpeaking}
-          failedSegments={dictation.failedSegments}
-          onFinish={dictation.finish}
-          onCancel={dictation.cancel}
-        />
-      )}
     </>
   );
 
@@ -299,11 +318,8 @@ export default function MobileView() {
       sessionId={list.sessionId}
       isBuilding={isBuilding}
       isListed={isListed}
-      micUnavailable={dictation.status === "unavailable"}
       onAddHit={list.addHit}
       onAddText={addText}
-      onDictate={dictation.start}
-      onDismissMicHint={dictation.dismissUnavailable}
       quickAddPanel={isBuilding ? null : departments}
     />
   );

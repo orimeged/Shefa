@@ -389,3 +389,109 @@ label {
     transition: none;
   }
 }
+
+/* ---- QR signs for the store: previewed in the dashboard, printed two to an A4 page. */
+
+.sign {
+  display: flex;
+  align-items: center;
+  gap: 6%;
+  aspect-ratio: 190 / 132;
+  padding: 6% 6%;
+  background: #fff;
+  color: #0f172a;
+  font-family: inherit;
+}
+
+.sign-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sign-brand {
+  font-weight: 700;
+  color: #0b7a55;
+  font-size: clamp(0.8rem, 1.6vw, 1.1rem);
+}
+
+.sign-headline {
+  margin-top: 0.25em;
+  font-weight: 800;
+  line-height: 1.05;
+  font-size: clamp(1.4rem, 3.4vw, 2.6rem);
+}
+
+.sign-body {
+  margin-top: 0.6em;
+  font-size: clamp(0.85rem, 1.7vw, 1.25rem);
+  line-height: 1.35;
+}
+
+.sign-footer {
+  margin-top: 0.9em;
+  padding-top: 0.6em;
+  border-top: 3px solid #0b7a55;
+  font-weight: 700;
+  font-size: clamp(0.85rem, 1.7vw, 1.25rem);
+}
+
+.sign-code {
+  width: 40%;
+  flex-shrink: 0;
+}
+
+.sign-qr {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.print-signs {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body > #root {
+    display: none;
+  }
+
+  .print-signs {
+    display: block;
+  }
+
+  .print-signs .sign {
+    width: 190mm;
+    height: 132mm;
+    aspect-ratio: auto;
+    padding: 12mm;
+    border: 0.4mm dashed #94a3b8;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-signs .sign:nth-child(2n) {
+    margin-top: 8mm;
+  }
+
+  .print-signs .sign-brand {
+    font-size: 14pt;
+  }
+
+  .print-signs .sign-headline {
+    font-size: 34pt;
+  }
+
+  .print-signs .sign-body,
+  .print-signs .sign-footer {
+    font-size: 16pt;
+  }
+
+  .print-signs .sign-code {
+    width: 70mm;
+  }
+}

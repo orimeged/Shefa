@@ -76,6 +76,15 @@ export function useShoppingList(map: StoreMap | null, seedIds: readonly string[]
     setSessionId(newUuid());
   }, []);
 
+  /**
+   * The shopper is standing here, by an aisle-end sign: the next route starts from it.
+   * A trip already under way re-plans from it too (see useShoppingRoute's anchor).
+   */
+  const placeShopperAt = useCallback((nodeId: string) => {
+    rememberPosition(nodeId);
+    setRestoredNodeId(nodeId);
+  }, []);
+
   useEffect(() => {
     if (map && seedKey && seedKey !== seededKey) {
       startNewTrip(itemsFromCategories(seedIds, map), seedKey);
@@ -220,6 +229,7 @@ export function useShoppingList(map: StoreMap | null, seedIds: readonly string[]
     setFound,
     restoredNodeId,
     rememberPosition,
+    placeShopperAt,
     resolveFailed,
     retryResolve,
     notice,

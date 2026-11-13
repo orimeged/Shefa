@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.admin import require_admin
@@ -101,7 +101,7 @@ def plan_floor_route(
     start = (body.start.row, body.start.col) if body.start else None
     try:
         route = loaded.router.plan_route(
-            store_id, body.category_ids, _targets(navigation), start, navigation.subcategories
+            store_id, body.category_ids, route_targets(navigation), start, navigation.subcategories
         )
     except FloorPlanNotRoutableError as error:
         raise HTTPException(
@@ -128,12 +128,34 @@ def _saved(store_id: str, loaded: LoadedFloorPlan, navigation: NavigationService
         floor_plan=loaded.plan,
         updated_at=loaded.saved_at,
         # Products drawn by name count as linked, after the departments.
-        check=loaded.router.check(_targets(navigation).values(), navigation.subcategories),
-        placements=loaded.router.placements(_targets(navigation), navigation.subcategories),
+        check=loaded.router.check(route_targets(navigation).values(), navigation.subcategories),
+        placements=loaded.router.placements(route_targets(navigation), navigation.subcategories),
     )
 
 
-def _targets(navigation: NavigationService) -> dict[str, Category]:
+def route_targets(navigation: NavigationService) -> dict[str, Category]:
     """Whatever a shopper can ask for: departments, and products managers placed."""
     store = navigation.store_map
     return {category.id: category for category in (*store.categories, *store.product_stops)}
+
+
+@router.get("/spot")
+def shelf_spot(
+    store_id: str,
+    _navigation: Navigation,
+    floor_plans: FloorPlans,
+    shelf: Annotated[str, Query(min_length=1, max_length=120)],
+) -> GridPoint:
+    """Where a shopper stands for a drawn shelf: what an aisle-end QR code means by "you are here".
+
+    Signs carry the shelf's name, not a tile, so a sign printed before the plan was
+    redrawn still points to the shelf wherever it is now.
+    """
+    loaded = floor_plans.get(store_id)
+    if loaded is None or not loaded.router.routable:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No routable floor plan for this store")
+    stop = loaded.router.stop_for(shelf)
+    if stop is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No shelf drawn as {shelf}")
+    row, col = stop
+    return GridPoint(row=row, col=col)

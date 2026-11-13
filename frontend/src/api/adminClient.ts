@@ -12,8 +12,12 @@ import type {
   EntityType,
   HeatmapReport,
   LostDemandReport,
+  LostSalesReport,
+  PickingReport,
   MapAudioResult,
   NotFoundReportRow,
+  PriceImport,
+  Resolution,
   SavedFloorPlan,
   StagedItem,
   TrafficReport,
@@ -115,17 +119,25 @@ export function createAdminApi(token: string, onUnauthorized: () => void) {
       await send(`${STORE}/products/${productId}`, { method: "DELETE" });
     },
 
+    /** A chain's published price file for this branch, XML or gzipped, as it was downloaded. */
+    importPrices: (file: Blob) =>
+      json<PriceImport>(`${STORE}/prices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+      }),
+
     notFoundReport: (signal?: AbortSignal) =>
       json<NotFoundReportRow[]>(
         `${ROOT}/reports/not-found?${new URLSearchParams({ store_id: STORE_ID })}`,
         { signal },
       ),
 
-    resolveNotFound: ({ item_query, category_id }: NotFoundReportRow) =>
+    resolveNotFound: ({ item_query, category_id }: NotFoundReportRow, resolution: Resolution = "restocked") =>
       json<{ resolved: number }>(`${ROOT}/reports/not-found/resolve`, {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ store_id: STORE_ID, item_query, category_id }),
+        body: JSON.stringify({ store_id: STORE_ID, item_query, category_id, resolution }),
       }),
 
     dashboardCounts: (signal?: AbortSignal) =>
@@ -133,6 +145,11 @@ export function createAdminApi(token: string, onUnauthorized: () => void) {
 
     lostDemand: (signal?: AbortSignal) =>
       json<LostDemandReport>(`${ANALYTICS}/lost-demand?${STORE_QUERY}`, { signal }),
+
+    lostSales: (signal?: AbortSignal) =>
+      json<LostSalesReport>(`${ANALYTICS}/lost-sales?${STORE_QUERY}`, { signal }),
+
+    picking: (signal?: AbortSignal) => json<PickingReport>(`${ANALYTICS}/picking?${STORE_QUERY}`, { signal }),
 
     notFoundHeatmap: (signal?: AbortSignal) =>
       json<HeatmapReport>(`${ANALYTICS}/not-found-heatmap?${STORE_QUERY}`, { signal }),

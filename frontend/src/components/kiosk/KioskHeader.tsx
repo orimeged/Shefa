@@ -1,7 +1,7 @@
 import { MapPinned, RotateCcw, Route } from "lucide-react";
 
 import { useLanguage } from "../../i18n/LanguageProvider";
-import { LanguageToggle } from "../LanguageToggle";
+import { LanguagePicker } from "../LanguagePicker";
 
 interface KioskHeaderProps {
   storeName: string | null;
@@ -52,7 +52,7 @@ export function KioskHeader({ storeName, caption, canReset, onReset }: KioskHead
             {t.quickClear}
           </button>
         )}
-        <LanguageToggle className="h-14 shrink-0 text-lg" />
+        <LanguagePicker className="h-14 shrink-0 text-lg" />
       </div>
     </header>
   );

@@ -1,6 +1,7 @@
 import { apiUrl } from "./backend";
 import type {
   FloorRouteRequest,
+  GridPoint,
   GridRoute,
   NotFoundReport,
   ResolvedItem,
@@ -74,6 +75,11 @@ export function resolveList(
 export async function getFloorPlan(signal?: AbortSignal): Promise<SavedFloorPlan | null> {
   const response = await send(`${BASE_URL}/floor-plan`, { signal });
   return response.status === 204 ? null : ((await response.json()) as SavedFloorPlan);
+}
+
+/** Where a shopper stands for a drawn shelf: what an aisle-end sign means by "you are here". */
+export function getShelfSpot(shelf: string, signal?: AbortSignal): Promise<GridPoint> {
+  return request(`/floor-plan/spot?${new URLSearchParams({ shelf })}`, { signal });
 }
 
 export function createFloorRoute(body: FloorRouteRequest, signal?: AbortSignal): Promise<GridRoute> {

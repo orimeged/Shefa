@@ -85,6 +85,9 @@ class Product(Base):
     subcategory: Mapped[str | None] = mapped_column(String(_NAME_LENGTH), default=None)
     # "pos" for a row from a catalog import, which the next import may update or drop.
     source: Mapped[str | None] = mapped_column(String(16), default=None)
+    # The shelf price in agorot, so sums of reported losses stay exact; None when unknown.
+    price_agorot: Mapped[int | None] = mapped_column(default=None)
+    price_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 class NodeAssignment(Base):

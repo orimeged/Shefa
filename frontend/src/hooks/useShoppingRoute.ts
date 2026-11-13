@@ -14,6 +14,11 @@ interface Options {
   sessionId: string;
   /** The graph's planner or the drawn plan's; both answer with the same route shape. */
   planRoute: PlanRoute;
+  /**
+   * Where an aisle-end sign said the shopper stands. Each new `seq` re-plans what's
+   * left from there; a trip not yet planned starts there through `restoredNodeId`.
+   */
+  anchor?: { nodeId: string; seq: number } | null;
 }
 
 /**
@@ -31,6 +36,7 @@ export function useShoppingRoute({
   restoredNodeId,
   sessionId,
   planRoute,
+  anchor = null,
 }: Options) {
   const [route, setRoute] = useState<Route | null>(null);
   // Every stop seen so far: later routes leave out found items.
@@ -103,6 +109,21 @@ export function useShoppingRoute({
     setFailed(false);
     setIsUpdating(false);
   }, [categoryKey, planFromHere]);
+
+  const anchorSeq = anchor?.seq ?? 0;
+  const anchorNode = anchor?.nodeId ?? null;
+  useEffect(() => {
+    const { route: current, found: ticked } = latest.current;
+    if (!anchorNode || !current || !categoryKey) {
+      return;
+    }
+    const remaining = categoryKey.split(",").filter((id) => !ticked.has(id));
+    if (remaining.length > 0) {
+      plan({ category_ids: remaining, start_node_id: anchorNode });
+    }
+    // Only a new sign re-plans: the list changing has its own effect above, and the
+    // node and the plan are read when the sign arrives, not watched.
+  }, [anchorSeq]);
 
   useEffect(() => () => inFlight.current?.abort(), []);
 

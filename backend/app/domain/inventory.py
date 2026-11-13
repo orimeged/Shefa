@@ -1,5 +1,6 @@
 """What store managers work with: zones on the map and what stands in them."""
 
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import ConfigDict, Field
@@ -7,6 +8,21 @@ from pydantic import ConfigDict, Field
 from app.domain.models import Model
 
 MAX_ITEM_NAME = 120
+# ₪100,000: far above anything on a supermarket shelf, so a typo can't skew a report by millions.
+MAX_PRICE_AGOROT = 10_000_000
+
+
+# A route stop for one product, rather than a whole department, is "product-<id>".
+_PRODUCT_STOP_PREFIX = "product-"
+
+
+def product_stop_id(product_id: int) -> str:
+    return f"{_PRODUCT_STOP_PREFIX}{product_id}"
+
+
+def product_id_of_stop(stop_id: str) -> int | None:
+    number = stop_id.removeprefix(_PRODUCT_STOP_PREFIX)
+    return int(number) if number != stop_id and number.isdecimal() else None
 
 
 class EntityType(StrEnum):
@@ -40,6 +56,8 @@ class CatalogRow(Model):
     item: str
     size: str
     zone: str
+    # The shelf price in agorot, when the export carries one.
+    price_agorot: int | None = None
 
     @property
     def display_name(self) -> str:
@@ -123,6 +141,9 @@ class CatalogProduct(Model):
     zones: int
     # The drawn plan's shelf a shopper is sent to for it; None with no plan, or none for it.
     shelf: str | None = None
+    # The shelf price in agorot, and when it was last set; None when nobody has given one.
+    price_agorot: int | None = None
+    price_updated_at: datetime | None = None
 
 
 class ProductDraft(Model):
@@ -137,6 +158,7 @@ class ProductDraft(Model):
     department: str = Field(min_length=1, max_length=64)
     # The shelf it stands on, finer than its department: one of the plan's, as the screen offers them.
     subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+    price_agorot: int | None = Field(default=None, ge=0, le=MAX_PRICE_AGOROT)
 
 
 class ProductChanges(Model):
@@ -148,5 +170,52 @@ class ProductChanges(Model):
     barcode: str | None = Field(default=None, max_length=14)
     brand: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
     size: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+    department: str | None = Field(default=None, min_length=1, max_length=64)
+    subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+    price_agorot: int | None = Field(default=None, ge=0, le=MAX_PRICE_AGOROT)
+
+
+class PriceLine(Model):
+    """One item of a chain's price file: its barcode and shelf price."""
+
+    barcode: str
+    price_agorot: int
+    name: str | None = None
+
+
+class PriceImport(Model):
+    """What a price file changed: how many of its lines matched the catalog and moved a price."""
+
+    lines: int
+    matched: int
+    updated: int
+    # Products still with no price after it, which a report can only estimate.
+    products_without_price: int
+
+
+class PricedProduct(Model):
+    id: int
+    name: str
+    name_key: str
+    department: str
+    price_agorot: int | None
+
+
+class StaffProductDraft(Model):
+    """A product a staff member scanned that the catalog didn't have: no price, which is the office's."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=MAX_ITEM_NAME)
+    barcode: str | None = Field(default=None, max_length=14)
+    department: str = Field(min_length=1, max_length=64)
+    subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
+
+
+class StaffPlacement(Model):
+    """Where a staff member found a product standing: its department and shelf, nothing else."""
+
+    model_config = ConfigDict(extra="forbid")
+
     department: str | None = Field(default=None, min_length=1, max_length=64)
     subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)

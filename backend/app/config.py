@@ -51,6 +51,12 @@ class Settings:
     # Origins by pattern, for preview deployments whose address changes with each branch.
     cors_origin_regex: str | None = None
     list_photo_model: str | None = None
+    # The floor staff's phones: alerts and shelf fixes, without the dashboard's full power.
+    staff_token: str | None = None
+    # Web Push to those phones. All three set, or alerts only show while the page is open.
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str | None = None
 
     @classmethod
     def from_env(cls) -> Self:
@@ -79,4 +85,8 @@ class Settings:
             ),
             list_photo_model=os.environ.get("LIST_PHOTO_MODEL") or None,
             cors_origin_regex=os.environ.get("CORS_ORIGIN_REGEX") or None,
+            staff_token=os.environ.get("STAFF_TOKEN") or None,
+            vapid_public_key=os.environ.get("VAPID_PUBLIC_KEY") or None,
+            vapid_private_key=os.environ.get("VAPID_PRIVATE_KEY") or None,
+            vapid_subject=os.environ.get("VAPID_SUBJECT") or None,
         )

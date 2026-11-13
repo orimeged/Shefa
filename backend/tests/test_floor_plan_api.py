@@ -319,3 +319,32 @@ def test_a_blank_session_id_is_refused(client: TestClient, drawing: dict[str, An
     save(client, drawing)
     response = client.post(f"{URL}/routes", json={"category_ids": ["coffee"], "session_id": "  "})
     assert response.status_code == 422
+
+
+# ---- "You are here" from an aisle-end sign
+
+
+def test_a_shelf_name_gives_the_spot_beside_it(client: TestClient, drawing: dict[str, Any]) -> None:
+    save(client, drawing)
+
+    spot = client.get(f"{URL}/spot", params={"shelf": "Bakery"})
+
+    assert spot.status_code == 200
+    row, col = spot.json()["row"], spot.json()["col"]
+    assert STORE[row][col] == ".", "a shopper stands in the aisle, not in the shelf"
+    assert abs(row - 2) + min(abs(col - 5), abs(col - 6)) == 1, "right beside the bakery"
+
+
+def test_the_spot_starts_a_route(client: TestClient, drawing: dict[str, Any]) -> None:
+    save(client, drawing)
+    spot = client.get(f"{URL}/spot", params={"shelf": "bakery"}).json()
+
+    route = client.post(f"{URL}/routes", json={"category_ids": ["coffee"], "start": spot}).json()
+
+    assert route["start"] == spot
+
+
+def test_an_unknown_shelf_or_no_plan_is_a_404(client: TestClient, drawing: dict[str, Any]) -> None:
+    assert client.get(f"{URL}/spot", params={"shelf": "Bakery"}).status_code == 404
+    save(client, drawing)
+    assert client.get(f"{URL}/spot", params={"shelf": "Fishmonger"}).status_code == 404

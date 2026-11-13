@@ -15,19 +15,22 @@ of the 7-day reports within days.
 import argparse
 import random
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from functools import cache
 from pathlib import Path
+from uuid import uuid4
 
 from app.config import Settings
 from app.domain.analytics import RouteTrip, SearchMiss, route_edges
-from app.domain.events import NotFoundEvent, NotFoundReport
+from app.domain.events import NotFoundEvent, NotFoundReport, Resolution
+from app.domain.picking import PickSession
 from app.domain.models import Store
 from app.repositories.analytics_store import SqlAnalyticsStore
 from app.repositories.database import create_database_engine, migrate, printable_url
 from app.repositories.event_store import DEMO_SESSION_PREFIX, SqlEventStore
 from app.repositories.inventory_repository import SqlInventoryRepository
+from app.repositories.pick_store import SqlPickSessions
 from app.repositories.store_repository import JsonStoreRepository
 from app.services.navigation import NavigationService
 from app.services.pos_import import read_pos_export
@@ -73,12 +76,55 @@ BACKGROUND_REPORTS: tuple[tuple[str, str, int], ...] = (
 # Last week was quieter, so every figure on the dashboard has somewhere to have moved from.
 PREVIOUS_WEEK_SHARE = 0.8
 
-PREVIOUS_WEEK_REPORTS: tuple[tuple[str, str, int], ...] = (
-    ("bakery", "לחם אחיד פרוס אנג'ל 750 גרם", 4),
-    ("dairy", "חלב 3% תנובה 1 ליטר", 3),
-    ("produce", "עגבניות שרי מהדרין 500 גרם", 3),
-    ("sauces", "טחינה גולמית הנסיך 500 גרם", 2),
+# An alert a manager already closed: department, item, reports, what they found, and
+# minutes from the first report to closing it.
+ClosedSpec = tuple[str, str, int, Resolution, int]
+
+# Alerts dealt with earlier this week: mostly refilled within the hour, and three items
+# that were on the floor all along, so the "misplaced" figure isn't empty.
+CLOSED_THIS_WEEK: tuple[ClosedSpec, ...] = (
+    ("dairy", "יוגורט יווני דנונה 200 גרם", 3, "restocked", 35),
+    ("dairy", "ביצים L משק 12 יחידות", 3, "restocked", 30),
+    ("bakery", "חלה מתוקה ברמן 450 גרם", 2, "restocked", 55),
+    ("beverages", "קוקה קולה קוקה קולה 1.5 ליטר", 3, "restocked", 40),
+    ("meat", "בשר טחון טרי טיבון 500 גרם", 2, "restocked", 75),
+    ("sauces", "חומוס מוכן צבר 400 גרם", 2, "on_shelf", 25),
+    ("sauces", 'שמן זית כתית מעולה יד מרדכי 750 מ"ל', 1, "on_shelf", 20),
+    ("cleaning", "טבליות למדיח פיירי 40 יחידות", 2, "relocated", 90),
 )
+
+# The week before: about as many reports, a little more money, and refilling took
+# hours. So the figures move the way a store using the alerts would see them move.
+PREVIOUS_WEEK_REPORTS: tuple[ClosedSpec, ...] = (
+    ("bakery", "לחם אחיד פרוס אנג'ל 750 גרם", 8, "restocked", 150),
+    ("bakery", "פיתות כפריות אנג'ל 10 יחידות", 6, "restocked", 170),
+    ("bakery", "חלה מתוקה ברמן 450 גרם", 3, "restocked", 95),
+    ("dairy", "חלב 3% תנובה 1 ליטר", 7, "restocked", 120),
+    ("dairy", "קוטג' 5% תנובה 250 גרם", 5, "restocked", 140),
+    ("dairy", "ביצים L משק 12 יחידות", 4, "restocked", 210),
+    ("dairy", "יוגורט יווני דנונה 200 גרם", 3, "restocked", 90),
+    ("produce", "עגבניות שרי מהדרין 500 גרם", 6, "restocked", 180),
+    ("produce", "מלפפונים מהדרין 1 קילו", 4, "restocked", 160),
+    ("baby", "חיתולים מידה 4 האגיס 56 יחידות", 3, "restocked", 240),
+    ("meat", "חזה עוף טרי עוף טוב 1 קילו", 2, "restocked", 130),
+    ("meat", "בשר טחון טרי טיבון 500 גרם", 2, "restocked", 200),
+    ("coffee", "קפה טורקי עלית 250 גרם", 3, "restocked", 110),
+    ("pasta", "אורז בסמטי סוגת 1 קילו", 2, "restocked", 150),
+    ("beverages", "קוקה קולה קוקה קולה 1.5 ליטר", 3, "restocked", 100),
+    ("sauces", "טחינה גולמית הנסיך 500 גרם", 2, "on_shelf", 60),
+    ("sauces", 'שמן זית כתית מעולה יד מרדכי 750 מ"ל', 2, "on_shelf", 45),
+    ("cleaning", "טבליות למדיח פיירי 40 יחידות", 2, "relocated", 120),
+)
+
+# Online orders picked this week with the sorted list. This week only: how much faster
+# than before is what a pilot measures, so the demo doesn't make one up.
+PICK_ORDERS = 18
+PICK_LINES = (12, 34)
+PICK_SECONDS_PER_LINE = (55, 95)
+PICK_MISSING_SHARE = 0.03
+
+# One demo report, for an item at a moment, wherever the store keeps it.
+MakeReport = Callable[[str, str, datetime, str], NotFoundEvent]
 
 # What shoppers asked for and the catalog doesn't list, this week. The department is
 # None for what doesn't belong to any of them.
@@ -173,17 +219,93 @@ def _reports(
     ]
 
 
+def closed_reports(
+    specs: Sequence[ClosedSpec],
+    hours: Sequence[datetime],
+    rng: random.Random,
+    make: MakeReport,
+    tag: str,
+) -> list[tuple[NotFoundEvent, datetime, Resolution]]:
+    """Each spec's reports, all before the manager closed them `minutes` after the first."""
+    closed: list[tuple[NotFoundEvent, datetime, Resolution]] = []
+    for spec_index, (category_id, item, count, resolution, minutes) in enumerate(specs):
+        first = rng.choice(hours) + timedelta(seconds=rng.randrange(3600))
+        resolved_at = first + timedelta(minutes=minutes)
+        for index in range(count):
+            # The first report opens the alert; the rest come in before it's dealt with.
+            moment = first if index == 0 else first + timedelta(minutes=rng.uniform(0, minutes * 0.8))
+            event = make(category_id, item, moment, f"{tag}{spec_index}-{index}")
+            closed.append((event, resolved_at, resolution))
+    return closed
+
+
+def closed_this_week_hours(now: datetime) -> list[datetime]:
+    """A day or more ago, so none of them still shows on the alerts table."""
+    return _open_hours(now, oldest=WEEK_HOURS - 24, newest=24)
+
+
+def previous_week_hours(now: datetime) -> list[datetime]:
+    """Older than the alerts table looks, so they only move the trend."""
+    return _open_hours(now, oldest=2 * WEEK_HOURS - 24, newest=WEEK_HOURS + 24)
+
+
+def _graph_report_maker(layout: Store, now: datetime, rng: random.Random) -> MakeReport:
+    nodes = {node.id: node for node in layout.nodes}
+    sections = {section.id: section for section in layout.sections}
+    zones = _zone_of_item()
+    spread_x, spread_y = AISLE_SPREAD_M
+
+    def make(category_id: str, item: str, moment: datetime, tag: str) -> NotFoundEvent:
+        shelf = nodes[sections[zones[item]].node_id]
+        return NotFoundEvent.from_report(
+            NotFoundReport(
+                store_id=layout.id,
+                session_id=f"{DEMO_SESSION_PREFIX}closed-{tag}",
+                item_query=item,
+                category_id=category_id,
+                x_coord=shelf.x + rng.uniform(-spread_x, spread_x),
+                y_coord=shelf.y + rng.uniform(-spread_y, spread_y),
+                timestamp=moment,
+            ),
+            now,
+        )
+
+    return make
+
+
+def build_closed_events(
+    layout: Store, now: datetime, rng: random.Random
+) -> list[tuple[NotFoundEvent, datetime, Resolution]]:
+    make = _graph_report_maker(layout, now, rng)
+    return [
+        *closed_reports(CLOSED_THIS_WEEK, closed_this_week_hours(now), rng, make, "week-"),
+        *closed_reports(PREVIOUS_WEEK_REPORTS, previous_week_hours(now), rng, make, "previous-"),
+    ]
+
+
 def build_events(layout: Store, now: datetime, rng: random.Random) -> list[NotFoundEvent]:
     tallies = (*PROBLEM_REPORTS, *BACKGROUND_REPORTS)
     return _reports(layout, tallies, _open_hours(now), now, rng, "")
 
 
-def build_previous_week_events(
-    layout: Store, now: datetime, rng: random.Random
-) -> list[NotFoundEvent]:
-    """Older than the alerts table looks, so they only move the trend."""
-    hours = _open_hours(now, oldest=2 * WEEK_HOURS - 24, newest=WEEK_HOURS + 24)
-    return _reports(layout, PREVIOUS_WEEK_REPORTS, hours, now, rng, "previous-")
+def build_pick_sessions(store_id: str, now: datetime, rng: random.Random) -> list[PickSession]:
+    hours = _open_hours(now, oldest=WEEK_HOURS - 6, newest=2)
+    sessions = []
+    for _ in range(PICK_ORDERS):
+        lines = rng.randint(*PICK_LINES)
+        finished = rng.choice(hours) + timedelta(seconds=rng.randrange(3600))
+        seconds = sum(rng.uniform(*PICK_SECONDS_PER_LINE) for _ in range(lines))
+        sessions.append(
+            PickSession(
+                id=uuid4(),
+                store_id=store_id,
+                started_at=(finished - timedelta(seconds=seconds)).astimezone(UTC),
+                finished_at=finished.astimezone(UTC),
+                lines=lines,
+                missing=sum(rng.random() < PICK_MISSING_SHARE for _ in range(lines)),
+            )
+        )
+    return sessions
 
 
 def build_misses(now: datetime, rng: random.Random) -> list[SearchMiss]:
@@ -255,6 +377,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.clear:
         events.replace_demo_events([])
         analytics.replace_demo_data([], [])
+        SqlPickSessions(database).replace_demo_sessions([])
         inventory.remove_imported_catalog(layout)
         database.dispose()
         print(f"Removed the demo data from {where}")
@@ -269,8 +392,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     reports = build_events(layout, now, rng)
     misses = build_misses(now, rng)
     trips = build_trips(layout, now, rng)
-    events.replace_demo_events([*reports, *build_previous_week_events(layout, now, rng)])
+    events.replace_demo_events(reports, build_closed_events(layout, now, rng))
     analytics.replace_demo_data(misses, trips)
+    SqlPickSessions(database).replace_demo_sessions(build_pick_sessions(layout.id, now, rng))
     database.dispose()
     print(
         f"Seeded {len(catalog)} catalog items, {len(reports)} reports, "

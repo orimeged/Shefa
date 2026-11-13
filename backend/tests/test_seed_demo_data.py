@@ -168,7 +168,8 @@ def test_the_script_seeds_a_database_that_doesnt_exist_yet(
 
     assert seed_demo_data.main([]) == 0
 
-    expected = 50 + sum(count for _, _, count in seed_demo_data.PREVIOUS_WEEK_REPORTS)
+    closed = (*seed_demo_data.CLOSED_THIS_WEEK, *seed_demo_data.PREVIOUS_WEEK_REPORTS)
+    expected = 50 + sum(spec[2] for spec in closed)
     assert len(rows(path)) == expected
     assert ", 50 reports," in capsys.readouterr().out
 
@@ -230,10 +231,31 @@ def analytics_rows(path: Path, table: str) -> int:
         connection.close()
 
 
-def test_previous_week_reports_stay_out_of_the_alerts_table(store: Store) -> None:
-    older = seed_demo_data.build_previous_week_events(store, NOW, random.Random(7))
+def test_closed_demo_alerts_were_closed_after_their_reports(store: Store) -> None:
+    closed = seed_demo_data.build_closed_events(store, NOW, random.Random(7))
 
+    assert len(closed) == sum(
+        spec[2] for spec in (*seed_demo_data.CLOSED_THIS_WEEK, *seed_demo_data.PREVIOUS_WEEK_REPORTS)
+    )
+    assert all(event.timestamp <= resolved_at < NOW for event, resolved_at, _ in closed)
+    assert {resolution for _, _, resolution in closed} == {"restocked", "relocated", "on_shelf"}
+
+
+def test_previous_week_reports_stay_out_of_the_alerts_table(store: Store) -> None:
+    previous = {spec[1] for spec in seed_demo_data.PREVIOUS_WEEK_REPORTS}
+    closed = seed_demo_data.build_closed_events(store, NOW, random.Random(7))
+    older = [event for event, _, _ in closed if "previous-" in event.session_id]
+
+    assert {event.item_query for event in older} == previous
     assert all(timedelta(days=7) < NOW - event.timestamp < timedelta(days=14) for event in older)
+
+
+def test_this_weeks_closed_alerts_are_off_the_alerts_table_already(store: Store) -> None:
+    closed = seed_demo_data.build_closed_events(store, NOW, random.Random(7))
+    week = [(event, at) for event, at, _ in closed if "week-" in event.session_id]
+
+    assert week
+    assert all(timedelta(hours=12) < NOW - event.timestamp < timedelta(days=7) for event, _ in week)
 
 
 def test_unfulfilled_searches_have_varied_departments() -> None:

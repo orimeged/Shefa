@@ -18,6 +18,10 @@ function row(times_reported: number): NotFoundReportRow {
     category_name_en: "Bakery",
     times_reported,
     last_reported_at: "2026-11-01T10:30:00Z",
+    unit_price_agorot: 740,
+    price_basis: "product",
+    value_agorot: 740 * times_reported,
+    shelf: "לחם ופיתות",
   };
 }
 

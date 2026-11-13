@@ -5,7 +5,7 @@ the migrations against, so `alembic revision --autogenerate` never offers to
 drop them.
 """
 
-from sqlalchemy import Column, Float, Index, Table, Text
+from sqlalchemy import Column, Float, Index, Integer, Table, Text
 
 from app.repositories.inventory_tables import Base
 
@@ -24,6 +24,10 @@ not_found_events = Table(
     Column("y_coord", Float, nullable=False),
     Column("timestamp", TIME, nullable=False),
     Column("resolved_at", TIME, nullable=True),
+    # What the manager found on closing it: "restocked", "relocated" or "on_shelf".
+    Column("resolution", Text, nullable=True),
+    # Who reported it: "shopper", or "picker" filling an online order.
+    Column("source", Text, nullable=False, server_default="shopper"),
     Index("idx_not_found_store_time", "store_id", "timestamp"),
     Index("idx_not_found_store_location", "store_id", "x_coord", "y_coord"),
     Index("idx_not_found_store_item", "store_id", "item_query"),
@@ -59,4 +63,27 @@ trip_edges = Table(
     Column("node_b", Text, primary_key=True),
     Column("timestamp", TIME, nullable=False),
     Index("idx_trip_edges_store_time", "store_id", "timestamp"),
+)
+
+push_subscriptions = Table(
+    "push_subscriptions",
+    Base.metadata,
+    Column("endpoint", Text, primary_key=True),
+    Column("store_id", Text, nullable=False),
+    Column("p256dh", Text, nullable=False),
+    Column("auth", Text, nullable=False),
+    Column("created_at", TIME, nullable=False),
+    Index("idx_push_subscriptions_store", "store_id"),
+)
+
+pick_sessions = Table(
+    "pick_sessions",
+    Base.metadata,
+    Column("id", Text, primary_key=True),
+    Column("store_id", Text, nullable=False),
+    Column("started_at", TIME, nullable=False),
+    Column("finished_at", TIME, nullable=False),
+    Column("lines", Integer, nullable=False),
+    Column("missing", Integer, nullable=False),
+    Index("idx_pick_sessions_store_time", "store_id", "finished_at"),
 )

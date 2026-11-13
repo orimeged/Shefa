@@ -6,6 +6,7 @@ closed instead of open.
 """
 
 import secrets
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
@@ -16,7 +17,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.dictionary import NO_MATCH
-from app.domain.events import EventStore, ShortId, Text
+from app.domain.events import ALERT_WINDOW, RESTOCKED, EventStore, Resolution, ShortId, Text
 from app.domain.inventory import (
     MAX_ITEM_NAME,
     CatalogCategory,
@@ -29,24 +30,28 @@ from app.domain.inventory import (
     EntityType,
     InvalidItemError,
     InventoryError,
+    PriceImport,
     StagedItem,
     Zone,
     ZoneItem,
 )
+from app.domain.lost_sales import PriceBasis, PriceBook
 from app.domain.search_text import normalize
 from app.domain.speech import SUPPORTED_AUDIO_TYPES, TranscriptionError, base_content_type
 from app.repositories.inventory_repository import CatalogEditing, SqlInventoryRepository, product_stop_id
 from app.services.floor_plans import FloorPlanRegistry
 from app.services.navigation import NavigationService
+from app.services.price_file import PriceFileError, parse_price_file
 from app.services.transcription import TranscriptionService
 
 _bearer = HTTPBearer(auto_error=False)
 
 # Far above what the recorder sends. Safari ignores the bitrate it's asked for.
 _MAX_AUDIO_BYTES = 16 * 1024 * 1024
+# A big branch's full price file is around 30 MB unzipped; gzipped, a few.
+_MAX_PRICE_FILE_BYTES = 64 * 1024 * 1024
 _MAX_BATCH_ITEMS = 100
 _MAX_CATALOG_RESULTS = 20
-_REPORT_WINDOW = timedelta(days=7)
 
 
 def require_admin(
@@ -104,6 +109,12 @@ class NotFoundReportRow(BaseModel):
     category_name_en: str | None
     times_reported: int
     last_reported_at: datetime
+    # The missing item's shelf price, how it was found, and that price times the reports.
+    unit_price_agorot: int | None = None
+    price_basis: PriceBasis | None = None
+    value_agorot: int = 0
+    # The drawn plan's shelf the shopper was sent to; None with no plan that routes.
+    shelf: str | None = None
 
 
 class ResolveNotFoundRequest(BaseModel):
@@ -114,6 +125,8 @@ class ResolveNotFoundRequest(BaseModel):
     store_id: ShortId
     item_query: Text
     category_id: ShortId | None = None
+    # What the manager found: an empty shelf refilled, or the item there after all.
+    resolution: Resolution = RESTOCKED
 
 
 class ResolveNotFoundResponse(BaseModel):
@@ -201,7 +214,23 @@ def delete_assignment(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-def _with_shelves(request: Request, store_id: str, rows: list[CatalogProduct]) -> list[CatalogProduct]:
+def shelf_finder(request: Request, store_id: str) -> Callable[[str | None], str | None]:
+    """The drawn plan's shelf a route stop (a department or "product-<id>") leads to.
+
+    Always None on a store without a plan that routes: its places are aisles, not shelves.
+    """
+    floor_plans: FloorPlanRegistry = request.app.state.floor_plans
+    loaded = floor_plans.get(store_id)
+    navigation: NavigationService | None = request.app.state.stores.get(store_id)
+    if loaded is None or not loaded.router.routable or navigation is None:
+        return lambda _category_id: None
+    store = navigation.store_map
+    targets = {target.id: target for target in (*store.categories, *store.product_stops)}
+    placements = loaded.router.placements(targets, navigation.subcategories)
+    return lambda category_id: placements.get(category_id) if category_id else None
+
+
+def with_shelves(request: Request, store_id: str, rows: list[CatalogProduct]) -> list[CatalogProduct]:
     """Each product's shelf on the drawn plan, as a shopper's route would find it.
 
     The same matching the routes use: the product's own name, its subcategory, then
@@ -223,13 +252,13 @@ def _with_shelves(request: Request, store_id: str, rows: list[CatalogProduct]) -
 
 @stores_router.get("/products")
 def list_products(store_id: str, request: Request, inventory: Inventory) -> list[CatalogProduct]:
-    return _with_shelves(request, store_id, CatalogEditing(inventory).products(store_id))
+    return with_shelves(request, store_id, CatalogEditing(inventory).products(store_id))
 
 
 @stores_router.post("/products", status_code=status.HTTP_201_CREATED)
 def create_product(store_id: str, body: ProductDraft, request: Request, inventory: Inventory) -> CatalogProduct:
     created = CatalogEditing(inventory).create(store_id, body)
-    return _with_shelves(request, store_id, [created])[0]
+    return with_shelves(request, store_id, [created])[0]
 
 
 @stores_router.patch("/products/{product_id}")
@@ -238,7 +267,27 @@ def update_product(
 ) -> CatalogProduct:
     # Only what was sent: a field left out stays, a null clears it.
     changed = CatalogEditing(inventory).update(store_id, product_id, body.model_dump(exclude_unset=True))
-    return _with_shelves(request, store_id, [changed])[0]
+    return with_shelves(request, store_id, [changed])[0]
+
+
+@stores_router.post("/prices")
+async def import_prices(store_id: str, request: Request, inventory: Inventory) -> PriceImport:
+    """A chain's price file for this branch, as published: XML, gzipped or not.
+
+    Only prices change, matched by barcode; products the file doesn't list keep theirs.
+    """
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > _MAX_PRICE_FILE_BYTES:
+            raise HTTPException(413, "Price file too large")
+    try:
+        lines = await run_in_threadpool(parse_price_file, bytes(data))
+    except PriceFileError as error:
+        raise HTTPException(422, str(error)) from error
+    return await run_in_threadpool(
+        CatalogEditing(inventory).apply_prices, store_id, lines, datetime.now(UTC)
+    )
 
 
 @stores_router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -257,17 +306,25 @@ def not_found_report(
     store_id: Annotated[str, Query(min_length=1, max_length=64)],
 ) -> list[NotFoundReportRow]:
     """Open alerts from the last week, the most reported first."""
+    return alert_rows(request, inventory, store_id)
+
+
+def alert_rows(request: Request, inventory: SqlInventoryRepository, store_id: str) -> list[NotFoundReportRow]:
+    """Open alerts from the last week, the most reported first, each valued and on its shelf."""
     if request.app.state.stores.get(store_id) is None:
         raise HTTPException(404, f"Unknown store: {store_id}")
 
+    shelf_of = shelf_finder(request, store_id)
     events: EventStore = request.app.state.events
-    tallies = events.tally_not_found(store_id, datetime.now(UTC) - _REPORT_WINDOW)
+    tallies = events.tally_not_found(store_id, datetime.now(UTC) - ALERT_WINDOW)
     departments = inventory.departments_of(
         store_id, {tally.category_id for tally in tallies if tally.category_id}
     )
+    prices = PriceBook(CatalogEditing(inventory).priced_products(store_id))
     rows: list[NotFoundReportRow] = []
     for tally in tallies:
         department = departments.get(tally.category_id or "")
+        estimate = prices.estimate(tally.item_query, tally.category_id)
         rows.append(
             NotFoundReportRow(
                 item_query=tally.item_query,
@@ -277,6 +334,10 @@ def not_found_report(
                 category_name_en=department.name_en if department else None,
                 times_reported=tally.times_reported,
                 last_reported_at=tally.last_reported_at,
+                unit_price_agorot=estimate.agorot if estimate else None,
+                price_basis=estimate.basis if estimate else None,
+                value_agorot=(estimate.agorot * tally.times_reported) if estimate else 0,
+                shelf=shelf_of(tally.category_id),
             )
         )
     return rows
@@ -285,12 +346,16 @@ def not_found_report(
 @router.post("/reports/not-found/resolve")
 def resolve_not_found(request: Request, body: ResolveNotFoundRequest) -> ResolveNotFoundResponse:
     """Closes one row's alert. Sending it twice is fine: the second closes nothing."""
+    return close_alert(request, body)
+
+
+def close_alert(request: Request, body: ResolveNotFoundRequest) -> ResolveNotFoundResponse:
     if request.app.state.stores.get(body.store_id) is None:
         raise HTTPException(404, f"Unknown store: {body.store_id}")
 
     events: EventStore = request.app.state.events
     resolved = events.resolve_not_found(
-        body.store_id, body.item_query, body.category_id, datetime.now(UTC)
+        body.store_id, body.item_query, body.category_id, datetime.now(UTC), body.resolution
     )
     return ResolveNotFoundResponse(resolved=resolved)
 

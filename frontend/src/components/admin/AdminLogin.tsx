@@ -8,7 +8,14 @@ import { useLanguage } from "../../i18n/LanguageProvider";
 import { LanguageToggle } from "../LanguageToggle";
 import { Notice } from "../Notice";
 
-export function AdminLogin({ onSignedIn }: { onSignedIn: (token: string) => void }) {
+interface AdminLoginProps {
+  onSignedIn: (token: string) => void;
+  /** The staff app signs in here too, with its own heading and check. */
+  title?: string;
+  check?: (token: string) => Promise<void>;
+}
+
+export function AdminLogin({ onSignedIn, title, check = checkAdminToken }: AdminLoginProps) {
   const { t } = useLanguage();
   const [token, setToken] = useState("");
   const [isChecking, setIsChecking] = useState(false);
@@ -20,7 +27,7 @@ export function AdminLogin({ onSignedIn }: { onSignedIn: (token: string) => void
     setIsChecking(true);
     setProblem(null);
     try {
-      await checkAdminToken(entered);
+      await check(entered);
       onSignedIn(entered);
     } catch (error) {
       const status = error instanceof ApiError ? error.status : 0;
@@ -35,7 +42,7 @@ export function AdminLogin({ onSignedIn }: { onSignedIn: (token: string) => void
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{t.adminTitle}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{title ?? t.adminTitle}</h1>
         <LanguageToggle className="h-11" />
       </div>
       <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">

@@ -6,7 +6,7 @@ import type { CatalogCategory, CatalogProduct, NotFoundReportRow, ProductDraft }
 import type { Catalog } from "../../hooks/useCatalog";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ShelfOption } from "../../lib/admin/catalog";
-import { filterCatalog } from "../../lib/admin/catalog";
+import { draftOf, filterCatalog } from "../../lib/admin/catalog";
 import type { FloorMap } from "../../lib/floorPlanMap";
 import { BLOCK_LIFT, MapEndpoint, MapFloor } from "../MapFloor";
 import { ProductForm } from "./ProductForm";
@@ -337,14 +337,7 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
                       onClick={() =>
                         setForm({
                           title: t.productEdit,
-                          initial: {
-                            name: product.name,
-                            barcode: product.barcode,
-                            brand: product.brand,
-                            size: product.size,
-                            department: product.department,
-                            subcategory: product.subcategory,
-                          },
+                          initial: draftOf(product),
                           product,
                         })
                       }

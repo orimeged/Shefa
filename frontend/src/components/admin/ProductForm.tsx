@@ -7,6 +7,7 @@ import type { CatalogProblem } from "../../hooks/useCatalog";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ShelfOption } from "../../lib/admin/catalog";
 import { barcodeProblem, shelvesOf } from "../../lib/admin/catalog";
+import { agorotToField, parseShekels } from "../../lib/admin/money";
 
 interface ProductFormProps {
   title: string;
@@ -32,6 +33,7 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
   const [size, setSize] = useState(initial.size ?? "");
   const [department, setDepartment] = useState(initial.department ?? categories[0]?.slug ?? "");
   const [subcategory, setSubcategory] = useState<string>(initial.subcategory ?? "");
+  const [price, setPrice] = useState(agorotToField(initial.price_agorot ?? null));
   const [problem, setProblem] = useState<CatalogProblem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -47,10 +49,12 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
   // A subcategory no shelf on the plan carries stays choosable, saying so, rather than vanishing.
   const isUndrawn = shelves !== null && subcategory !== "" && !options.some((shelf) => shelf.subcategory === subcategory);
   const badBarcode = barcodeProblem(barcode);
+  const priceAgorot = parseShekels(price);
+  const badPrice = Number.isNaN(priceAgorot);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (badBarcode || !name.trim() || !department) {
+    if (badBarcode || badPrice || !name.trim() || !department) {
       return;
     }
     setIsSaving(true);
@@ -62,6 +66,7 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
       size: size.trim() || null,
       department,
       subcategory: subcategory || null,
+      price_agorot: priceAgorot,
     });
     setIsSaving(false);
     if (outcome) {
@@ -127,6 +132,26 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
           {badBarcode && (
             <span id={`${ids}-barcode`} className="text-sm font-medium text-danger">
               {t.productBarcodeInvalid}
+            </span>
+          )}
+        </Field>
+
+        <Field id={`${ids}-price`} label={t.productFields.price}>
+          <input
+            id={`${ids}-price`}
+            value={price}
+            inputMode="decimal"
+            maxLength={12}
+            placeholder="0.00"
+            aria-invalid={badPrice}
+            aria-describedby={badPrice ? `${ids}-price-problem` : undefined}
+            onChange={(event) => setPrice(event.target.value)}
+            className={`${field} ${badPrice ? "ring-2 ring-danger" : ""}`}
+            dir="ltr"
+          />
+          {badPrice && (
+            <span id={`${ids}-price-problem`} className="text-sm font-medium text-danger">
+              {t.productPriceInvalid}
             </span>
           )}
         </Field>
@@ -209,7 +234,7 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={isSaving || badBarcode || !name.trim()}
+            disabled={isSaving || badBarcode || badPrice || !name.trim()}
             className="h-12 flex-1 rounded-xl bg-brand font-semibold text-white shadow-sm disabled:opacity-50"
           >
             {t.productSave}

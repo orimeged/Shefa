@@ -26,13 +26,24 @@ services:
       # The managers' dashboard key. Render makes a random one; read it in the dashboard.
       - key: ADMIN_TOKEN
         generateValue: true
+      # The floor staff's phone app at /staff. Render makes a random one, like the admin's.
+      - key: STAFF_TOKEN
+        generateValue: true
+      # Alerts pushed to staff phones: copy the three from backend/.env after running
+      # generate_vapid_keys.py. Without them, alerts show only while the staff app is open.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
       # The frontend's address, such as https://shefa.vercel.app. Asked for at setup.
       - key: CORS_ORIGINS
         sync: false
       # Optional: Vercel preview deployments, such as https://shefa-[a-z0-9-]+\.vercel\.app
       - key: CORS_ORIGIN_REGEX
         sync: false
-      # Dictation and photos of lists. Without it the phone says they're off.
+      # Photos of lists, and the dashboard's spoken inventory. Without it both are off.
       - key: OPENAI_API_KEY
         sync: false
       # Optional: sorting unclear list lines. Without it, the food dictionary does it alone.

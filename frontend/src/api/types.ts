@@ -197,7 +197,19 @@ export interface NotFoundReportRow {
   category_name_en: string | null;
   times_reported: number;
   last_reported_at: string;
+  /** The missing item's shelf price in agorot, how it was found, and that price times the reports. */
+  unit_price_agorot: number | null;
+  price_basis: PriceBasis | null;
+  value_agorot: number;
+  /** The drawn plan's shelf the shopper was sent to; null with no plan that routes. */
+  shelf: string | null;
 }
+
+/** What a manager found on closing an alert. Mirrors Resolution in backend/app/domain/events.py. */
+export type Resolution = "restocked" | "relocated" | "on_shelf";
+
+/** How a missing item's price was found, from most to least exact. */
+export type PriceBasis = "product" | "similar" | "department";
 
 /** Mirrors backend/app/api/analytics.py. */
 export interface CountPair {
@@ -232,6 +244,82 @@ export interface LostDemandReport {
   total: number;
   items: LostItem[];
   categories: LostCategory[];
+}
+
+export interface LostSalesBucket {
+  reports: number;
+  items: number;
+  value_agorot: number;
+}
+
+export interface LostSalesItem {
+  item: string;
+  category_id: string | null;
+  category_name: string | null;
+  category_name_en: string | null;
+  reports: number;
+  open_reports: number;
+  picker_reports: number;
+  unit_price_agorot: number | null;
+  price_basis: PriceBasis | null;
+  value_agorot: number;
+  state: "open" | "restocked" | "misplaced";
+  last_reported_at: string;
+}
+
+/**
+ * The last 7 days of "not found" reports valued at shelf prices, against the 7 before.
+ * A floor for what walked out: only shoppers who reported are counted.
+ */
+export interface LostSalesReport {
+  days: number;
+  value_agorot: number;
+  previous_value_agorot: number;
+  reports: number;
+  previous_reports: number;
+  priced_reports: number;
+  exact_reports: number;
+  empty_shelf: LostSalesBucket;
+  misplaced: LostSalesBucket;
+  not_carried: { searches: number; previous_searches: number; items: LostItem[] };
+  open_alerts: number;
+  open_value_agorot: number;
+  restocked_alerts: number;
+  restock_median_minutes: number | null;
+  previous_restock_median_minutes: number | null;
+  items: LostSalesItem[];
+}
+
+/** Mirrors PickingSummary in backend/app/domain/picking.py. */
+export interface PickingSummary {
+  orders: number;
+  lines: number;
+  missing: number;
+  median_minutes: number | null;
+  median_minutes_per_line: number | null;
+}
+
+export interface PickingReport {
+  current: PickingSummary;
+  previous: PickingSummary;
+}
+
+/** One finished order, as the picker's phone sends it. */
+export interface PickSession {
+  id: string;
+  store_id: string;
+  started_at: string;
+  finished_at: string;
+  lines: number;
+  missing: number;
+}
+
+/** What a chain's price file changed. Mirrors PriceImport in backend/app/domain/inventory.py. */
+export interface PriceImport {
+  lines: number;
+  matched: number;
+  updated: number;
+  products_without_price: number;
 }
 
 export interface HeatPoint {
@@ -342,6 +430,9 @@ export interface CatalogProduct {
   zones: number;
   /** The drawn plan's shelf a shopper is sent to for it; null with no plan, or none for it. */
   shelf: string | null;
+  /** The shelf price in agorot, and when it was last set; null when nobody has given one. */
+  price_agorot: number | null;
+  price_updated_at: string | null;
 }
 
 export interface ProductDraft {
@@ -351,6 +442,7 @@ export interface ProductDraft {
   size?: string | null;
   department: string;
   subcategory?: string | null;
+  price_agorot?: number | null;
 }
 
 /** A field left out stays as it was; null clears it. */

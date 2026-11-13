@@ -135,14 +135,18 @@ def test_every_department_has_shelves_of_its_own(export: list[CatalogRow], store
 
 def test_seeded_reports_name_real_catalog_items(export: list[CatalogRow]) -> None:
     names = {line.display_name: line.department for line in export}
-    tallies = (
-        *seed_demo_data.PROBLEM_REPORTS,
-        *seed_demo_data.BACKGROUND_REPORTS,
-        *seed_demo_data.PREVIOUS_WEEK_REPORTS,
-    )
+    tallies = (*seed_demo_data.PROBLEM_REPORTS, *seed_demo_data.BACKGROUND_REPORTS)
+    closed = (*seed_demo_data.CLOSED_THIS_WEEK, *seed_demo_data.PREVIOUS_WEEK_REPORTS)
 
-    for department, item, _ in tallies:
+    for department, item in [(spec[0], spec[1]) for spec in (*tallies, *closed)]:
         assert names.get(item) == department, item
+
+
+def test_every_demo_item_has_a_shelf_price(export: list[CatalogRow]) -> None:
+    """The lost-sales report values reports at these prices, so none may be missing."""
+    assert all(line.price_agorot for line in export)
+    milk = next(line for line in export if line.display_name == "חלב 3% תנובה 1 ליטר")
+    assert milk.price_agorot == 710
 
 
 # ---- Importing

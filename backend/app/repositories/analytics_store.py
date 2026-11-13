@@ -259,3 +259,7 @@ class SqlAnalyticsStore:
     def trip_count(self, store_id: str, since: datetime, until: datetime) -> int:
         with self._engine.connect() as connection:
             return self._count(connection, "trips", store_id, since, until)
+
+    def miss_count(self, store_id: str, since: datetime, until: datetime) -> int:
+        with self._engine.connect() as connection:
+            return self._count(connection, "search_misses", store_id, since, until)

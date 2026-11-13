@@ -88,3 +88,32 @@ def test_a_long_list_resolves_fast(navigation: NavigationService) -> None:
     navigation.resolve_list(lines)
 
     assert time.perf_counter() - started < 0.5
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("حليب", "dairy"),
+        ("خبز", "bakery"),
+        ("بندورة", "produce"),
+        ("دجاج", "meat"),
+        ("قهوة", "coffee"),
+        ("حفاضات", "baby"),
+        ("مسحوق غسيل", "cleaning"),
+        ("молоко", "dairy"),
+        ("Хлеб", "bakery"),
+        ("помидоры", "produce"),
+        ("курица", "meat"),
+        ("гречка", "pasta"),
+        ("подгузники", "baby"),
+        ("йогурт", "dairy"),
+    ],
+)
+def test_places_everyday_items_in_arabic_and_russian(navigation: NavigationService, text: str, expected: str) -> None:
+    """Shoppers who read Arabic or Russian type in it: the kiosk and the phone speak both."""
+    assert category_of(navigation, text) == expected
+
+
+def test_an_arabic_list_resolves_line_by_line(navigation: NavigationService) -> None:
+    resolved = navigation.resolve_list(["حليب", "خبز", "بيض", "شامبو"])
+    assert [item.hit.category_id if item.hit else None for item in resolved] == ["dairy", "bakery", "dairy", "toiletries"]

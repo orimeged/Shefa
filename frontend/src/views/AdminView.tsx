@@ -4,14 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AdminApi } from "../api/adminClient";
 import { createAdminApi } from "../api/adminClient";
-import type { CatalogCategory, NotFoundReportRow, SavedFloorPlan, Zone } from "../api/types";
+import type { CatalogCategory, NotFoundReportRow, Resolution, SavedFloorPlan, Zone } from "../api/types";
 import { AdminLogin } from "../components/admin/AdminLogin";
 import { CatalogPanel } from "../components/admin/CatalogPanel";
 import { FloorGridEditor } from "../components/admin/FloorGridEditor";
 import { KpiRow } from "../components/admin/KpiRow";
 import { LostDemandWidget } from "../components/admin/LostDemandWidget";
+import { LostSalesPanel } from "../components/admin/LostSalesPanel";
+import { PickingCard } from "../components/admin/PickingCard";
 import type { AlertOutcome } from "../components/admin/ShelfStockAlerts";
 import { ShelfStockAlerts } from "../components/admin/ShelfStockAlerts";
+import { SignsPanel } from "../components/admin/SignsPanel";
 import { StoreMapPanel } from "../components/admin/StoreMapPanel";
 import { ZoneManagementModal } from "../components/admin/ZoneManagementModal";
 import { LanguageToggle } from "../components/LanguageToggle";
@@ -29,7 +32,7 @@ import { readFloorMap } from "../lib/floorPlanMap";
 // For this tab only: a shared tablet shouldn't stay signed in overnight.
 const TOKEN_KEY = "admin-token";
 
-type Tab = "dashboard" | "alerts" | "catalog" | "floor";
+type Tab = "dashboard" | "alerts" | "catalog" | "signs" | "floor";
 
 export default function AdminView() {
   const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY));
@@ -78,6 +81,8 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   const catalog = useCatalog(api);
   const alertCount = alerts.rows ? countAlerts(alerts.rows) : 0;
   const counts = usePolledReport(api.dashboardCounts, closedAlerts);
+  const lostSales = usePolledReport(api.lostSales, closedAlerts);
+  const picking = usePolledReport(api.picking);
   const lostDemand = usePolledReport(api.lostDemand);
 
   const reload = useCallback(() => setAttempt((current) => current + 1), []);
@@ -148,8 +153,8 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
     }
   };
 
-  const closeAlert = async (row: NotFoundReportRow) => {
-    const closed = await alerts.resolve(row);
+  const closeAlert = async (row: NotFoundReportRow, resolution: Resolution = "restocked") => {
+    const closed = await alerts.resolve(row, resolution);
     if (closed) {
       setClosedAlerts((current) => current + 1);
     }
@@ -161,6 +166,15 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
     if (!(await closeAlert(row))) {
       setOutcome({ ok: false, text: t.alertResolveFailed });
     }
+  };
+
+  const markOnShelf = async (row: NotFoundReportRow) => {
+    setOutcome(null);
+    setOutcome(
+      (await closeAlert(row, "on_shelf"))
+        ? { ok: true, text: t.alertOnShelfDone(row.item_query) }
+        : { ok: false, text: t.alertResolveFailed },
+    );
   };
 
   const startPlacing = (row: NotFoundReportRow) => {
@@ -178,7 +192,7 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
     setSelectedNodeId(null);
     setTab("alerts");
     setOutcome(
-      (await closeAlert(row))
+      (await closeAlert(row, "relocated"))
         ? { ok: true, text: t.alertMoved(row.item_query, zone) }
         : { ok: false, text: t.alertMovedStillOpen(row.item_query) },
     );
@@ -208,8 +222,12 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
 
         <KpiRow
           counts={counts.data}
-          failed={counts.failed}
-          onRetry={counts.retry}
+          lostSales={lostSales.data}
+          failed={counts.failed || lostSales.failed}
+          onRetry={() => {
+            counts.retry();
+            lostSales.retry();
+          }}
           onOpenAlerts={() => openTab("alerts")}
         />
 
@@ -227,6 +245,9 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
           </TabButton>
           <TabButton isSelected={tab === "catalog"} onSelect={() => openTab("catalog")}>
             {t.adminTabCatalog}
+          </TabButton>
+          <TabButton isSelected={tab === "signs"} onSelect={() => openTab("signs")}>
+            {t.adminTabSigns}
           </TabButton>
           <TabButton isSelected={tab === "floor"} onSelect={() => openTab("floor")}>
             {t.adminTabFloorEditor}
@@ -262,11 +283,15 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
                 )
               )}
             </div>
-            <LostDemandWidget
-              report={lostDemand.data}
-              failed={lostDemand.failed}
-              onRetry={lostDemand.retry}
-            />
+            <div className="flex flex-col gap-5">
+              <LostSalesPanel report={lostSales.data} failed={lostSales.failed} onRetry={lostSales.retry} />
+              <PickingCard report={picking.data} />
+              <LostDemandWidget
+                report={lostDemand.data}
+                failed={lostDemand.failed}
+                onRetry={lostDemand.retry}
+              />
+            </div>
           </div>
         </div>
 
@@ -278,6 +303,7 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
             outcome={outcome}
             onRetry={alerts.retry}
             onRestocked={(row) => void markRestocked(row)}
+            onOnShelf={(row) => void markOnShelf(row)}
             onUpdateLocation={startPlacing}
           />
         </div>
@@ -285,6 +311,13 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
         <div role="tabpanel" hidden={tab !== "catalog"} aria-label={t.adminTabCatalog}>
           {hasOpenedCatalog && <CatalogPanel catalog={catalog} categories={categories} shelves={shelves} />}
         </div>
+
+        {/* Only while open: its signs go to the printer, and the dashboard prints nothing else. */}
+        {tab === "signs" && (
+          <div role="tabpanel" aria-label={t.adminTabSigns}>
+            <SignsPanel shelves={shelves} />
+          </div>
+        )}
 
         {/* Mounted while hidden too, so a drawing and its undo steps survive a look at the alerts. */}
         <div role="tabpanel" hidden={tab !== "floor"} aria-label={t.adminTabFloorEditor}>

@@ -1,8 +1,16 @@
 import type { Side } from "../api/types";
+import { shopperArabic } from "./shopper.ar";
+import { shopperRussian } from "./shopper.ru";
 
-export type Language = "he" | "en";
+export type Language = "he" | "en" | "ar" | "ru";
 
 export const DEFAULT_LANGUAGE: Language = "he";
+
+/** The shoppers' screens speak all four; the staff app and the dashboard, Hebrew and English. */
+export const SHOPPER_LANGUAGES: readonly Language[] = ["he", "ar", "ru", "en"];
+
+/** Each language named in itself, so a shopper who reads only that one can find it. */
+export const LANGUAGE_NAMES: Record<Language, string> = { he: "עברית", ar: "العربية", ru: "Русский", en: "English" };
 
 export interface Strings {
   direction: "rtl" | "ltr";
@@ -60,6 +68,8 @@ export interface Strings {
   whichItemMissing: string;
   noneOfThem: string;
   notFoundThanks: (text: string) => string;
+  /** After scanning an aisle-end sign. */
+  youAreHere: (shelf: string) => string;
   missingHeading: string;
   foundAfterAll: string;
   routeFinished: (missing: number) => string;
@@ -90,18 +100,9 @@ export interface Strings {
   photoReview: string;
   photoUnreadable: string;
   photoUnavailable: string;
-  micHint: string;
   departments: string;
   quickAdd: string;
   closePanel: string;
-  listening: string;
-  listeningHint: string;
-  dictationStarting: string;
-  dictationFinishing: string;
-  dictationSegmentFailed: string;
-  finishDictation: string;
-  cancelDictation: string;
-  startDictation: string;
   unmatchedHeading: string;
   pickDepartment: string;
   removeItemShort: (name: string) => string;
@@ -204,7 +205,7 @@ export interface Strings {
   catalogImported: string;
   productNew: string;
   productEdit: string;
-  productFields: { name: string; barcode: string; brand: string; size: string; department: string; shelf: string; subcategory: string };
+  productFields: { name: string; barcode: string; brand: string; size: string; department: string; shelf: string; subcategory: string; price: string };
   productShelfHint: string;
   productWholeDepartment: string;
   productShelfNotDrawn: (name: string) => string;
@@ -293,7 +294,14 @@ export interface Strings {
   placingHint: (item: string) => string;
   kpiRoutesToday: string;
   kpiMissingAlerts: string;
-  kpiUnfulfilled: string;
+  /** The week's reported items at shelf prices. */
+  kpiLostValue: string;
+  kpiLostValueDetail: (reports: number) => string;
+  kpiOpenValue: (value: string) => string;
+  /** Median minutes from an alert's first report to its shelf refilled. */
+  kpiRestockTime: string;
+  kpiRestockNone: string;
+  kpiRestockDetail: (alerts: number) => string;
   kpiVsSameHours: string;
   kpiVsLastWeek: string;
   kpiVsPreviousWeek: string;
@@ -314,13 +322,117 @@ export interface Strings {
   legendTrafficHigh: string;
   legendHeat: string;
   trafficTrips: (count: number) => string;
+  /** "40 min", "2 h 30 min", "2.5 days". */
+  durationMinutes: (minutes: number) => string;
+  lostSalesTitle: string;
+  lostSalesHint: string;
+  lostSalesEmpty: string;
+  lostSalesReports: (reports: number, exact: number) => string;
+  lostSalesEmptyShelf: string;
+  lostSalesEmptyShelfHint: (open: number, openValue: string) => string;
+  lostSalesMisplaced: string;
+  lostSalesMisplacedHint: string;
+  lostSalesNotCarried: string;
+  lostSalesNotCarriedHint: string;
+  lostSalesReportCount: (count: number) => string;
+  lostSalesSearchCount: (count: number) => string;
+  lostSalesTopItems: string;
+  lostSalesState: Record<"open" | "restocked" | "misplaced", string>;
+  lostSalesBasis: Record<"product" | "similar" | "department", string>;
+  lostSalesNoPrice: string;
+  lostSalesPickers: (count: number) => string;
+  lostSalesFootnote: string;
+  alertValue: string;
+  alertOnShelf: string;
+  alertOnShelfDone: (item: string) => string;
+  catalogPrice: string;
+  catalogNoPrice: string;
+  productPriceInvalid: string;
+  pricesImport: string;
+  pricesImportHint: string;
+  pricesImporting: string;
+  pricesImported: (updated: number, matched: number, lines: number, withoutPrice: number) => string;
+  pricesImportFailed: string;
+  adminTabSigns: string;
+  signsTitle: string;
+  signsHint: string;
+  signsPrint: (count: number) => string;
+  signsEntrance: string;
+  signsNoPlan: string;
+  staffTitle: string;
+  staffOpenAlerts: (count: number) => string;
+  staffEmpty: string;
+  staffEmptyHint: string;
+  staffAtRisk: (value: string) => string;
+  staffShelf: (shelf: string) => string;
+  staffNewAlert: (item: string) => string;
+  staffClosed: (item: string) => string;
+  staffMisplacedClosed: (item: string) => string;
+  staffElsewhere: string;
+  pickNoPlan: string;
+  pickPasteLabel: string;
+  pickPastePlaceholder: string;
+  pickSort: string;
+  pickHint: string;
+  pickSortFailed: string;
+  pickReportFailed: string;
+  pickProgress: (done: number, total: number, missing: number) => string;
+  pickMissing: string;
+  pickElsewhere: string;
+  pickFinish: string;
+  pickFinishEarly: (left: number) => string;
+  pickDone: (minutes: number, lines: number, missing: number) => string;
+  pickingTitle: string;
+  pickingMedian: string;
+  pickingOrders: string;
+  pickingMissing: string;
+  pickingNoBaseline: string;
+  pickingVsBefore: (before: string) => string;
+  /** How long ago, at a glance: "לפני 12 דק׳", "לפני שעתיים", "אתמול". */
+  ago: { now: string; minutes: (n: number) => string; hours: (n: number) => string; days: (n: number) => string };
+  placeScan: string;
+  placeScanTitle: string;
+  placeScanHint: string;
+  placeLooking: string;
+  placeTypeBarcode: string;
+  placeFind: string;
+  placeTypeInstead: string;
+  placeCameraDenied: string;
+  placeNoCamera: string;
+  placeNoReader: string;
+  placeLookupFailed: string;
+  placeNoPlan: string;
+  placeNow: (shelf: string) => string;
+  placeWhichShelf: string;
+  placeHereNow: string;
+  placeOtherShelves: string;
+  placeFilterShelves: string;
+  placeUnknown: (barcode: string) => string;
+  placeNameFirst: string;
+  placeSaved: (name: string, shelf: string) => string;
+  placeAlertClosed: string;
+  placeScanAnother: string;
+  placeRelocating: (item: string) => string;
+  staffNav: { alerts: string; place: string; pick: string };
+  staffPush: {
+    on: string;
+    off: string;
+    turnOn: string;
+    turnOff: string;
+    test: string;
+    testSent: (count: number) => string;
+    installFirst: string;
+    unsupported: string;
+    serverOff: string;
+    denied: string;
+  };
 }
 
-function formatMetres(value: number, language: Language): string {
+function formatMetres(value: number, language: "he" | "en"): string {
   return new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(value);
 }
 
-export const strings: Record<Language, Strings> = {
+const baseStrings: Record<"he" | "en", Strings> = {
   he: {
     direction: "rtl",
     appName: "מסלול קניות",
@@ -369,7 +481,8 @@ export const strings: Record<Language, Strings> = {
     notFoundItem: (name) => `לא מצאתי כאן: ${name}`,
     whichItemMissing: "מה חסר במדף?",
     noneOfThem: "אף אחד מהם",
-    notFoundThanks: (text) => `דיווחנו על ${text}. תודה!`,
+    notFoundThanks: (text) => `דיווחנו על ${text} לצוות הסניף. תודה!`,
+    youAreHere: (shelf) => `אתם ליד מדף ${shelf}. המסלול יוצא מכאן.`,
     missingHeading: "לא נמצאו",
     foundAfterAll: "מצאתי בכל זאת",
     listComplete: "כל המוצרים נאספו!",
@@ -405,18 +518,9 @@ export const strings: Record<Language, Strings> = {
     photoReview: "זה מה שקראנו. אפשר לתקן לפני שמוסיפים.",
     photoUnreadable: "לא הצלחנו לקרוא את התמונה. אפשר לצלם שוב באור טוב יותר, או לכתוב כאן.",
     photoUnavailable: "צילום רשימה לא זמין כרגע. אפשר לכתוב או להדביק כאן.",
-    micHint: "ההכתבה לא זמינה כרגע. לוחצים על שדה הטקסט ואז על המיקרופון במקלדת.",
     departments: "מחלקות",
     quickAdd: "הוספה מהירה",
     closePanel: "סגירה",
-    listening: "מקשיבים",
-    listeningHint: "אומרים פריט אחרי פריט. לא צריך למהר, מקשיבים עד שלוחצים סיום.",
-    dictationStarting: "מפעילים את המיקרופון",
-    dictationFinishing: "מסיימים לפענח",
-    dictationSegmentFailed: "משהו לא נקלט. כדאי לחזור על הפריט האחרון.",
-    finishDictation: "סיום",
-    cancelDictation: "ביטול",
-    startDictation: "הכתבה קולית",
     unmatchedHeading: "לא מצאנו בסניף",
     pickDepartment: "בחירת מחלקה",
     removeItemShort: (name) => `הסרת ${name}`,
@@ -523,7 +627,7 @@ export const strings: Record<Language, Strings> = {
     catalogImported: "מיובא",
     productNew: "מוצר חדש",
     productEdit: "עריכת מוצר",
-    productFields: { name: "שם המוצר", barcode: "ברקוד", brand: "מותג", size: "גודל", department: "מחלקה", shelf: "מדף במפה", subcategory: "תת־קטגוריה" },
+    productFields: { name: "שם המוצר", barcode: "ברקוד", brand: "מותג", size: "גודל", department: "מחלקה", shelf: "מדף במפה", subcategory: "תת־קטגוריה", price: "מחיר מדף (₪)" },
     productShelfHint: "המדף שאליו הקונים יגיעו. אלה המדפים שצוירו במפה למחלקה הזאת.",
     productWholeDepartment: "מדף המחלקה, בלי מדף מדויק",
     productShelfNotDrawn: (name) => `${name} (לא מצויר במפה)`,
@@ -597,7 +701,7 @@ export const strings: Record<Language, Strings> = {
     floorViewLabel: "איזו מפה להציג",
     floorViewDrawn: "המפה המצוירת",
     floorViewZones: "אזורי מדף",
-    floorMapHint: "תנועה ודיווחי \"לא מצאתי\" על המפה שציירתם. את המוצרים מציבים על המדפים בלשונית \"אזורי מדף\" או בקטלוג.",
+    floorMapHint: "מסלולים מתוכננים ודיווחי \"לא מצאתי\" על המפה שציירתם. את המוצרים מציבים על המדפים בלשונית \"אזורי מדף\" או בקטלוג.",
     alertsHint: "מה לקוחות לא מצאו על המדף ב-7 הימים האחרונים.",
     alertsSummary: (count) =>
       count === 1 ? "פריט אחד דווח 3 פעמים או יותר." : `${count} פריטים דווחו 3 פעמים או יותר.`,
@@ -621,13 +725,18 @@ export const strings: Record<Language, Strings> = {
       `מיקום חדש עבור ${item}: הפריט יעבור למדף הזה, יוסר ממדפים אחרים וההתראה תיסגר.`,
     kpiRoutesToday: "מסלולים היום",
     kpiMissingAlerts: "התראות חוסר",
-    kpiUnfulfilled: "חיפושים ללא מענה",
+    kpiLostValue: "מכירות בסיכון · 7 ימים",
+    kpiLostValueDetail: (reports) => (reports === 1 ? "מדיווח אחד" : `מ-${reports} דיווחים`),
+    kpiOpenValue: (value) => `${value} עדיין על מדפים ריקים`,
+    kpiRestockTime: "זמן עד מילוי מדף",
+    kpiRestockNone: "עוד לא נסגרה התראה כ\"מולא\"",
+    kpiRestockDetail: (alerts) => (alerts === 1 ? "חציון, התראה אחת" : `חציון של ${alerts} התראות`),
     kpiVsSameHours: "מול אותן שעות לפני שבוע",
     kpiVsLastWeek: "מול לפני שבוע",
     kpiVsPreviousWeek: "מול 7 הימים שלפני",
     kpiNew: "חדש",
     kpiFlat: "ללא שינוי",
-    lostDemandTitle: "ביקוש שלא נענה",
+    lostDemandTitle: "מה חיפשו ואין לכם",
     lostDemandHint: (total) => `${total} חיפושים ב-7 הימים האחרונים לא מצאו מוצר בקטלוג.`,
     lostDemandItems: "הפריטים המבוקשים ביותר",
     lostDemandCategories: "לפי מחלקה",
@@ -637,11 +746,138 @@ export const strings: Record<Language, Strings> = {
     lostDemandCenter: "חיפושים",
     lostDemandTimes: (count) => (count === 1 ? "פעם אחת" : `${count} פעמים`),
     layerHeat: "מפת חום",
-    layerTraffic: "זרימת תנועה",
-    legendTrafficLow: "תנועה נמוכה",
-    legendTrafficHigh: "תנועה גבוהה",
+    layerTraffic: "מסלולים מתוכננים",
+    legendTrafficLow: "מעט מסלולים",
+    legendTrafficHigh: "הרבה מסלולים",
     legendHeat: "דיווחי חוסר פתוחים",
     trafficTrips: (count) => (count === 1 ? "מסלול אחד ב-7 ימים" : `${count} מסלולים ב-7 ימים`),
+    durationMinutes: (minutes) => {
+      if (minutes < 60) return `${Math.max(1, Math.round(minutes))} דק׳`;
+      if (minutes < 24 * 60) {
+        const hours = Math.floor(minutes / 60);
+        const rest = Math.round(minutes - hours * 60);
+        return rest ? `${hours} שע׳ ${rest} דק׳` : `${hours} שע׳`;
+      }
+      return `${(minutes / (24 * 60)).toFixed(1)} ימים`;
+    },
+    lostSalesTitle: "מכירות שאבדו",
+    lostSalesHint: "7 הימים האחרונים, לפי מחירי המדף",
+    lostSalesEmpty: "אין דיווחי \"לא מצאתי\" ב-7 הימים האחרונים.",
+    lostSalesReports: (reports, exact) =>
+      `${reports === 1 ? "דיווח אחד" : `${reports} דיווחים`} · ${exact} במחיר המוצר עצמו`,
+    lostSalesEmptyShelf: "מדף ריק",
+    lostSalesEmptyShelfHint: (open, openValue) =>
+      open === 0 ? "אין פריטים פתוחים" : `${open === 1 ? "פריט אחד עדיין פתוח" : `${open} פריטים עדיין פתוחים`} · ${openValue}`,
+    lostSalesMisplaced: "לא במקום",
+    lostSalesMisplacedHint: "היה בסניף ולא נמצא: שילוט או מפה",
+    lostSalesNotCarried: "לא מחזיקים",
+    lostSalesNotCarriedHint: "ביקוש שהקופה לא רואה",
+    lostSalesReportCount: (count) => (count === 1 ? "דיווח אחד" : `${count} דיווחים`),
+    lostSalesSearchCount: (count) => (count === 1 ? "חיפוש אחד" : `${count} חיפושים`),
+    lostSalesTopItems: "מה עלה הכי הרבה",
+    lostSalesState: { open: "פתוח", restocked: "מולא", misplaced: "לא במקום" },
+    lostSalesBasis: {
+      product: "מחיר המוצר",
+      similar: "מחיר משוער: מוצרים דומים",
+      department: "מחיר משוער: ממוצע המחלקה",
+    },
+    lostSalesNoPrice: "אין מחיר",
+    lostSalesPickers: (count) => (count === 1 ? "מלקט אחד" : `${count} מלקטים`),
+    lostSalesFootnote:
+      "מחיר המדף של כל פריט שדווח, פעם אחת לכל דיווח. זה מינימום: נספרים רק לקוחות שדיווחו, בלי הכפלה לכל הסניף.",
+    alertValue: "שווי",
+    alertOnShelf: "היה במדף",
+    alertOnShelfDone: (item) => `${item} סומן כ"היה במדף". נספר כ"לא במקום", לא כמדף ריק.`,
+    catalogPrice: "מחיר",
+    catalogNoPrice: "אין מחיר",
+    productPriceInvalid: "מחיר לא תקין: מספר בשקלים, עד שתי ספרות אחרי הנקודה.",
+    pricesImport: "ייבוא קובץ מחירים",
+    pricesImportHint: "קובץ PriceFull שהרשת מפרסמת לסניף, XML או gz",
+    pricesImporting: "מייבאים מחירים…",
+    pricesImported: (updated, matched, lines, withoutPrice) =>
+      `${lines} שורות בקובץ, ${matched} התאימו לקטלוג, ${updated} מחירים עודכנו.${
+        withoutPrice > 0 ? ` ${withoutPrice} מוצרים עדיין בלי מחיר.` : ""
+      }`,
+    pricesImportFailed: "הקובץ לא נקרא כקובץ מחירים. צריך את קובץ ה-PriceFull של הסניף, כפי שהורד.",
+    adminTabSigns: "שלטי QR",
+    signsTitle: "שלטי QR לסניף",
+    signsHint:
+      "שלט בכניסה ושלט בקצה כל מעבר. סריקה של שלט מעבר גם אומרת לטלפון איפה הלקוח עומד, והמסלול יוצא משם. מדפיסים, גוזרים לפי הקו ומדביקים בגובה העיניים.",
+    signsPrint: (count) => (count === 1 ? "הדפסת שלט אחד" : `הדפסת ${count} שלטים`),
+    signsEntrance: "שלט כניסה",
+    signsNoPlan: "שלטי מעבר דורשים מפה מצוירת. שלט הכניסה עובד גם בלעדיה.",
+    staffTitle: "צוות הסניף",
+    staffOpenAlerts: (count) => (count === 1 ? "התראה פתוחה אחת" : `${count} התראות פתוחות`),
+    staffEmpty: "אין התראות פתוחות",
+    staffEmptyHint: "דיווח חדש של לקוח יופיע כאן, ויצלצל בטלפון כשההתראות פועלות.",
+    staffAtRisk: (value) => `${value} בסיכון`,
+    staffShelf: (shelf) => `מדף ${shelf}`,
+    staffNewAlert: (item) => `התראה חדשה: ${item}`,
+    staffClosed: (item) => `נסגר: ${item}. תודה!`,
+    staffMisplacedClosed: (item) => `נסגר: ${item} היה במדף. נספר כ"לא במקום".`,
+    staffElsewhere: "במקום אחר",
+    pickNoPlan: "ליקוט לפי מסלול דורש מפה מצוירת של הסניף.",
+    pickPasteLabel: "ההזמנה",
+    pickPastePlaceholder: "מדביקים כאן את ההזמנה, מוצר בכל שורה",
+    pickSort: "סידור לפי המסלול",
+    pickHint: "אפשר להדביק הזמנה ממערכת האונליין או מוואטסאפ. כמויות נשארות בשורה. מוצר שחסר במדף מדווח לצוות מיד.",
+    pickSortFailed: "סידור ההזמנה לא הצליח. בודקים את החיבור ומנסים שוב.",
+    pickReportFailed: "הדיווח על החוסר לא נשלח. הוא נשאר מסומן; כדאי לעדכן את מנהל המשמרת.",
+    pickProgress: (done, total, missing) => `${done}/${total} שורות${missing > 0 ? ` · ${missing} חסרים` : ""}`,
+    pickMissing: "חסר",
+    pickElsewhere: "בלי מיקום במפה",
+    pickFinish: "סיום ליקוט",
+    pickFinishEarly: (left) => (left === 1 ? "נשארה שורה אחת בלי סימון. לסיים בכל זאת?" : `נשארו ${left} שורות בלי סימון. לסיים בכל זאת?`),
+    pickDone: (minutes, lines, missing) =>
+      `ההזמנה נלקטה ב-${Math.max(1, Math.round(minutes))} דק׳: ${lines} שורות${missing > 0 ? `, ${missing} חסרים דווחו לצוות` : ", בלי חסרים"}.`,
+    pickingTitle: "ליקוט הזמנות אונליין",
+    pickingMedian: "חציון להזמנה",
+    pickingOrders: "הזמנות השבוע",
+    pickingMissing: "שורות חסרות",
+    pickingNoBaseline: "אין עדיין נתון משבוע קודם להשוואה.",
+    pickingVsBefore: (before) => `בשבוע שלפני: ${before} להזמנה.`,
+    ago: {
+      now: "עכשיו",
+      minutes: (n) => (n === 1 ? "לפני דקה" : `לפני ${n} דק׳`),
+      hours: (n) => (n === 1 ? "לפני שעה" : n === 2 ? "לפני שעתיים" : `לפני ${n} שעות`),
+      days: (n) => (n === 1 ? "אתמול" : n === 2 ? "לפני יומיים" : `לפני ${n} ימים`),
+    },
+    placeScan: "סריקת ברקוד",
+    placeScanTitle: "סריקת ברקוד",
+    placeScanHint: "מכוונים את המצלמה לברקוד של המוצר",
+    placeLooking: "מחפשים בקטלוג…",
+    placeTypeBarcode: "או הקלדת ברקוד",
+    placeFind: "חיפוש לפי ברקוד",
+    placeTypeInstead: "הקלדת ברקוד במקום",
+    placeCameraDenied: "אין גישה למצלמה. אפשר לאשר אותה בהגדרות הדפדפן, או להקליד את הברקוד.",
+    placeNoCamera: "לא נמצאה מצלמה. אפשר להקליד את הברקוד.",
+    placeNoReader: "קורא הברקודים לא נטען. אפשר להקליד את הברקוד.",
+    placeLookupFailed: "החיפוש לא הצליח. בודקים את החיבור ומנסים שוב.",
+    placeNoPlan: "לסניף עוד אין מפה מצוירת. מיקום מוצרים לפי ברקוד יעבוד אחרי שהמפה תצויר בלוח הבקרה.",
+    placeNow: (shelf) => `במפה עכשיו: מדף ${shelf}`,
+    placeWhichShelf: "באיזה מדף הוא עומד?",
+    placeHereNow: "כאן במפה",
+    placeOtherShelves: "מדף במחלקה אחרת",
+    placeFilterShelves: "חיפוש מדף",
+    placeUnknown: (barcode) => `הברקוד ${barcode} לא בקטלוג`,
+    placeNameFirst: "קודם שם המוצר, ואז המדף.",
+    placeSaved: (name, shelf) => `${name} נמצא עכשיו במדף ${shelf}.`,
+    placeAlertClosed: "ההתראה נסגרה.",
+    placeScanAnother: "סריקת מוצר נוסף",
+    placeRelocating: (item) => `מחפשים את ${item}: סורקים את המוצר במקום שבו הוא עומד עכשיו.`,
+    staffNav: { alerts: "התראות", place: "מיקום מוצר", pick: "ליקוט" },
+    staffPush: {
+      on: "התראות לטלפון פועלות",
+      off: "התראות לטלפון כבויות",
+      turnOn: "הפעלה",
+      turnOff: "כיבוי",
+      test: "שליחת בדיקה",
+      testSent: (count) => (count === 0 ? "אף טלפון לא קיבל. כדאי לכבות ולהפעיל שוב." : count === 1 ? "נשלחה לטלפון אחד." : `נשלחה ל-${count} טלפונים.`),
+      installFirst: "באייפון: שיתוף ← \"הוספה למסך הבית\", לפתוח משם ולהפעיל כאן התראות.",
+      unsupported: "הדפדפן הזה לא מקבל התראות. התראות חדשות יופיעו כאן כשהמסך פתוח.",
+      serverOff: "שליחת התראות עוד לא הוגדרה בשרת. התראות חדשות יופיעו כאן כשהמסך פתוח.",
+      denied: "התראות נחסמו לאתר הזה. אפשר לאפשר אותן בהגדרות הטלפון.",
+    },
   },
   en: {
     direction: "ltr",
@@ -691,7 +927,8 @@ export const strings: Record<Language, Strings> = {
     notFoundItem: (name) => `Not found here: ${name}`,
     whichItemMissing: "What's missing from the shelf?",
     noneOfThem: "None of them",
-    notFoundThanks: (text) => `Reported ${text}. Thanks!`,
+    notFoundThanks: (text) => `Reported ${text} to the store staff. Thanks!`,
+    youAreHere: (shelf) => `You're by the ${shelf} shelf. The route starts here.`,
     missingHeading: "Not found",
     foundAfterAll: "Found after all",
     listComplete: "All items collected!",
@@ -723,18 +960,9 @@ export const strings: Record<Language, Strings> = {
     photoReview: "This is what we read. You can fix it before adding.",
     photoUnreadable: "We couldn't read that photo. Try again in better light, or type here.",
     photoUnavailable: "Photos of lists aren't available right now. You can type or paste here.",
-    micHint: "Dictation isn't available right now. Tap a text field, then your keyboard's microphone.",
     departments: "Departments",
     quickAdd: "Quick add",
     closePanel: "Close",
-    listening: "Listening",
-    listeningHint: "Say one item after another. No rush, we listen until you tap Done.",
-    dictationStarting: "Turning on the microphone",
-    dictationFinishing: "Finishing up",
-    dictationSegmentFailed: "Something didn't come through. Try the last item again.",
-    finishDictation: "Done",
-    cancelDictation: "Cancel",
-    startDictation: "Voice dictation",
     unmatchedHeading: "Not found in this store",
     pickDepartment: "Pick a department",
     removeItemShort: (name) => `Remove ${name}`,
@@ -841,7 +1069,7 @@ export const strings: Record<Language, Strings> = {
     catalogImported: "Imported",
     productNew: "New product",
     productEdit: "Edit product",
-    productFields: { name: "Product name", barcode: "Barcode", brand: "Brand", size: "Size", department: "Department", shelf: "Shelf on the map", subcategory: "Subcategory" },
+    productFields: { name: "Product name", barcode: "Barcode", brand: "Brand", size: "Size", department: "Department", shelf: "Shelf on the map", subcategory: "Subcategory", price: "Shelf price (₪)" },
     productShelfHint: "Where shoppers are sent: the shelves drawn on the map for this department.",
     productWholeDepartment: "The department's shelf, no exact one",
     productShelfNotDrawn: (name) => `${name} (not drawn on the map)`,
@@ -915,7 +1143,7 @@ export const strings: Record<Language, Strings> = {
     floorViewLabel: "Which map to show",
     floorViewDrawn: "Drawn map",
     floorViewZones: "Shelf zones",
-    floorMapHint: "Traffic and \"not found\" reports on the map you drew. Put products on its shelves under \"Shelf zones\" or in the catalog.",
+    floorMapHint: "Planned routes and \"not found\" reports on the map you drew. Put products on its shelves under \"Shelf zones\" or in the catalog.",
     alertsHint: "What shoppers couldn't find on the shelf in the last 7 days.",
     alertsSummary: (count) =>
       count === 1 ? "1 item reported 3 times or more." : `${count} items reported 3 times or more.`,
@@ -939,13 +1167,18 @@ export const strings: Record<Language, Strings> = {
       `New location for ${item}: it moves to this shelf, leaves any others, and its alert closes.`,
     kpiRoutesToday: "Total Routes Today",
     kpiMissingAlerts: "Missing Alerts",
-    kpiUnfulfilled: "Unfulfilled Searches",
+    kpiLostValue: "Sales at risk · 7 days",
+    kpiLostValueDetail: (reports) => (reports === 1 ? "from 1 report" : `from ${reports} reports`),
+    kpiOpenValue: (value) => `${value} still on empty shelves`,
+    kpiRestockTime: "Time to restock",
+    kpiRestockNone: "No alert closed as restocked yet",
+    kpiRestockDetail: (alerts) => (alerts === 1 ? "median, 1 alert" : `median of ${alerts} alerts`),
     kpiVsSameHours: "vs the same hours last week",
     kpiVsLastWeek: "vs a week ago",
     kpiVsPreviousWeek: "vs the previous 7 days",
     kpiNew: "New",
     kpiFlat: "No change",
-    lostDemandTitle: "Lost Demand",
+    lostDemandTitle: "Searched for, not carried",
     lostDemandHint: (total) => `${total} searches in the last 7 days found nothing in the catalog.`,
     lostDemandItems: "Most wanted items",
     lostDemandCategories: "By department",
@@ -955,10 +1188,144 @@ export const strings: Record<Language, Strings> = {
     lostDemandCenter: "searches",
     lostDemandTimes: (count) => (count === 1 ? "Once" : `${count} times`),
     layerHeat: "Heatmap",
-    layerTraffic: "Traffic Flow",
-    legendTrafficLow: "Low Traffic",
-    legendTrafficHigh: "High Traffic",
+    layerTraffic: "Planned routes",
+    legendTrafficLow: "Few routes",
+    legendTrafficHigh: "Many routes",
     legendHeat: "Open missing reports",
     trafficTrips: (count) => (count === 1 ? "1 route in 7 days" : `${count} routes in 7 days`),
+    durationMinutes: (minutes) => {
+      if (minutes < 60) return `${Math.max(1, Math.round(minutes))} min`;
+      if (minutes < 24 * 60) {
+        const hours = Math.floor(minutes / 60);
+        const rest = Math.round(minutes - hours * 60);
+        return rest ? `${hours} h ${rest} min` : `${hours} h`;
+      }
+      return `${(minutes / (24 * 60)).toFixed(1)} days`;
+    },
+    lostSalesTitle: "Lost sales",
+    lostSalesHint: "Last 7 days, at shelf prices",
+    lostSalesEmpty: "No \"not found\" reports in the last 7 days.",
+    lostSalesReports: (reports, exact) =>
+      `${reports === 1 ? "1 report" : `${reports} reports`} · ${exact} at the product's own price`,
+    lostSalesEmptyShelf: "Empty shelf",
+    lostSalesEmptyShelfHint: (open, openValue) =>
+      open === 0 ? "Nothing still open" : `${open === 1 ? "1 item still open" : `${open} items still open`} · ${openValue}`,
+    lostSalesMisplaced: "Misplaced",
+    lostSalesMisplacedHint: "In the store but not found: signage or the map",
+    lostSalesNotCarried: "Not carried",
+    lostSalesNotCarriedHint: "Demand the till never sees",
+    lostSalesReportCount: (count) => (count === 1 ? "1 report" : `${count} reports`),
+    lostSalesSearchCount: (count) => (count === 1 ? "1 search" : `${count} searches`),
+    lostSalesTopItems: "What cost the most",
+    lostSalesState: { open: "Open", restocked: "Restocked", misplaced: "Misplaced" },
+    lostSalesBasis: {
+      product: "The product's price",
+      similar: "Estimated: similar products",
+      department: "Estimated: department average",
+    },
+    lostSalesNoPrice: "No price",
+    lostSalesPickers: (count) => (count === 1 ? "1 picker" : `${count} pickers`),
+    lostSalesFootnote:
+      "The shelf price of every reported item, once per report. A floor: only shoppers who reported count, never scaled up to the whole store.",
+    alertValue: "Value",
+    alertOnShelf: "Was on the shelf",
+    alertOnShelfDone: (item) => `${item} marked as on the shelf. It counts as misplaced, not as an empty shelf.`,
+    catalogPrice: "Price",
+    catalogNoPrice: "No price",
+    productPriceInvalid: "Not a price: shekels, with at most two decimals.",
+    pricesImport: "Import a price file",
+    pricesImportHint: "The branch's PriceFull file as the chain publishes it, XML or gz",
+    pricesImporting: "Importing prices…",
+    pricesImported: (updated, matched, lines, withoutPrice) =>
+      `${lines} lines in the file, ${matched} matched the catalog, ${updated} prices changed.${
+        withoutPrice > 0 ? ` ${withoutPrice} products still have no price.` : ""
+      }`,
+    pricesImportFailed: "That didn't read as a price file. Use the branch's PriceFull file, as downloaded.",
+    adminTabSigns: "QR signs",
+    signsTitle: "QR signs for the store",
+    signsHint:
+      "One at the entrance and one at each aisle end. Scanning an aisle sign also tells the phone where the shopper stands, so the route starts there. Print, cut along the line, and put them up at eye level. The signs are in Hebrew.",
+    signsPrint: (count) => (count === 1 ? "Print 1 sign" : `Print ${count} signs`),
+    signsEntrance: "Entrance sign",
+    signsNoPlan: "Aisle signs need a drawn map. The entrance sign works without one.",
+    staffTitle: "Store staff",
+    staffOpenAlerts: (count) => (count === 1 ? "1 open alert" : `${count} open alerts`),
+    staffEmpty: "No open alerts",
+    staffEmptyHint: "A shopper's new report shows here, and rings the phone when alerts are on.",
+    staffAtRisk: (value) => `${value} at risk`,
+    staffShelf: (shelf) => `${shelf} shelf`,
+    staffNewAlert: (item) => `New alert: ${item}`,
+    staffClosed: (item) => `Closed: ${item}. Thanks!`,
+    staffMisplacedClosed: (item) => `Closed: ${item} was on the shelf. It counts as misplaced.`,
+    staffElsewhere: "Somewhere else",
+    pickNoPlan: "Picking by route needs a drawn map of the store.",
+    pickPasteLabel: "The order",
+    pickPastePlaceholder: "Paste the order here, one product per line",
+    pickSort: "Sort by the route",
+    pickHint: "Paste an order from the online system or from WhatsApp. Quantities stay in the line. A product missing from its shelf is reported to the staff at once.",
+    pickSortFailed: "Sorting the order failed. Check the connection and try again.",
+    pickReportFailed: "The missing report didn't go through. It stays marked; tell the shift manager.",
+    pickProgress: (done, total, missing) => `${done}/${total} lines${missing > 0 ? ` · ${missing} missing` : ""}`,
+    pickMissing: "Missing",
+    pickElsewhere: "Not on the map",
+    pickFinish: "Finish picking",
+    pickFinishEarly: (left) => (left === 1 ? "1 line is still unmarked. Finish anyway?" : `${left} lines are still unmarked. Finish anyway?`),
+    pickDone: (minutes, lines, missing) =>
+      `Order picked in ${Math.max(1, Math.round(minutes))} min: ${lines} lines${missing > 0 ? `, ${missing} missing reported to the staff` : ", nothing missing"}.`,
+    pickingTitle: "Online order picking",
+    pickingMedian: "Median per order",
+    pickingOrders: "Orders this week",
+    pickingMissing: "Missing lines",
+    pickingNoBaseline: "No earlier week to compare with yet.",
+    pickingVsBefore: (before) => `The week before: ${before} per order.`,
+    ago: {
+      now: "just now",
+      minutes: (n) => `${n} min ago`,
+      hours: (n) => (n === 1 ? "1 hour ago" : `${n} hours ago`),
+      days: (n) => (n === 1 ? "yesterday" : `${n} days ago`),
+    },
+    placeScan: "Scan a barcode",
+    placeScanTitle: "Scan a barcode",
+    placeScanHint: "Point the camera at the product's barcode",
+    placeLooking: "Looking it up…",
+    placeTypeBarcode: "or type the barcode",
+    placeFind: "Find by barcode",
+    placeTypeInstead: "Type the barcode instead",
+    placeCameraDenied: "No access to the camera. Allow it in the browser's settings, or type the barcode.",
+    placeNoCamera: "No camera found. Type the barcode instead.",
+    placeNoReader: "The barcode reader didn't load. Type the barcode instead.",
+    placeLookupFailed: "That lookup failed. Check the connection and try again.",
+    placeNoPlan: "This store has no drawn map yet. Placing products by barcode works once the map is drawn in the dashboard.",
+    placeNow: (shelf) => `On the map now: ${shelf} shelf`,
+    placeWhichShelf: "Which shelf is it on?",
+    placeHereNow: "Here on the map",
+    placeOtherShelves: "A shelf in another department",
+    placeFilterShelves: "Find a shelf",
+    placeUnknown: (barcode) => `Barcode ${barcode} isn't in the catalog`,
+    placeNameFirst: "The product's name first, then its shelf.",
+    placeSaved: (name, shelf) => `${name} is now on the ${shelf} shelf.`,
+    placeAlertClosed: "The alert is closed.",
+    placeScanAnother: "Scan another product",
+    placeRelocating: (item) => `Looking for ${item}: scan the product where it stands now.`,
+    staffNav: { alerts: "Alerts", place: "Place a product", pick: "Picking" },
+    staffPush: {
+      on: "Phone alerts are on",
+      off: "Phone alerts are off",
+      turnOn: "Turn on",
+      turnOff: "Turn off",
+      test: "Send a test",
+      testSent: (count) => (count === 0 ? "No phone got it. Try turning alerts off and on." : count === 1 ? "Sent to 1 phone." : `Sent to ${count} phones.`),
+      installFirst: "On an iPhone: Share → \"Add to Home Screen\", open it from there, then turn alerts on here.",
+      unsupported: "This browser can't receive alerts. New ones show here while the screen is open.",
+      serverOff: "The server isn't set up to send alerts yet. New ones show here while the screen is open.",
+      denied: "Alerts are blocked for this site. They can be allowed in the phone's settings.",
+    },
   },
+};
+
+export const strings: Record<Language, Strings> = {
+  ...baseStrings,
+  // Over English: whatever only staff see stays in English for them.
+  ar: { ...baseStrings.en, ...shopperArabic, otherLanguageLabel: "עברית", otherLanguageShort: "עב" },
+  ru: { ...baseStrings.en, ...shopperRussian, otherLanguageLabel: "עברית", otherLanguageShort: "עב" },
 };

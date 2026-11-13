@@ -1,11 +1,12 @@
-import { CircleAlert, MapPin, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CircleAlert, FileUp, LoaderCircle, MapPin, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 
 import type { CatalogCategory, CatalogProduct } from "../../api/types";
 import type { Catalog } from "../../hooks/useCatalog";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ShelfOption } from "../../lib/admin/catalog";
-import { filterCatalog } from "../../lib/admin/catalog";
+import { draftOf, filterCatalog } from "../../lib/admin/catalog";
+import { formatShekels } from "../../lib/admin/money";
 import { Notice } from "../Notice";
 import { ProductForm } from "./ProductForm";
 
@@ -25,8 +26,10 @@ interface CatalogPanelProps {
  * here, and sees at a glance what isn't on the map.
  */
 export function CatalogPanel({ catalog, categories, shelves }: CatalogPanelProps) {
-  const { t, pick } = useLanguage();
+  const { t, pick, language } = useLanguage();
   const [query, setQuery] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const priceFile = useRef<HTMLInputElement>(null);
   const [department, setDepartment] = useState("");
   const [offMapOnly, setOffMapOnly] = useState(false);
   const [editing, setEditing] = useState<CatalogProduct | "new" | null>(null);
@@ -44,6 +47,18 @@ export function CatalogPanel({ catalog, categories, shelves }: CatalogPanelProps
   );
   const hasPlan = shelves !== null;
   const offMap = hasPlan && products ? products.filter((product) => product.shelf === null).length : 0;
+
+  const importPrices = async (file: File) => {
+    setIsImporting(true);
+    setMessage(null);
+    const result = await catalog.importPrices(file);
+    setIsImporting(false);
+    setMessage(
+      result
+        ? { ok: true, text: t.pricesImported(result.updated, result.matched, result.lines, result.products_without_price) }
+        : { ok: false, text: t.pricesImportFailed },
+    );
+  };
 
   const remove = async (product: CatalogProduct) => {
     if (!window.confirm(t.catalogDeleteConfirm(product.name))) {
@@ -66,14 +81,44 @@ export function CatalogPanel({ catalog, categories, shelves }: CatalogPanelProps
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing("new")}
-          className="flex h-11 items-center gap-2 rounded-full bg-brand px-5 font-semibold text-white shadow-sm"
-        >
-          <Plus aria-hidden className="size-5" />
-          {t.catalogAdd}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={priceFile}
+            type="file"
+            accept=".xml,.gz,application/xml,text/xml,application/gzip"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden
+            data-price-file
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void importPrices(file);
+            }}
+          />
+          <button
+            type="button"
+            disabled={isImporting}
+            title={t.pricesImportHint}
+            onClick={() => priceFile.current?.click()}
+            className="flex h-11 items-center gap-2 rounded-full bg-white px-4 font-medium text-slate-700 ring-1 ring-slate-300 disabled:opacity-60"
+          >
+            {isImporting ? (
+              <LoaderCircle aria-hidden className="size-5 animate-spin" />
+            ) : (
+              <FileUp aria-hidden className="size-5" />
+            )}
+            {isImporting ? t.pricesImporting : t.pricesImport}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing("new")}
+            className="flex h-11 items-center gap-2 rounded-full bg-brand px-5 font-semibold text-white shadow-sm"
+          >
+            <Plus aria-hidden className="size-5" />
+            {t.catalogAdd}
+          </button>
+        </div>
       </div>
 
       {!hasPlan && (
@@ -133,12 +178,13 @@ export function CatalogPanel({ catalog, categories, shelves }: CatalogPanelProps
 
       {products && (
         <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200">
-          <table className="w-full min-w-[40rem] text-start text-sm">
+          <table className="w-full min-w-[46rem] text-start text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th scope="col" className="px-3 py-2.5 text-start font-medium">{t.catalogColumns.name}</th>
                 <th scope="col" className="px-3 py-2.5 text-start font-medium">{t.catalogColumns.barcode}</th>
                 <th scope="col" className="px-3 py-2.5 text-start font-medium">{t.catalogColumns.department}</th>
+                <th scope="col" className="px-3 py-2.5 text-end font-medium">{t.catalogPrice}</th>
                 <th scope="col" className="px-3 py-2.5 text-start font-medium">{t.catalogColumns.shelf}</th>
                 <th scope="col" className="px-3 py-2.5 text-end font-medium">
                   <span className="sr-only">{t.catalogColumns.actions}</span>
@@ -158,6 +204,13 @@ export function CatalogPanel({ catalog, categories, shelves }: CatalogPanelProps
                     <span dir="ltr">{product.barcode ?? "—"}</span>
                   </td>
                   <td className="px-3 py-2 text-slate-700">{departmentName(product.department)}</td>
+                  <td data-price className="px-3 py-2 text-end whitespace-nowrap tabular-nums">
+                    {product.price_agorot === null ? (
+                      <span className="text-slate-400">{t.catalogNoPrice}</span>
+                    ) : (
+                      <span className="text-slate-900">{formatShekels(product.price_agorot, language)}</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     {product.shelf ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-0.5 font-medium text-brand-strong">
@@ -207,14 +260,7 @@ export function CatalogPanel({ catalog, categories, shelves }: CatalogPanelProps
           initial={
             editing === "new"
               ? { department: department || undefined }
-              : {
-                  name: editing.name,
-                  barcode: editing.barcode,
-                  brand: editing.brand,
-                  size: editing.size,
-                  department: editing.department,
-                  subcategory: editing.subcategory,
-                }
+              : draftOf(editing)
           }
           categories={categories}
           shelves={shelves}
