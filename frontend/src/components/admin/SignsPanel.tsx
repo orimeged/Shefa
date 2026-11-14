@@ -41,19 +41,19 @@ export function SignsPanel({ shelves }: SignsPanelProps) {
     });
 
   return (
-    <section aria-labelledby="signs-title" className="flex flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section aria-labelledby="signs-title" className="flex flex-col gap-4 rounded-3xl bg-surface p-5 shadow-sm ring-1 ring-line">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="signs-title" className="text-lg font-semibold">
+          <h2 id="signs-title" className="text-2xl font-semibold">
             {t.signsTitle}
           </h2>
-          <p className="max-w-2xl text-sm text-slate-500">{t.signsHint}</p>
+          <p className="max-w-2xl text-muted">{t.signsHint}</p>
         </div>
         <button
           type="button"
           onClick={() => window.print()}
           disabled={specs.length === 0}
-          className="flex h-11 items-center gap-2 rounded-full bg-brand px-5 font-semibold text-white shadow-sm disabled:opacity-50"
+          className="flex h-12 items-center gap-2 rounded-2xl bg-brand px-5 font-semibold text-white shadow-sm disabled:opacity-50"
         >
           <Printer aria-hidden className="size-5" />
           {t.signsPrint(specs.length)}
@@ -66,12 +66,12 @@ export function SignsPanel({ shelves }: SignsPanelProps) {
           <Choice key={label} isOn={!excluded.has(label)} onToggle={() => toggle(label)} label={label} />
         ))}
       </div>
-      {labels.length === 0 && <p className="text-sm text-slate-500">{t.signsNoPlan}</p>}
+      {labels.length === 0 && <p className="text-sm text-muted">{t.signsNoPlan}</p>}
 
       {/* On screen: a preview of the first ones. Printed: every sign, two to an A4 page. */}
       <div className="grid gap-4 lg:grid-cols-2">
         {specs.slice(0, 4).map((spec) => (
-          <div key={spec.key} className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+          <div key={spec.key} className="overflow-hidden rounded-2xl ring-1 ring-line">
             <Sign spec={spec} />
           </div>
         ))}
@@ -97,7 +97,7 @@ function Choice({ isOn, onToggle, label }: { isOn: boolean; onToggle: () => void
       aria-checked={isOn}
       onClick={onToggle}
       className={`flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium ring-1 ${
-        isOn ? "bg-brand-soft text-brand-strong ring-brand/40" : "bg-white text-slate-500 ring-slate-300"
+        isOn ? "bg-brand-soft text-brand-strong ring-brand/40" : "bg-surface text-muted ring-line"
       }`}
     >
       {isOn ? <CheckSquare aria-hidden className="size-4" /> : <Square aria-hidden className="size-4" />}

@@ -1,23 +1,21 @@
-import { LogOut } from "lucide-react";
+import { ArrowRight, Bell, LayoutDashboard, LogOut, Map as MapIcon, Package, QrCode } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { AdminApi } from "../api/adminClient";
 import { createAdminApi } from "../api/adminClient";
 import type { CatalogCategory, NotFoundReportRow, Resolution, SavedFloorPlan, Zone } from "../api/types";
 import { AdminLogin } from "../components/admin/AdminLogin";
-import { CatalogPanel } from "../components/admin/CatalogPanel";
+import { AlertsPanel } from "../components/admin/AlertsPanel";
+import { SECONDARY_BUTTON } from "../components/admin/cards";
 import { FloorGridEditor } from "../components/admin/FloorGridEditor";
-import { KpiRow } from "../components/admin/KpiRow";
-import { LostDemandWidget } from "../components/admin/LostDemandWidget";
-import { LostSalesPanel } from "../components/admin/LostSalesPanel";
-import { PickingCard } from "../components/admin/PickingCard";
-import type { AlertOutcome } from "../components/admin/ShelfStockAlerts";
-import { ShelfStockAlerts } from "../components/admin/ShelfStockAlerts";
+import { MapPanel } from "../components/admin/MapPanel";
+import { OverviewPanel } from "../components/admin/OverviewPanel";
+import { ProductsPanel } from "../components/admin/ProductsPanel";
 import { SignsPanel } from "../components/admin/SignsPanel";
-import { StoreMapPanel } from "../components/admin/StoreMapPanel";
 import { ZoneManagementModal } from "../components/admin/ZoneManagementModal";
 import { LanguageToggle } from "../components/LanguageToggle";
+import { Toast } from "../components/mobile/Toast";
 import { Notice } from "../components/Notice";
 import { useCatalog } from "../hooks/useCatalog";
 import { usePolledReport } from "../hooks/usePolledReport";
@@ -32,10 +30,11 @@ import { readFloorMap } from "../lib/floorPlanMap";
 // For this tab only: a shared tablet shouldn't stay signed in overnight.
 const TOKEN_KEY = "admin-token";
 
-type Tab = "dashboard" | "alerts" | "catalog" | "signs" | "floor";
+type Tab = "overview" | "alerts" | "products" | "map" | "signs";
 
 export default function AdminView() {
   const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY));
+  useAdminTitle();
 
   const signOut = useCallback(() => {
     sessionStorage.removeItem(TOKEN_KEY);
@@ -57,6 +56,18 @@ export default function AdminView() {
   return <Dashboard api={api} onSignOut={signOut} />;
 }
 
+/** The browser tab says which screen this is, not the shoppers' app's name. */
+function useAdminTitle() {
+  const { t } = useLanguage();
+  useEffect(() => {
+    const before = document.title;
+    document.title = `${t.direction === "rtl" ? "שפע" : "Shefa"} · ${t.adminTitle}`;
+    return () => {
+      document.title = before;
+    };
+  }, [t]);
+}
+
 function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void }) {
   const { t } = useLanguage();
   const { map, failed: mapFailed, retry: retryMap } = useStoreMap();
@@ -65,29 +76,32 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
-  const [tab, setTab] = useState<Tab>("dashboard");
-  // The editor loads its plan on first opening, not with every visit to the dashboard.
-  const [hasOpenedFloor, setHasOpenedFloor] = useState(false);
+  const [tab, setTab] = useState<Tab>("overview");
+  /** The map tab shows the shelves, or the editor the plan is drawn in. */
+  const [isEditing, setIsEditing] = useState(false);
+  // The editor loads its plan on first opening, and then keeps its drawing and undo steps.
+  const [hasOpenedEditor, setHasOpenedEditor] = useState(false);
   // Hundreds of rows: drawn once the tab is first opened, then kept with their filters.
-  const [hasOpenedCatalog, setHasOpenedCatalog] = useState(false);
+  const [hasOpenedProducts, setHasOpenedProducts] = useState(false);
   /** The alert whose item is getting a new shelf, while a manager picks one on the map. */
   const [placing, setPlacing] = useState<NotFoundReportRow | null>(null);
-  const [outcome, setOutcome] = useState<AlertOutcome | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   /** Goes up when an alert closes, since the figures and the heat depend on them. */
   const [closedAlerts, setClosedAlerts] = useState(0);
-  const mapSection = useRef<HTMLDivElement>(null);
 
   const alerts = useStockAlerts(api);
   const catalog = useCatalog(api);
-  const alertCount = alerts.rows ? countAlerts(alerts.rows) : 0;
+  const urgentAlerts = alerts.rows ? countAlerts(alerts.rows) : 0;
   const counts = usePolledReport(api.dashboardCounts, closedAlerts);
   const lostSales = usePolledReport(api.lostSales, closedAlerts);
   const picking = usePolledReport(api.picking);
   const lostDemand = usePolledReport(api.lostDemand);
+  const heat = usePolledReport(api.notFoundHeatmap, closedAlerts);
+  const dismissToast = useCallback(() => setToast(null), []);
 
   const reload = useCallback(() => setAttempt((current) => current + 1), []);
 
-  // Loaded once for both the map panel and the editor; a save updates both.
+  // Loaded once for the overview, the products, the map and the editor; a save updates all of them.
   const [savedFloor, setSavedFloor] = useState<SavedFloorPlan | null | undefined>(undefined);
   const [floorFailed, setFloorFailed] = useState(false);
   const [floorAttempt, setFloorAttempt] = useState(0);
@@ -141,19 +155,22 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   }, [api, attempt]);
 
   const openTab = (next: Tab) => {
-    setTab(next);
-    setPlacing(null);
-    if (next === "floor") {
-      setHasOpenedFloor(true);
-    } else if (next === "catalog") {
-      setHasOpenedCatalog(true);
-    }
-    if (next !== tab && (next === "dashboard" || next === "catalog")) {
+    if (next !== tab && (next === "overview" || next === "products" || next === "map")) {
       refresh();
     }
+    setTab(next);
+    setPlacing(null);
+    if (next === "products") setHasOpenedProducts(true);
+    window.scrollTo({ top: 0 });
   };
 
-  const closeAlert = async (row: NotFoundReportRow, resolution: Resolution = "restocked") => {
+  const openEditor = () => {
+    setHasOpenedEditor(true);
+    setIsEditing(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  const closeAlert = async (row: NotFoundReportRow, resolution: Resolution) => {
     const closed = await alerts.resolve(row, resolution);
     if (closed) {
       setClosedAlerts((current) => current + 1);
@@ -162,27 +179,19 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
   };
 
   const markRestocked = async (row: NotFoundReportRow) => {
-    setOutcome(null);
-    if (!(await closeAlert(row))) {
-      setOutcome({ ok: false, text: t.alertResolveFailed });
-    }
+    setToast((await closeAlert(row, "restocked")) ? t.staffClosed(row.item_query) : t.alertResolveFailed);
   };
 
   const markOnShelf = async (row: NotFoundReportRow) => {
-    setOutcome(null);
-    setOutcome(
-      (await closeAlert(row, "on_shelf"))
-        ? { ok: true, text: t.alertOnShelfDone(row.item_query) }
-        : { ok: false, text: t.alertResolveFailed },
-    );
+    setToast((await closeAlert(row, "on_shelf")) ? t.alertOnShelfDone(row.item_query) : t.alertResolveFailed);
   };
 
   const startPlacing = (row: NotFoundReportRow) => {
-    setOutcome(null);
+    setToast(null);
+    setTab("map");
+    setIsEditing(false);
     setPlacing(row);
-    setTab("dashboard");
-    // The table can be long, and the shelf to pick is on the map.
-    requestAnimationFrame(() => mapSection.current?.scrollIntoView({ block: "start" }));
+    window.scrollTo({ top: 0 });
   };
 
   // The location is already saved here, so a failed close only leaves a false alert open.
@@ -191,151 +200,163 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
     setPlacing(null);
     setSelectedNodeId(null);
     setTab("alerts");
-    setOutcome(
-      (await closeAlert(row, "relocated"))
-        ? { ok: true, text: t.alertMoved(row.item_query, zone) }
-        : { ok: false, text: t.alertMovedStillOpen(row.item_query) },
+    setToast(
+      (await closeAlert(row, "relocated")) ? t.alertMoved(row.item_query, zone) : t.alertMovedStillOpen(row.item_query),
     );
   };
 
+  const navItems: { id: Tab; label: string; icon: ReactNode; badge?: number }[] = [
+    { id: "overview", label: t.adminNav.overview, icon: <LayoutDashboard aria-hidden className="size-6 md:size-5" /> },
+    {
+      id: "alerts",
+      label: t.adminNav.alerts,
+      icon: <Bell aria-hidden className="size-6 md:size-5" />,
+      badge: urgentAlerts,
+    },
+    { id: "products", label: t.adminNav.products, icon: <Package aria-hidden className="size-6 md:size-5" /> },
+    { id: "map", label: t.adminNav.map, icon: <MapIcon aria-hidden className="size-6 md:size-5" /> },
+    { id: "signs", label: t.adminNav.signs, icon: <QrCode aria-hidden className="size-6 md:size-5" /> },
+  ];
+
   return (
-    <div className="min-h-dvh bg-slate-100 text-slate-900">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 p-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:p-6">
-        <header className="flex flex-wrap items-center gap-2">
+    <div className="min-h-dvh bg-paper pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-ink md:pb-10">
+      <header className="sticky top-0 z-20 bg-slate-900 text-white print:hidden">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 sm:px-6">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-semibold tracking-tight">{t.adminTitle}</h1>
-            <p className="text-sm text-slate-500">
-              {map?.name ? `${map.name} · ` : ""}
-              {t.adminSubtitle}
-            </p>
+            <h1 className="truncate text-lg leading-tight font-semibold">{t.adminTitle}</h1>
+            {map?.name && <p className="truncate text-sm text-white/60">{map.name}</p>}
           </div>
-          <LanguageToggle className="h-11" />
+          <nav
+            role="tablist"
+            aria-label={t.adminTitle}
+            className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 gap-1 border-t border-line bg-surface px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] md:static md:z-auto md:flex md:gap-1 md:rounded-full md:border-0 md:bg-white/10 md:p-1"
+          >
+            {navItems.map((item) => (
+              <NavButton
+                key={item.id}
+                isSelected={tab === item.id}
+                onSelect={() => openTab(item.id)}
+                label={item.label}
+                badge={item.badge}
+              >
+                {item.icon}
+              </NavButton>
+            ))}
+          </nav>
+          <LanguageToggle compact className="h-10 min-w-10 bg-white/10 px-3 text-white ring-1 ring-white/20" />
           <button
             type="button"
             onClick={onSignOut}
-            className="flex h-11 items-center gap-2 rounded-full bg-white px-4 font-medium ring-1 ring-slate-200"
+            aria-label={t.adminSignOut}
+            title={t.adminSignOut}
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 ring-1 ring-white/20 hover:bg-white/20"
           >
             <LogOut aria-hidden className="size-4 rtl:-scale-x-100" />
-            {t.adminSignOut}
           </button>
-        </header>
-
-        <div role="tablist" aria-label={t.adminTitle} className="flex flex-wrap gap-1">
-          <TabButton isSelected={tab === "dashboard"} onSelect={() => openTab("dashboard")}>
-            {t.adminTabDashboard}
-          </TabButton>
-          <TabButton isSelected={tab === "alerts"} onSelect={() => openTab("alerts")}>
-            {t.adminTabAlerts}
-            {alertCount > 0 && (
-              <span className="grid h-6 min-w-6 place-items-center rounded-full bg-danger px-1.5 text-sm font-semibold text-white">
-                {alertCount}
-              </span>
-            )}
-          </TabButton>
-          <TabButton isSelected={tab === "catalog"} onSelect={() => openTab("catalog")}>
-            {t.adminTabCatalog}
-          </TabButton>
-          <TabButton isSelected={tab === "signs"} onSelect={() => openTab("signs")}>
-            {t.adminTabSigns}
-          </TabButton>
-          <TabButton isSelected={tab === "floor"} onSelect={() => openTab("floor")}>
-            {t.adminTabFloorEditor}
-          </TabButton>
         </div>
+      </header>
 
-        {/* Stays mounted while hidden, so going to the alerts and back keeps the zoom. */}
-        <div role="tabpanel" hidden={tab !== "dashboard"} aria-label={t.adminTabDashboard} className="flex flex-col gap-5">
-          {/* The week's figures head the dashboard; the editor and the catalog need the room. */}
-          <KpiRow
-            counts={counts.data}
-            lostSales={lostSales.data}
-            failed={counts.failed || lostSales.failed}
+      <main className="mx-auto flex max-w-7xl flex-col gap-5 px-4 pt-5 sm:px-6">
+        {(mapFailed || failed) && (
+          <Notice
+            message={t.loadFailed}
             onRetry={() => {
-              counts.retry();
-              lostSales.retry();
+              retryMap();
+              reload();
             }}
-            onOpenAlerts={() => openTab("alerts")}
           />
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-            <div ref={mapSection} className="scroll-mt-4">
-              {mapFailed && <Notice message={t.loadFailed} onRetry={retryMap} />}
-              {failed && <Notice message={t.loadFailed} onRetry={reload} />}
-              {map && zones ? (
-                <StoreMapPanel
-                  api={api}
-                  map={map}
-                  floor={floor}
-                  shelves={shelves}
-                  catalog={catalog}
-                  categories={categories}
-                  zones={zones}
-                  selectedNodeId={selectedNodeId}
-                  placing={placing}
-                  refreshKey={closedAlerts}
-                  onSelectZone={setSelectedNodeId}
-                  onCancelPlacing={() => openTab("alerts")}
-                  onPlaced={(row, shelf) => void finishPlacing(row, shelf)}
-                />
-              ) : (
-                !mapFailed &&
-                !failed && (
-                  <div className="aspect-[34/29.6] w-full animate-pulse rounded-2xl bg-slate-200/70" />
-                )
-              )}
-            </div>
-            <div className="flex flex-col gap-5">
-              <LostSalesPanel report={lostSales.data} failed={lostSales.failed} onRetry={lostSales.retry} />
-              <PickingCard report={picking.data} />
-              <LostDemandWidget
-                report={lostDemand.data}
-                failed={lostDemand.failed}
-                onRetry={lostDemand.retry}
-              />
-            </div>
-          </div>
-        </div>
+        )}
 
-        <div role="tabpanel" hidden={tab !== "alerts"} aria-label={t.adminTabAlerts}>
-          <ShelfStockAlerts
+        {/* Its figures live up here, so it can come and go with its tab; so can the map's, and the two never share a page. */}
+        {tab === "overview" && (
+          <div role="tabpanel" aria-label={t.adminNav.overview}>
+            <OverviewPanel
+              counts={counts}
+              lostSales={lostSales}
+              picking={picking}
+              lostDemand={lostDemand}
+              heat={heat}
+              floor={floor}
+              map={map}
+              zones={zones}
+              selectedNodeId={selectedNodeId}
+              onSelectZone={setSelectedNodeId}
+              openAlerts={alerts.rows ? alerts.rows.length : null}
+              urgentAlerts={urgentAlerts}
+              onOpenAlerts={() => openTab("alerts")}
+              onOpenMap={() => openTab("map")}
+            />
+          </div>
+        )}
+
+        <div role="tabpanel" hidden={tab !== "alerts"} aria-label={t.adminNav.alerts}>
+          <AlertsPanel
             rows={alerts.rows}
             failed={alerts.failed}
             resolvingKey={alerts.resolvingKey}
-            outcome={outcome}
             onRetry={alerts.retry}
             onRestocked={(row) => void markRestocked(row)}
             onOnShelf={(row) => void markOnShelf(row)}
-            onUpdateLocation={startPlacing}
+            onElsewhere={startPlacing}
           />
         </div>
 
-        <div role="tabpanel" hidden={tab !== "catalog"} aria-label={t.adminTabCatalog}>
-          {hasOpenedCatalog && <CatalogPanel catalog={catalog} categories={categories} shelves={shelves} />}
+        <div role="tabpanel" hidden={tab !== "products"} aria-label={t.adminNav.products}>
+          {hasOpenedProducts && (
+            <ProductsPanel catalog={catalog} categories={categories} shelves={shelves} floor={floor} />
+          )}
+        </div>
+
+        <div role="tabpanel" hidden={tab !== "map"} aria-label={t.adminNav.map}>
+          <div hidden={isEditing}>
+            {tab !== "map" ? null : map && zones ? (
+              <MapPanel
+                map={map}
+                floor={floor}
+                shelves={shelves}
+                catalog={catalog}
+                categories={categories}
+                zones={zones}
+                selectedNodeId={selectedNodeId}
+                placing={placing}
+                onSelectZone={setSelectedNodeId}
+                onCancelPlacing={() => openTab("alerts")}
+                onPlaced={(row, shelf) => void finishPlacing(row, shelf)}
+                onEdit={openEditor}
+              />
+            ) : (
+              !mapFailed && !failed && <div className="aspect-[3/2] w-full animate-pulse rounded-3xl bg-line/60" />
+            )}
+          </div>
+          {/* Mounted while hidden too, so a drawing and its undo steps survive a look at the shelves. */}
+          {hasOpenedEditor && (
+            <div hidden={!isEditing} role="region" aria-label={t.floorEditorTitle} className="flex flex-col gap-4">
+              <button type="button" onClick={() => setIsEditing(false)} className={`${SECONDARY_BUTTON} self-start`}>
+                <ArrowRight aria-hidden className="size-5 ltr:-scale-x-100" />
+                {t.mapBack}
+              </button>
+              <FloorEditorPanel
+                api={api}
+                categories={categories}
+                saved={savedFloor}
+                failed={floorFailed}
+                onRetry={() => setFloorAttempt((current) => current + 1)}
+                onSaved={(next) => {
+                  setSavedFloor(next);
+                  // Which shelf each product reaches depends on the plan.
+                  catalog.reload();
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Only while open: its signs go to the printer, and the dashboard prints nothing else. */}
         {tab === "signs" && (
-          <div role="tabpanel" aria-label={t.adminTabSigns}>
+          <div role="tabpanel" aria-label={t.adminNav.signs}>
             <SignsPanel shelves={shelves} />
           </div>
         )}
-
-        {/* Mounted while hidden too, so a drawing and its undo steps survive a look at the alerts. */}
-        <div role="tabpanel" hidden={tab !== "floor"} aria-label={t.adminTabFloorEditor}>
-          {hasOpenedFloor && (
-            <FloorEditorPanel
-              api={api}
-              categories={categories}
-              saved={savedFloor}
-              failed={floorFailed}
-              onRetry={() => setFloorAttempt((current) => current + 1)}
-              onSaved={(next) => {
-                setSavedFloor(next);
-                // Which shelf each product reaches depends on the plan.
-                catalog.reload();
-              }}
-            />
-          )}
-        </div>
 
         {selectedNodeId !== null && zones && (
           <ZoneManagementModal
@@ -353,7 +374,9 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
             onClose={() => setSelectedNodeId(null)}
           />
         )}
-      </div>
+      </main>
+
+      {toast && <Toast message={toast} onDismiss={dismissToast} aboveAction />}
     </div>
   );
 }
@@ -399,7 +422,7 @@ function FloorEditorPanel({
     return <Notice message={t.floorLoadFailed} onRetry={onRetry} />;
   }
   if (saved === undefined) {
-    return <div className="h-[36rem] w-full animate-pulse rounded-2xl bg-slate-200/70" />;
+    return <div className="h-[36rem] w-full animate-pulse rounded-3xl bg-line/60" />;
   }
   return (
     <FloorGridEditor
@@ -420,13 +443,18 @@ function FloorEditorPanel({
   );
 }
 
-function TabButton({
+/** A section of the dashboard: a pill in the header on a tablet, a tab in the bottom bar on a phone, as in the staff app. */
+function NavButton({
   isSelected,
   onSelect,
+  label,
+  badge,
   children,
 }: {
   isSelected: boolean;
   onSelect: () => void;
+  label: string;
+  badge?: number;
   children: ReactNode;
 }) {
   return (
@@ -435,11 +463,19 @@ function TabButton({
       role="tab"
       aria-selected={isSelected}
       onClick={onSelect}
-      className={`flex min-h-11 items-center gap-2 rounded-full px-4 font-medium ring-1 ${
-        isSelected ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200"
+      className={`relative flex h-16 flex-col items-center justify-center gap-0.5 rounded-2xl text-sm font-medium md:h-10 md:flex-row md:gap-2 md:rounded-full md:px-4 md:text-base ${
+        isSelected
+          ? "text-brand-strong md:bg-white md:text-ink md:shadow-sm"
+          : "text-muted md:text-white/75 md:hover:bg-white/10 md:hover:text-white"
       }`}
     >
       {children}
+      {label}
+      {badge ? (
+        <span className="absolute start-[calc(50%+0.5rem)] top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-xs font-semibold text-white md:static md:h-6 md:min-w-6 md:text-sm">
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }

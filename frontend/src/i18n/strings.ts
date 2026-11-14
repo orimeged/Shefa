@@ -136,9 +136,9 @@ export interface Strings {
   screenMaySleep: string;
 
   adminTitle: string;
-  adminSubtitle: string;
   adminSignIn: string;
   adminTokenLabel: string;
+  adminSignInHint: string;
   adminWrongToken: string;
   adminLocked: string;
   adminSignInFailed: string;
@@ -185,11 +185,7 @@ export interface Strings {
   discardStaged: string;
   unsavedConfirm: string;
   itemsAdded: (count: number) => string;
-  adminTabDashboard: string;
   mapPanelTitle: string;
-  adminTabAlerts: string;
-  adminTabFloorEditor: string;
-  adminTabCatalog: string;
   catalogSummary: (count: number, offMap: number) => string;
   catalogSearch: string;
   catalogAllDepartments: string;
@@ -202,7 +198,6 @@ export interface Strings {
   catalogEdit: (name: string) => string;
   catalogDelete: (name: string) => string;
   catalogDeleteConfirm: (name: string) => string;
-  catalogImported: string;
   productNew: string;
   productEdit: string;
   productFields: { name: string; barcode: string; brand: string; size: string; department: string; shelf: string; subcategory: string; price: string };
@@ -253,9 +248,6 @@ export interface Strings {
   floorCell: (row: number, col: number) => string;
   floorGridLabel: string;
   floorStats: (walkable: number, blocked: number) => string;
-  floorJson: string;
-  floorCopy: string;
-  floorCopied: string;
   floorShortcuts: string;
   floorSaving: string;
   floorLoadFailed: string;
@@ -270,22 +262,31 @@ export interface Strings {
   floorTileSizeHint: (width: number, height: number) => string;
   floorTileSizeInvalid: (min: number, max: number) => string;
   metres: string;
-  floorViewLabel: string;
-  floorViewDrawn: string;
-  floorViewZones: string;
-  floorMapHint: string;
+  /** The dashboard's five sections, as its navigation names them. */
+  adminNav: { overview: string; alerts: string; products: string; map: string; signs: string };
+  overviewLostTitle: string;
+  overviewUrgentTitle: string;
+  /** Under the count of urgent alerts: what makes one urgent, out of how many open. */
+  overviewUrgent: (open: number) => string;
+  /** The hero's call to act: what's still on empty shelves right now. */
+  overviewNow: (items: number, value: string) => string;
+  overviewHandle: string;
+  overviewHeatTitle: string;
+  overviewHeatHint: string;
+  overviewToMap: string;
+  productsSearch: string;
+  productsPickHint: string;
+  productsWhereTitle: string;
+  productsOnShelf: (shelf: string) => string;
+  productsOffMap: string;
+  productsShow: (name: string) => string;
+  productsMore: (shown: number, total: number) => string;
+  mapEdit: string;
+  mapBack: string;
+  mapNoPlan: string;
   alertsHint: string;
   alertsSummary: (count: number) => string;
-  alertsEmpty: string;
-  alertItem: string;
-  alertCategory: string;
-  alertTimes: string;
-  alertLastReported: string;
-  alertNeedsAction: string;
-  alertNoCategory: string;
-  alertActions: string;
   alertRestocked: string;
-  alertUpdateLocation: string;
   alertResolveFailed: string;
   alertMoved: (item: string, zone: string) => string;
   alertMovedStillOpen: (item: string) => string;
@@ -293,39 +294,23 @@ export interface Strings {
   placingCancel: string;
   placingHint: (item: string) => string;
   kpiRoutesToday: string;
-  kpiMissingAlerts: string;
-  /** The week's reported items at shelf prices. */
-  kpiLostValue: string;
-  kpiLostValueDetail: (reports: number) => string;
-  kpiOpenValue: (value: string) => string;
   /** Median minutes from an alert's first report to its shelf refilled. */
   kpiRestockTime: string;
   kpiRestockNone: string;
   kpiRestockDetail: (alerts: number) => string;
   kpiVsSameHours: string;
-  kpiVsLastWeek: string;
   kpiVsPreviousWeek: string;
   kpiNew: string;
   kpiFlat: string;
   lostDemandTitle: string;
   lostDemandHint: (total: number) => string;
-  lostDemandItems: string;
-  lostDemandCategories: string;
   lostDemandEmpty: string;
-  lostDemandOther: string;
   lostDemandNoCategory: string;
-  lostDemandCenter: string;
   lostDemandTimes: (count: number) => string;
-  layerHeat: string;
-  layerTraffic: string;
-  legendTrafficLow: string;
-  legendTrafficHigh: string;
   legendHeat: string;
-  trafficTrips: (count: number) => string;
   /** "40 min", "2 h 30 min", "2.5 days". */
   durationMinutes: (minutes: number) => string;
   lostSalesTitle: string;
-  lostSalesHint: string;
   lostSalesEmpty: string;
   lostSalesReports: (reports: number, exact: number) => string;
   lostSalesEmptyShelf: string;
@@ -342,10 +327,8 @@ export interface Strings {
   lostSalesNoPrice: string;
   lostSalesPickers: (count: number) => string;
   lostSalesFootnote: string;
-  alertValue: string;
   alertOnShelf: string;
   alertOnShelfDone: (item: string) => string;
-  catalogPrice: string;
   catalogNoPrice: string;
   productPriceInvalid: string;
   pricesImport: string;
@@ -353,7 +336,6 @@ export interface Strings {
   pricesImporting: string;
   pricesImported: (updated: number, matched: number, lines: number, withoutPrice: number) => string;
   pricesImportFailed: string;
-  adminTabSigns: string;
   signsTitle: string;
   signsHint: string;
   signsPrint: (count: number) => string;
@@ -557,9 +539,9 @@ const baseStrings: Record<"he" | "en", Strings> = {
     screenMaySleep: "המסך עלול לכבות: שמירה על מסך דלוק דורשת HTTPS.",
 
     adminTitle: "ניהול הסניף",
-    adminSubtitle: "מה נמצא על כל מדף. שינוי כאן מגיע ללקוחות מיד.",
     adminSignIn: "כניסה",
     adminTokenLabel: "קוד גישה",
+    adminSignInHint: "מקלידים את קוד הגישה של הסניף.",
     adminWrongToken: "קוד הגישה שגוי.",
     adminLocked: "הניהול נעול: לא הוגדר קוד גישה בשרת.",
     adminSignInFailed: "לא הצלחנו להתחבר לשרת.",
@@ -607,11 +589,7 @@ const baseStrings: Record<"he" | "en", Strings> = {
     discardStaged: "ביטול הרשימה",
     unsavedConfirm: "יש פריטים שלא נשמרו. לסגור בכל זאת?",
     itemsAdded: (count) => (count === 1 ? "פריט אחד נשמר במדף." : `${count} פריטים נשמרו במדף.`),
-    adminTabDashboard: "לוח בקרה",
     mapPanelTitle: "מפת הסניף",
-    adminTabAlerts: "התראות מלאי על המדף",
-    adminTabFloorEditor: "עורך מפה",
-    adminTabCatalog: "קטלוג מוצרים",
     catalogSummary: (count, offMap) => `${count} מוצרים${offMap > 0 ? ` · ${offMap} לא על המפה` : ""}`,
     catalogSearch: "חיפוש לפי שם או ברקוד",
     catalogAllDepartments: "כל המחלקות",
@@ -624,7 +602,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
     catalogEdit: (name) => `עריכת ${name}`,
     catalogDelete: (name) => `מחיקת ${name}`,
     catalogDeleteConfirm: (name) => `למחוק את "${name}" מהקטלוג? קונים לא ימצאו אותו יותר.`,
-    catalogImported: "מיובא",
     productNew: "מוצר חדש",
     productEdit: "עריכת מוצר",
     productFields: { name: "שם המוצר", barcode: "ברקוד", brand: "מותג", size: "גודל", department: "מחלקה", shelf: "מדף במפה", subcategory: "תת־קטגוריה", price: "מחיר מדף (₪)" },
@@ -676,9 +653,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
     floorCell: (row, col) => `שורה ${row}, עמודה ${col}`,
     floorGridLabel: "רשת המפה. החיצים מזיזים, רווח צובע ו-Delete מוחק.",
     floorStats: (walkable, blocked) => `${walkable} משבצות מעבר · ${blocked} חוסמות`,
-    floorJson: "ה-JSON שנשלח לשרת",
-    floorCopy: "העתקה",
-    floorCopied: "הועתק",
     floorShortcuts: "1–5 בוחרים כלי · Ctrl+Z מבטל",
     floorSaving: "שומר…",
     floorLoadFailed: "לא הצלחנו לטעון את מפת הסניף.",
@@ -698,23 +672,29 @@ const baseStrings: Record<"he" | "en", Strings> = {
       `הסניף בציור: ${formatMetres(width, "he")} × ${formatMetres(height, "he")} מטרים`,
     floorTileSizeInvalid: (min, max) => `בין ${min} ל-${max} מטרים`,
     metres: "מ׳",
-    floorViewLabel: "איזו מפה להציג",
-    floorViewDrawn: "המפה המצוירת",
-    floorViewZones: "אזורי מדף",
-    floorMapHint: "מסלולים מתוכננים ודיווחי \"לא מצאתי\" על המפה שציירתם. את המוצרים מציבים על המדפים בלשונית \"אזורי מדף\" או בקטלוג.",
+    adminNav: { overview: "סקירה", alerts: "התראות", products: "מוצרים", map: "מפה", signs: "שלטים" },
+    overviewLostTitle: "מכירות בסיכון · 7 ימים",
+    overviewUrgentTitle: "התראות דחופות",
+    overviewUrgent: (open) => `דווחו 3 פעמים או יותר · מתוך ${open} פתוחות`,
+    overviewNow: (items, value) => `עכשיו: ${items === 1 ? "פריט אחד חסר" : `${items} פריטים חסרים`} במדפים, ${value} בסיכון`,
+    overviewHandle: "לטיפול",
+    overviewHeatTitle: "איפה לקוחות לא מצאו מוצרים",
+    overviewHeatHint: "כל כתם אדום הוא דיווחי \"לא מצאתי\" מ-7 הימים האחרונים, במקום שבו נשלחו.",
+    overviewToMap: "לניהול המדפים",
+    productsSearch: "איפה נמצא…? שם מוצר או ברקוד",
+    productsPickHint: "בוחרים מוצר ברשימה, והמדף שלו נצבע במפה.",
+    productsWhereTitle: "איפה המוצר?",
+    productsOnShelf: (shelf) => `במדף ${shelf}`,
+    productsOffMap: "המוצר עוד לא על המפה. לוחצים על העיפרון ובוחרים לו מדף.",
+    productsShow: (name) => `הצגת ${name} במפה`,
+    productsMore: (shown, total) => `מוצגים ${shown} מתוך ${total}. חיפוש מצמצם את הרשימה.`,
+    mapEdit: "עריכת מבנה המפה",
+    mapBack: "חזרה למפה",
+    mapNoPlan: "עוד אין לסניף מפה מצוירת. מציירים אותה פעם אחת, וממנה נבנים המדפים, המסלולים והשלטים.",
     alertsHint: "מה לקוחות לא מצאו על המדף ב-7 הימים האחרונים.",
     alertsSummary: (count) =>
       count === 1 ? "פריט אחד דווח 3 פעמים או יותר." : `${count} פריטים דווחו 3 פעמים או יותר.`,
-    alertsEmpty: "אין דיווחים ב-7 הימים האחרונים.",
-    alertItem: "שם הפריט",
-    alertCategory: "מחלקה",
-    alertTimes: "דווח כחסר",
-    alertLastReported: "דיווח אחרון",
-    alertNeedsAction: "דורש טיפול",
-    alertNoCategory: "לא ידוע",
-    alertActions: "פעולות",
     alertRestocked: "מולא מחדש",
-    alertUpdateLocation: "עדכן מיקום",
     alertResolveFailed: "הסימון לא נשמר. בודקים את החיבור ומנסים שוב.",
     alertMoved: (item, zone) => `המיקום של ${item} עודכן ל${zone}, וההתראה נסגרה.`,
     alertMovedStillOpen: (item) =>
@@ -724,33 +704,19 @@ const baseStrings: Record<"he" | "en", Strings> = {
     placingHint: (item) =>
       `מיקום חדש עבור ${item}: הפריט יעבור למדף הזה, יוסר ממדפים אחרים וההתראה תיסגר.`,
     kpiRoutesToday: "מסלולים היום",
-    kpiMissingAlerts: "התראות חוסר",
-    kpiLostValue: "מכירות בסיכון · 7 ימים",
-    kpiLostValueDetail: (reports) => (reports === 1 ? "מדיווח אחד" : `מ-${reports} דיווחים`),
-    kpiOpenValue: (value) => `${value} עדיין על מדפים ריקים`,
     kpiRestockTime: "זמן עד מילוי מדף",
     kpiRestockNone: "עוד לא נסגרה התראה כ\"מולא\"",
     kpiRestockDetail: (alerts) => (alerts === 1 ? "חציון, התראה אחת" : `חציון של ${alerts} התראות`),
     kpiVsSameHours: "מול אותן שעות לפני שבוע",
-    kpiVsLastWeek: "מול לפני שבוע",
     kpiVsPreviousWeek: "מול 7 הימים שלפני",
     kpiNew: "חדש",
     kpiFlat: "ללא שינוי",
     lostDemandTitle: "מה חיפשו ואין לכם",
     lostDemandHint: (total) => `${total} חיפושים ב-7 הימים האחרונים לא מצאו מוצר בקטלוג.`,
-    lostDemandItems: "הפריטים המבוקשים ביותר",
-    lostDemandCategories: "לפי מחלקה",
     lostDemandEmpty: "אין חיפושים ללא מענה ב-7 הימים האחרונים.",
-    lostDemandOther: "אחר",
     lostDemandNoCategory: "ללא מחלקה",
-    lostDemandCenter: "חיפושים",
     lostDemandTimes: (count) => (count === 1 ? "פעם אחת" : `${count} פעמים`),
-    layerHeat: "מפת חום",
-    layerTraffic: "מסלולים מתוכננים",
-    legendTrafficLow: "מעט מסלולים",
-    legendTrafficHigh: "הרבה מסלולים",
     legendHeat: "דיווחי חוסר פתוחים",
-    trafficTrips: (count) => (count === 1 ? "מסלול אחד ב-7 ימים" : `${count} מסלולים ב-7 ימים`),
     durationMinutes: (minutes) => {
       if (minutes < 60) return `${Math.max(1, Math.round(minutes))} דק׳`;
       if (minutes < 24 * 60) {
@@ -761,7 +727,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
       return `${(minutes / (24 * 60)).toFixed(1)} ימים`;
     },
     lostSalesTitle: "מכירות שאבדו",
-    lostSalesHint: "7 הימים האחרונים, לפי מחירי המדף",
     lostSalesEmpty: "אין דיווחי \"לא מצאתי\" ב-7 הימים האחרונים.",
     lostSalesReports: (reports, exact) =>
       `${reports === 1 ? "דיווח אחד" : `${reports} דיווחים`} · ${exact} במחיר המוצר עצמו`,
@@ -785,10 +750,8 @@ const baseStrings: Record<"he" | "en", Strings> = {
     lostSalesPickers: (count) => (count === 1 ? "מלקט אחד" : `${count} מלקטים`),
     lostSalesFootnote:
       "מחיר המדף של כל פריט שדווח, פעם אחת לכל דיווח. זה מינימום: נספרים רק לקוחות שדיווחו, בלי הכפלה לכל הסניף.",
-    alertValue: "שווי",
     alertOnShelf: "היה במדף",
     alertOnShelfDone: (item) => `${item} סומן כ"היה במדף". נספר כ"לא במקום", לא כמדף ריק.`,
-    catalogPrice: "מחיר",
     catalogNoPrice: "אין מחיר",
     productPriceInvalid: "מחיר לא תקין: מספר בשקלים, עד שתי ספרות אחרי הנקודה.",
     pricesImport: "ייבוא קובץ מחירים",
@@ -799,7 +762,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
         withoutPrice > 0 ? ` ${withoutPrice} מוצרים עדיין בלי מחיר.` : ""
       }`,
     pricesImportFailed: "הקובץ לא נקרא כקובץ מחירים. צריך את קובץ ה-PriceFull של הסניף, כפי שהורד.",
-    adminTabSigns: "שלטי QR",
     signsTitle: "שלטי QR לסניף",
     signsHint:
       "שלט בכניסה ושלט בקצה כל מעבר. סריקה של שלט מעבר גם אומרת לטלפון איפה הלקוח עומד, והמסלול יוצא משם. מדפיסים, גוזרים לפי הקו ומדביקים בגובה העיניים.",
@@ -999,9 +961,9 @@ const baseStrings: Record<"he" | "en", Strings> = {
     screenMaySleep: "The screen may turn off: keeping it on needs HTTPS.",
 
     adminTitle: "Store management",
-    adminSubtitle: "What stands on each shelf. Changes reach shoppers right away.",
     adminSignIn: "Sign in",
     adminTokenLabel: "Access code",
+    adminSignInHint: "Enter the store's access code.",
     adminWrongToken: "That access code is wrong.",
     adminLocked: "Management is locked: the server has no access code set.",
     adminSignInFailed: "We couldn't reach the server.",
@@ -1049,11 +1011,7 @@ const baseStrings: Record<"he" | "en", Strings> = {
     discardStaged: "Discard list",
     unsavedConfirm: "Some items aren't saved. Close anyway?",
     itemsAdded: (count) => (count === 1 ? "1 item saved to this shelf." : `${count} items saved to this shelf.`),
-    adminTabDashboard: "Dashboard",
     mapPanelTitle: "Store map",
-    adminTabAlerts: "Shelf Stock Alerts",
-    adminTabFloorEditor: "Map Editor",
-    adminTabCatalog: "Product catalog",
     catalogSummary: (count, offMap) => `${count} products${offMap > 0 ? ` · ${offMap} not on the map` : ""}`,
     catalogSearch: "Search by name or barcode",
     catalogAllDepartments: "All departments",
@@ -1066,7 +1024,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
     catalogEdit: (name) => `Edit ${name}`,
     catalogDelete: (name) => `Delete ${name}`,
     catalogDeleteConfirm: (name) => `Delete "${name}" from the catalog? Shoppers won't find it any more.`,
-    catalogImported: "Imported",
     productNew: "New product",
     productEdit: "Edit product",
     productFields: { name: "Product name", barcode: "Barcode", brand: "Brand", size: "Size", department: "Department", shelf: "Shelf on the map", subcategory: "Subcategory", price: "Shelf price (₪)" },
@@ -1118,9 +1075,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
     floorCell: (row, col) => `Row ${row}, column ${col}`,
     floorGridLabel: "Map grid. Arrows move, Space paints, Delete erases.",
     floorStats: (walkable, blocked) => `${walkable} walkable tiles · ${blocked} blocked`,
-    floorJson: "JSON sent to the server",
-    floorCopy: "Copy",
-    floorCopied: "Copied",
     floorShortcuts: "1–5 pick a tool · Ctrl+Z undoes",
     floorSaving: "Saving…",
     floorLoadFailed: "We couldn't load the store layout.",
@@ -1140,23 +1094,29 @@ const baseStrings: Record<"he" | "en", Strings> = {
       `The drawing covers ${formatMetres(width, "en")} × ${formatMetres(height, "en")} metres`,
     floorTileSizeInvalid: (min, max) => `Between ${min} and ${max} metres`,
     metres: "m",
-    floorViewLabel: "Which map to show",
-    floorViewDrawn: "Drawn map",
-    floorViewZones: "Shelf zones",
-    floorMapHint: "Planned routes and \"not found\" reports on the map you drew. Put products on its shelves under \"Shelf zones\" or in the catalog.",
+    adminNav: { overview: "Overview", alerts: "Alerts", products: "Products", map: "Map", signs: "Signs" },
+    overviewLostTitle: "Sales at risk · 7 days",
+    overviewUrgentTitle: "Urgent alerts",
+    overviewUrgent: (open) => `Reported 3 times or more · of ${open} open`,
+    overviewNow: (items, value) => `Right now: ${items === 1 ? "1 item" : `${items} items`} missing from shelves, ${value} at risk`,
+    overviewHandle: "Handle",
+    overviewHeatTitle: "Where shoppers couldn't find products",
+    overviewHeatHint: "Each red patch is \"not found\" reports from the last 7 days, where they were sent from.",
+    overviewToMap: "Manage shelves",
+    productsSearch: "Where is…? Product name or barcode",
+    productsPickHint: "Pick a product in the list and its shelf lights up on the map.",
+    productsWhereTitle: "Where is it?",
+    productsOnShelf: (shelf) => `On the ${shelf} shelf`,
+    productsOffMap: "This product isn't on the map yet. Tap the pencil and give it a shelf.",
+    productsShow: (name) => `Show ${name} on the map`,
+    productsMore: (shown, total) => `Showing ${shown} of ${total}. A search narrows the list.`,
+    mapEdit: "Edit the floor plan",
+    mapBack: "Back to the map",
+    mapNoPlan: "This store has no drawn map yet. Draw it once: shelves, routes and signs all come from it.",
     alertsHint: "What shoppers couldn't find on the shelf in the last 7 days.",
     alertsSummary: (count) =>
       count === 1 ? "1 item reported 3 times or more." : `${count} items reported 3 times or more.`,
-    alertsEmpty: "No reports in the last 7 days.",
-    alertItem: "Item Name",
-    alertCategory: "Category",
-    alertTimes: "Times Reported Missing",
-    alertLastReported: "Last Reported Time",
-    alertNeedsAction: "Needs attention",
-    alertNoCategory: "Unknown",
-    alertActions: "Actions",
     alertRestocked: "Restocked",
-    alertUpdateLocation: "Update Location",
     alertResolveFailed: "That wasn't saved. Check the connection and try again.",
     alertMoved: (item, zone) => `${item} now points to ${zone}, and its alert is closed.`,
     alertMovedStillOpen: (item) =>
@@ -1166,33 +1126,19 @@ const baseStrings: Record<"he" | "en", Strings> = {
     placingHint: (item) =>
       `New location for ${item}: it moves to this shelf, leaves any others, and its alert closes.`,
     kpiRoutesToday: "Total Routes Today",
-    kpiMissingAlerts: "Missing Alerts",
-    kpiLostValue: "Sales at risk · 7 days",
-    kpiLostValueDetail: (reports) => (reports === 1 ? "from 1 report" : `from ${reports} reports`),
-    kpiOpenValue: (value) => `${value} still on empty shelves`,
     kpiRestockTime: "Time to restock",
     kpiRestockNone: "No alert closed as restocked yet",
     kpiRestockDetail: (alerts) => (alerts === 1 ? "median, 1 alert" : `median of ${alerts} alerts`),
     kpiVsSameHours: "vs the same hours last week",
-    kpiVsLastWeek: "vs a week ago",
     kpiVsPreviousWeek: "vs the previous 7 days",
     kpiNew: "New",
     kpiFlat: "No change",
     lostDemandTitle: "Searched for, not carried",
     lostDemandHint: (total) => `${total} searches in the last 7 days found nothing in the catalog.`,
-    lostDemandItems: "Most wanted items",
-    lostDemandCategories: "By department",
     lostDemandEmpty: "No unfulfilled searches in the last 7 days.",
-    lostDemandOther: "Other",
     lostDemandNoCategory: "No department",
-    lostDemandCenter: "searches",
     lostDemandTimes: (count) => (count === 1 ? "Once" : `${count} times`),
-    layerHeat: "Heatmap",
-    layerTraffic: "Planned routes",
-    legendTrafficLow: "Few routes",
-    legendTrafficHigh: "Many routes",
     legendHeat: "Open missing reports",
-    trafficTrips: (count) => (count === 1 ? "1 route in 7 days" : `${count} routes in 7 days`),
     durationMinutes: (minutes) => {
       if (minutes < 60) return `${Math.max(1, Math.round(minutes))} min`;
       if (minutes < 24 * 60) {
@@ -1203,7 +1149,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
       return `${(minutes / (24 * 60)).toFixed(1)} days`;
     },
     lostSalesTitle: "Lost sales",
-    lostSalesHint: "Last 7 days, at shelf prices",
     lostSalesEmpty: "No \"not found\" reports in the last 7 days.",
     lostSalesReports: (reports, exact) =>
       `${reports === 1 ? "1 report" : `${reports} reports`} · ${exact} at the product's own price`,
@@ -1227,10 +1172,8 @@ const baseStrings: Record<"he" | "en", Strings> = {
     lostSalesPickers: (count) => (count === 1 ? "1 picker" : `${count} pickers`),
     lostSalesFootnote:
       "The shelf price of every reported item, once per report. A floor: only shoppers who reported count, never scaled up to the whole store.",
-    alertValue: "Value",
     alertOnShelf: "Was on the shelf",
     alertOnShelfDone: (item) => `${item} marked as on the shelf. It counts as misplaced, not as an empty shelf.`,
-    catalogPrice: "Price",
     catalogNoPrice: "No price",
     productPriceInvalid: "Not a price: shekels, with at most two decimals.",
     pricesImport: "Import a price file",
@@ -1241,7 +1184,6 @@ const baseStrings: Record<"he" | "en", Strings> = {
         withoutPrice > 0 ? ` ${withoutPrice} products still have no price.` : ""
       }`,
     pricesImportFailed: "That didn't read as a price file. Use the branch's PriceFull file, as downloaded.",
-    adminTabSigns: "QR signs",
     signsTitle: "QR signs for the store",
     signsHint:
       "One at the entrance and one at each aisle end. Scanning an aisle sign also tells the phone where the shopper stands, so the route starts there. Print, cut along the line, and put them up at eye level. The signs are in Hebrew.",

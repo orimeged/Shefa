@@ -1,5 +1,5 @@
-import { ArrowDownToLine, MapPin, Pencil, Plus, X } from "lucide-react";
-import type { KeyboardEvent, ReactNode } from "react";
+import { ArrowDownToLine, MapPin, Pencil, Plus, Trash2, X } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type { CatalogCategory, CatalogProduct, NotFoundReportRow, ProductDraft } from "../../api/types";
@@ -24,9 +24,6 @@ interface ShelvesMapProps {
   categories: readonly CatalogCategory[];
   /** The alert whose item is getting a shelf; a shelf picked then takes it. */
   placing: NotFoundReportRow | null;
-  /** Drawn over the floor and under the shelves' click targets, such as the heat. */
-  layers?: ReactNode;
-  legend?: ReactNode;
   onPlaced: (row: NotFoundReportRow, shelf: string) => void;
 }
 
@@ -35,7 +32,7 @@ interface ShelvesMapProps {
  * drawn map, what's on it, and a way to put a product on it. It reads the
  * current plan, so a shelf renamed or added in the editor is here at once.
  */
-export function ShelvesMap({ floor, shelves, catalog, categories, placing, layers, legend, onPlaced }: ShelvesMapProps) {
+export function ShelvesMap({ floor, shelves, catalog, categories, placing, onPlaced }: ShelvesMapProps) {
   const { t, pick } = useLanguage();
   const { layout } = floor;
   const [active, setActive] = useState<string | null>(null);
@@ -77,17 +74,16 @@ export function ShelvesMap({ floor, shelves, catalog, categories, placing, layer
   };
 
   if (shelves.length === 0) {
-    return <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-slate-600 ring-1 ring-slate-200">{t.shelfNone}</p>;
+    return <p className="rounded-2xl bg-paper px-4 py-6 text-center text-muted ring-1 ring-line">{t.shelfNone}</p>;
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="relative overflow-hidden rounded-xl bg-slate-50 ring-1 ring-slate-200">
-        <svg viewBox={layout.viewBox} data-map="shelves" aria-label={t.floorViewZones} role="group" className="block h-auto max-h-[70vh] w-full">
+    <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start xl:gap-5">
+      <div className="relative overflow-hidden rounded-2xl bg-paper ring-1 ring-line">
+        <svg viewBox={layout.viewBox} data-map="shelves" aria-label={t.mapPanelTitle} role="group" className="block h-auto max-h-[70vh] w-full">
           <MapFloor layout={layout} highlight={active ?? open?.label ?? null} />
           <MapEndpoint point={layout.entrance} label={t.entrance} />
           <MapEndpoint point={layout.checkout} label={t.checkout} />
-          {layers}
           {targets.map(({ shelf, rects }) => {
             const count = counts.get(shelf.label) ?? 0;
             return (
@@ -120,17 +116,16 @@ export function ShelvesMap({ floor, shelves, catalog, categories, placing, layer
             );
           })}
         </svg>
-        {legend}
       </div>
 
-      <section aria-labelledby="shelves-list-title" className="flex flex-col gap-3">
-        <h3 id="shelves-list-title" className="font-semibold text-slate-900">
+      <section aria-labelledby="shelves-list-title" className="flex flex-col gap-3 xl:max-h-[70vh] xl:overflow-y-auto xl:pe-1">
+        <h3 id="shelves-list-title" className="text-lg font-semibold text-ink">
           {t.shelvesListTitle}
         </h3>
         <ul className="flex flex-col gap-3">
           {groups.map((group) => (
             <li key={group.slug} className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-slate-500">{group.name}</span>
+              <span className="text-sm font-semibold text-muted">{group.name}</span>
               <div className="flex flex-wrap gap-1.5">
                 {group.shelves.map((shelf) => {
                   const count = counts.get(shelf.label) ?? 0;
@@ -143,12 +138,12 @@ export function ShelvesMap({ floor, shelves, catalog, categories, placing, layer
                       onClick={() => choose(shelf)}
                       onPointerEnter={() => setActive(shelf.label)}
                       onPointerLeave={() => setActive(null)}
-                      className="flex min-h-10 items-center gap-2 rounded-full bg-white px-3 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:ring-brand"
+                      className="flex min-h-11 items-center gap-2 rounded-full bg-surface px-3.5 font-medium text-ink ring-1 ring-line hover:bg-brand-soft hover:ring-brand"
                     >
                       {shelf.label}
                       <span
                         className={`grid h-6 min-w-6 place-items-center rounded-full px-1.5 text-xs font-semibold ${
-                          count > 0 ? "bg-brand-soft text-brand-strong" : "bg-slate-100 text-slate-400"
+                          count > 0 ? "bg-brand-soft text-brand-strong" : "bg-paper text-muted"
                         }`}
                       >
                         {count}
@@ -236,6 +231,15 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
     }
   };
 
+  const remove = async (product: CatalogProduct) => {
+    if (!window.confirm(t.catalogDeleteConfirm(product.name))) {
+      return;
+    }
+    setFailed(false);
+    const result = await catalog.remove(product.id);
+    if (!result.ok) setFailed(true);
+  };
+
   return (
     <dialog
       ref={dialog}
@@ -244,7 +248,7 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
         event.preventDefault();
         onClose();
       }}
-      className="m-auto max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-900/40"
+      className="m-auto max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-paper p-5 text-ink shadow-2xl backdrop:bg-ink/40"
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-2">
@@ -253,39 +257,39 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
               <MapPin aria-hidden className="size-5 shrink-0 text-brand" />
               {shelf.label}
             </h2>
-            <p className="text-sm text-slate-500">{t.shelfOf(departmentName)}</p>
+            <p className="text-sm text-muted">{t.shelfOf(departmentName)}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label={t.closePanel}
-            className="grid size-11 shrink-0 place-items-center rounded-xl text-slate-500 hover:bg-slate-100"
+            className="grid size-11 shrink-0 place-items-center rounded-xl text-muted hover:bg-surface"
           >
             <X aria-hidden className="size-5" />
           </button>
         </div>
 
         {failed && (
-          <p role="alert" className="rounded-xl bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger">
+          <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger">
             {t.saveFailed}
           </p>
         )}
 
         {placing ? (
           <section aria-labelledby={`${ids}-matches`} className="flex flex-col gap-2">
-            <p role="status" className="rounded-xl bg-next-soft px-4 py-2.5 font-medium ring-1 ring-next">
+            <p role="status" className="rounded-2xl bg-next-soft px-4 py-2.5 font-medium ring-1 ring-next">
               {t.shelfPlaceHere(placing.item_query)}
             </p>
             <h3 id={`${ids}-matches`} className="font-semibold">
               {t.shelfMatches}
             </h3>
-            {matches.length === 0 && <p className="text-sm text-slate-500">{t.shelfNoMatches}</p>}
-            <ul className="flex flex-col divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">
+            {matches.length === 0 && <p className="text-sm text-muted">{t.shelfNoMatches}</p>}
+            <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
               {matches.map((product) => (
                 <li key={product.id} className="flex items-center gap-2 px-3 py-2">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{product.name}</p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted">
                       {product.shelf ? t.shelfCurrently(product.shelf) : t.catalogNotOnMap}
                     </p>
                   </div>
@@ -307,7 +311,7 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
               onClick={() =>
                 setForm({ title: t.productNew, initial: { name: placing.item_query, ...here }, product: null })
               }
-              className="flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 font-semibold text-brand-strong ring-1 ring-brand"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-surface px-4 font-semibold text-brand-strong ring-1 ring-brand"
             >
               <Plus aria-hidden className="size-5" />
               {t.shelfAddAsNew(placing.item_query)}
@@ -319,15 +323,15 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
               {t.shelfProducts(onShelf.length)}
             </h3>
             {onShelf.length === 0 ? (
-              <p className="text-sm text-slate-500">{t.shelfEmpty}</p>
+              <p className="text-sm text-muted">{t.shelfEmpty}</p>
             ) : (
-              <ul className="flex max-h-80 flex-col divide-y divide-slate-100 overflow-y-auto rounded-xl ring-1 ring-slate-200">
+              <ul className="flex max-h-80 flex-col divide-y divide-line overflow-y-auto rounded-2xl bg-surface ring-1 ring-line">
                 {onShelf.map((product) => (
                   <li key={product.id} className="flex items-center gap-2 px-3 py-1.5">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{product.name}</p>
                       {product.barcode && (
-                        <p className="font-mono text-xs text-slate-500">
+                        <p className="font-mono text-xs text-muted">
                           <span dir="ltr">{product.barcode}</span>
                         </p>
                       )}
@@ -342,9 +346,17 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
                         })
                       }
                       aria-label={t.catalogEdit(product.name)}
-                      className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                      className="grid size-10 shrink-0 place-items-center rounded-xl text-muted hover:bg-paper hover:text-ink"
                     >
                       <Pencil aria-hidden className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void remove(product)}
+                      aria-label={t.catalogDelete(product.name)}
+                      className="grid size-10 shrink-0 place-items-center rounded-xl text-muted hover:bg-danger-soft hover:text-danger"
+                    >
+                      <Trash2 aria-hidden className="size-4" />
                     </button>
                   </li>
                 ))}
@@ -353,7 +365,7 @@ function ShelfDialog({ shelf, departmentName, catalog, categories, shelves, plac
             <button
               type="button"
               onClick={() => setForm({ title: t.productNew, initial: here, product: null })}
-              className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 font-semibold text-white"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-brand px-4 font-semibold text-white shadow-sm"
             >
               <Plus aria-hidden className="size-5" />
               {t.shelfAddHere}

@@ -69,7 +69,7 @@ export function AdminMapEditor({
 
   return (
     // The map is drawn in store coordinates, and the library positions it from the left.
-    <div dir="ltr" className="relative overflow-hidden rounded-xl bg-surface ring-1 ring-slate-200">
+    <div dir="ltr" className="relative overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
       <TransformWrapper
         minScale={1}
         maxScale={MAX_SCALE}

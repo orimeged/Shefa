@@ -76,7 +76,7 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
     }
   };
 
-  const field = "h-11 w-full rounded-xl bg-white px-3 text-slate-900 ring-1 ring-slate-300 outline-none focus:ring-2 focus:ring-brand";
+  const field = "h-12 w-full rounded-2xl bg-surface px-3 text-ink ring-1 ring-line outline-none focus:ring-2 focus:ring-brand";
 
   return (
     <dialog
@@ -86,24 +86,24 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
         event.preventDefault();
         onClose();
       }}
-      className="m-auto max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-900/40"
+      className="m-auto max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-paper p-5 text-ink shadow-2xl backdrop:bg-ink/40"
     >
       <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 id={`${ids}-title`} className="text-lg font-semibold">
+          <h2 id={`${ids}-title`} className="text-xl font-semibold">
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={t.closePanel}
-            className="grid size-11 shrink-0 place-items-center rounded-xl text-slate-500 hover:bg-slate-100"
+            className="grid size-11 shrink-0 place-items-center rounded-xl text-muted hover:bg-surface"
           >
             <X aria-hidden className="size-5" />
           </button>
         </div>
 
-        {note && <p className="rounded-xl bg-next-soft px-4 py-2.5 text-sm font-medium ring-1 ring-next">{note}</p>}
+        {note && <p className="rounded-2xl bg-next-soft px-4 py-2.5 text-sm font-medium ring-1 ring-next">{note}</p>}
 
         <Field id={`${ids}-name`} label={t.productFields.name}>
           <input
@@ -203,7 +203,7 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
                 ))}
               {isUndrawn && <option value={subcategory}>{t.productShelfNotDrawn(subcategory)}</option>}
             </select>
-            <span id={`${ids}-shelf-hint`} className="text-sm text-slate-500">
+            <span id={`${ids}-shelf-hint`} className="text-sm text-muted">
               {t.productShelfHint}
             </span>
           </Field>
@@ -226,7 +226,7 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
         )}
 
         {problem && (
-          <p role="alert" className="rounded-xl bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger">
+          <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger">
             {problem === "duplicate" ? t.productDuplicate : problem === "invalid" ? t.productInvalid : t.saveFailed}
           </p>
         )}
@@ -235,11 +235,11 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
           <button
             type="submit"
             disabled={isSaving || badBarcode || badPrice || !name.trim()}
-            className="h-12 flex-1 rounded-xl bg-brand font-semibold text-white shadow-sm disabled:opacity-50"
+            className="h-12 flex-1 rounded-2xl bg-brand font-semibold text-white shadow-sm disabled:opacity-50"
           >
             {t.productSave}
           </button>
-          <button type="button" onClick={onClose} className="h-12 rounded-xl px-5 font-medium text-slate-600 ring-1 ring-slate-300">
+          <button type="button" onClick={onClose} className="h-12 rounded-2xl bg-surface px-5 font-medium text-ink ring-1 ring-line">
             {t.productCancel}
           </button>
         </div>
@@ -252,7 +252,7 @@ export function ProductForm({ title, initial, categories, shelves, note, onSubmi
 function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-semibold text-slate-700">
+      <label htmlFor={id} className="text-sm font-semibold text-ink">
         {label}
       </label>
       {children}

@@ -20,7 +20,6 @@ import type {
   Resolution,
   SavedFloorPlan,
   StagedItem,
-  TrafficReport,
   Zone,
   ZoneItem,
 } from "./types";
@@ -153,9 +152,6 @@ export function createAdminApi(token: string, onUnauthorized: () => void) {
 
     notFoundHeatmap: (signal?: AbortSignal) =>
       json<HeatmapReport>(`${ANALYTICS}/not-found-heatmap?${STORE_QUERY}`, { signal }),
-
-    trafficFlow: (signal?: AbortSignal) =>
-      json<TrafficReport>(`${ANALYTICS}/traffic-flow?${STORE_QUERY}`, { signal }),
 
     /** Null until a manager saves the store's first floor plan: the server answers 204. */
     floorPlan: async (signal?: AbortSignal): Promise<SavedFloorPlan | null> => {

@@ -39,7 +39,7 @@ export function StaffAlertCard({ row, isResolving, onRestocked, onOnShelf, onEls
         </span>
         <span className="text-muted">{formatAgo(row.last_reported_at, t)}</span>
         {row.unit_price_agorot !== null && (
-          <span className="ms-auto font-semibold text-ink tabular-nums">
+          <span data-value className="ms-auto font-semibold text-ink tabular-nums">
             {t.staffAtRisk(formatShekels(row.value_agorot, language))}
           </span>
         )}
