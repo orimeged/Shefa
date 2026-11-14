@@ -100,6 +100,10 @@ function KioskVisit({ map, floor, layout, planRoute, screenCanStayOn }: KioskVis
   // While typing, the shelf the first result is on lights up on the map.
   const firstHit = term.trim() ? hits[0] : undefined;
   const highlight = firstHit ? (placements?.[firstHit.category_id] ?? null) : null;
+  // Where on that shelf, for a product or an area ("מים") whose quarter is known.
+  const highlightPart = firstHit
+    ? (map?.product_stops.find((stop) => stop.id === firstHit.category_id)?.shelf_part ?? null)
+    : null;
   const caption = highlight ? t.kioskMapShowing(highlight) : route ? t.kioskRouteEnds : t.kioskMapIdle;
   const warnings = [
     ...(isReachableFromPhone(publicOrigin()) ? [] : [t.qrUnreachable]),
@@ -152,7 +156,14 @@ function KioskVisit({ map, floor, layout, planRoute, screenCanStayOn }: KioskVis
         />
         {/* The map takes what the code leaves: a wide frame, as stores are wider than deep. */}
         <div className="flex min-h-0 flex-col gap-[2.2vh]">
-          <KioskMap layout={layout} route={route} highlight={highlight} badges={badges} caption={caption} />
+          <KioskMap
+            layout={layout}
+            route={route}
+            highlight={highlight}
+            highlightPart={highlightPart}
+            badges={badges}
+            caption={caption}
+          />
           <KioskQrCard categoryIds={items.map((item) => item.categoryId)} />
         </div>
       </main>

@@ -12,7 +12,7 @@ import seed_demo_data
 import seed_flagship_store as flagship
 from app.config import Settings
 from app.domain.floor_plan import FloorPlan
-from app.domain.floor_routing import CELL_PREFIX, GridRouter
+from app.domain.floor_routing import CELL_PREFIX, GridRouter, shelf_part_tiles
 from app.domain.inventory import CatalogRow
 from app.domain.models import Store
 from app.main import create_app
@@ -159,6 +159,31 @@ def test_a_product_whose_subcategory_has_no_shelf_stops_the_seed(router: GridRou
 # ---------- The activity on it ----------
 
 
+def test_products_of_a_kind_share_a_quarter_and_the_kinds_spread_along_the_shelf() -> None:
+    parts = flagship.catalog_parts(CATALOG)
+    assert set(parts) == {row.barcode for row in CATALOG}
+    water = {parts[row.barcode] for row in CATALOG if row.item.startswith("מים ")}
+    juice = {parts[row.barcode] for row in CATALOG if row.item.startswith("מיץ ")}
+    assert water == {0}
+    assert len(juice) == 1 and juice != water
+    for names in SUBCATEGORIES.values():
+        for shelf in names:
+            used = {parts[row.barcode] for row in CATALOG if row.subcategory == shelf}
+            assert len(used) >= 2, shelf
+
+
+def test_a_product_is_routed_beside_its_quarter_never_the_shelfs_end(router: GridRouter, store: Store) -> None:
+    targets = flagship.route_targets(store, CATALOG)
+    parts = flagship.catalog_parts(CATALOG)
+    by_label = tiles_by_label(router.plan)
+    for row in CATALOG:
+        route = router.plan_route("demo", [f"item:{row.barcode}"], targets, None, SUBCATEGORIES)
+        [stop] = route.stops
+        quarter = set(shelf_part_tiles(sorted(by_label[row.subcategory]), parts[row.barcode]))
+        beside = {(r + dr, c + dc) for r, c in quarter for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1))}
+        assert (stop.row, stop.col) in beside, row.display_name
+
+
 def test_reports_stand_at_their_items_own_shelf(plan: FloorPlan, router: GridRouter) -> None:
     subcategory_of = {row.display_name: row.subcategory for row in CATALOG}
     hours = seed_demo_data._open_hours(NOW)
@@ -233,6 +258,8 @@ def test_shoppers_and_managers_get_it_from_the_api(seeded: Path) -> None:
         for product_id, place in answer["placements"].items():
             if product_id in subcategory_of and subcategory_of[product_id]:
                 assert place == subcategory_of[product_id], product_id
+        # Each in its quarter of its shelf.
+        assert all(stop["shelf_part"] is not None for stop in product_stops if stop["subcategory"])
         # A shopper's report from the far side of the 60 m store is kept.
         report = {
             "event_id": "8d6b7b1e-6c39-4a8e-9f0e-2a9a1f3c4d55",

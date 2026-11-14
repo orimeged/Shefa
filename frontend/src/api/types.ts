@@ -35,6 +35,8 @@ export interface Category {
   subcategory?: string | null;
   /** A placed product's shelf price in agorot; a department has none. */
   price_agorot?: number | null;
+  /** Which quarter of its shelf it stands in, 0 to 3 from the shelf's top or left end; null when unknown. */
+  shelf_part?: number | null;
 }
 
 export interface StoreMap {
@@ -437,6 +439,8 @@ export interface CatalogProduct {
   /** The shelf price in agorot, and when it was last set; null when nobody has given one. */
   price_agorot: number | null;
   price_updated_at: string | null;
+  /** Which quarter of its shelf it stands in, 0 to 3 from the shelf's top or left end; null when nobody said. */
+  shelf_part: number | null;
 }
 
 export interface ProductDraft {
@@ -447,6 +451,7 @@ export interface ProductDraft {
   department: string;
   subcategory?: string | null;
   price_agorot?: number | null;
+  shelf_part?: number | null;
 }
 
 /** A field left out stays as it was; null clears it. */

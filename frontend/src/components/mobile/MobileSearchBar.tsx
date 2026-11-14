@@ -203,7 +203,9 @@ export function MobileSearchBar({
                           {hit.matched_text}
                         </span>
                         <span className="block truncate text-sm text-muted">
-                          {where(hit.category_id, hit.aisle_no, hit.side)} · {name}
+                          {where(hit.category_id, hit.aisle_no, hit.side)}
+                          {/* A product's or an area's name is already the line above. */}
+                          {name === hit.matched_text ? "" : ` · ${name}`}
                         </span>
                       </span>
                       {added ? (

@@ -12,9 +12,11 @@ What a run does, in this order:
 1. Reads the 258-product catalog (app/data/demo_pos_export.csv) and draws the flagship
    floor plan from its subcategories (app/services/flagship_plan.py): every shelf is one
    subcategory, so every product has a shelf of exactly its kind.
-2. Routes every product, and every department, on that plan, and stops with an error if
+2. Puts every product in a quarter of its shelf, products of a kind together (the water,
+   then the juices), so a route ends beside it rather than at the shelf's middle.
+   Routes every product, and every department, on that plan, and stops with an error if
    any of them doesn't reach a shelf of its own. Nothing is written before this passes.
-3. Imports the catalog through the same importer a chain's real export uses.
+3. Imports the catalog through the same importer a chain's real export uses, with the quarters.
 4. Saves the store's current floor plan to a file, if it has one, and prints where; then
    saves the flagship plan. Shoppers' apps and the dashboard pick it up on their next request.
 5. Writes two weeks of made-up activity on the plan: "not found" reports beside their
@@ -35,9 +37,10 @@ from app.config import Settings
 from app.domain.analytics import RouteTrip
 from app.domain.events import NotFoundEvent, NotFoundReport
 from app.domain.floor_plan import FloorPlan
-from app.domain.floor_routing import GridRouter, grid_route_edges
+from app.domain.floor_routing import SHELF_PARTS, GridRouter, grid_route_edges
 from app.domain.inventory import CatalogRow
 from app.domain.models import Category, Store
+from app.domain.search_text import normalize
 from app.repositories.analytics_store import SqlAnalyticsStore
 from app.repositories.database import create_database_engine, migrate, printable_url
 from app.repositories.pick_store import SqlPickSessions
@@ -66,9 +69,32 @@ def catalog_subcategories(catalog: Sequence[CatalogRow]) -> dict[str, list[str]]
     return {department: list(names) for department, names in found.items()}
 
 
+def catalog_parts(catalog: Sequence[CatalogRow]) -> dict[str, int]:
+    """Which quarter of its shelf each product stands in, by barcode.
+
+    Products of a kind stand together, as on a real shelf: a kind is the item's first
+    word, so the three waters share a quarter and the juices the next. The kinds take
+    the shelf in the catalog's order, each starting where the ones before it end.
+    """
+    shelves: dict[str, dict[str, list[CatalogRow]]] = {}
+    for row in catalog:
+        words = normalize(row.item).split()
+        shelves.setdefault(row.subcategory, {}).setdefault(words[0] if words else "", []).append(row)
+    parts: dict[str, int] = {}
+    for kinds in shelves.values():
+        total = sum(len(rows) for rows in kinds.values())
+        before = 0
+        for rows in kinds.values():
+            part = min(SHELF_PARTS - 1, before * SHELF_PARTS // total)
+            parts.update({row.barcode: part for row in rows})
+            before += len(rows)
+    return parts
+
+
 def route_targets(layout: Store, catalog: Sequence[CatalogRow]) -> dict[str, Category]:
     """The departments, each product as a placed one would be, and each shelf by its name."""
     targets = {category.id: category for category in layout.categories}
+    parts = catalog_parts(catalog)
     for row in catalog:
         targets[f"item:{row.barcode}"] = Category(
             id=f"item:{row.barcode}",
@@ -77,6 +103,7 @@ def route_targets(layout: Store, catalog: Sequence[CatalogRow]) -> dict[str, Cat
             section_id="unused",
             department_id=row.department,
             subcategory=row.subcategory,
+            shelf_part=parts.get(row.barcode),
         )
     for names in catalog_subcategories(catalog).values():
         for name in names:
@@ -122,12 +149,13 @@ def plan_reports(
     now: datetime,
     rng: random.Random,
     tag: str,
+    part_of: Mapping[str, int] | None = None,
 ) -> list[NotFoundEvent]:
-    """Through the same checks as a real report, standing at the item's own shelf, in the plan's metres."""
+    """Through the same checks as a real report, standing at the item's place on its shelf, in the plan's metres."""
     size = plan.cell_size_m
     events: list[NotFoundEvent] = []
     for category_id, item, count in tallies:
-        stop = router.stop_for(subcategory_of[item])
+        stop = router.stop_for(subcategory_of[item], (part_of or {}).get(item))
         if stop is None:
             raise FlagshipError(f"no shelf on the plan for {item}")
         row, col = stop
@@ -156,12 +184,13 @@ def plan_report_maker(
     subcategory_of: Mapping[str, str],
     now: datetime,
     rng: random.Random,
+    part_of: Mapping[str, int] | None = None,
 ) -> demo.MakeReport:
-    """A report at the item's own shelf on the plan, for alerts the seed marks closed."""
+    """A report at the item's place on its shelf, for alerts the seed marks closed."""
     size = plan.cell_size_m
 
     def make(category_id: str, item: str, moment: datetime, tag: str) -> NotFoundEvent:
-        stop = router.stop_for(subcategory_of[item])
+        stop = router.stop_for(subcategory_of[item], (part_of or {}).get(item))
         if stop is None:
             raise FlagshipError(f"no shelf on the plan for {item}")
         row, col = stop
@@ -278,17 +307,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         placeholders = {product.barcode for product in layout.products}
         inventory.import_catalog(layout.id, catalog, retire_barcodes=placeholders)
+        parts = catalog_parts(catalog)
+        inventory.set_shelf_parts(layout.id, parts)
         now = datetime.now(UTC)
         backup = back_up_plan(plans, layout.id, BACKUP_DIR)
         plans.save(layout.id, plan, now)
 
         rng = random.Random()
         subcategory_of = {row.display_name: row.subcategory for row in catalog}
+        part_of = {row.display_name: parts[row.barcode] for row in catalog}
         reports = plan_reports(
             router, plan, layout.id, subcategory_of,
-            (*demo.PROBLEM_REPORTS, *demo.BACKGROUND_REPORTS), demo._open_hours(now), now, rng, "",
+            (*demo.PROBLEM_REPORTS, *demo.BACKGROUND_REPORTS), demo._open_hours(now), now, rng, "", part_of,
         )
-        make = plan_report_maker(router, plan, layout.id, subcategory_of, now, rng)
+        make = plan_report_maker(router, plan, layout.id, subcategory_of, now, rng, part_of)
         closed = [
             *demo.closed_reports(demo.CLOSED_THIS_WEEK, demo.closed_this_week_hours(now), rng, make, "week-"),
             *demo.closed_reports(demo.PREVIOUS_WEEK_REPORTS, demo.previous_week_hours(now), rng, make, "previous-"),
@@ -304,7 +336,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     shelves = sorted({label.label for label in plan.labels})
     print(
         f"Flagship store in {where}: a {plan.cols} × {plan.rows} m plan with {len(shelves)} subcategory shelves, "
-        f"{len(catalog)} products ({checked} routes checked, each to its own shelf), "
+        f"{len(catalog)} products ({checked} routes checked, each to its own shelf, in a quarter of it), "
         f"{len(reports)} reports, {len(misses)} unfulfilled searches and {len(trips)} trips."
     )
     if backup is not None:

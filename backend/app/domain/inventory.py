@@ -25,6 +25,10 @@ def product_id_of_stop(stop_id: str) -> int | None:
     return int(number) if number != stop_id and number.isdecimal() else None
 
 
+# A shelf's quarters, numbered 0 to 3: see `SHELF_PARTS` in floor routing.
+SHELF_PART_MAX = 3
+
+
 class EntityType(StrEnum):
     PRODUCT = "product"
     CATEGORY = "category"
@@ -144,6 +148,8 @@ class CatalogProduct(Model):
     # The shelf price in agorot, and when it was last set; None when nobody has given one.
     price_agorot: int | None = None
     price_updated_at: datetime | None = None
+    # Which quarter of its shelf it stands in, 0 to 3 from the shelf's top or left end on the plan.
+    shelf_part: int | None = None
 
 
 class ProductDraft(Model):
@@ -159,6 +165,7 @@ class ProductDraft(Model):
     # The shelf it stands on, finer than its department: one of the plan's, as the screen offers them.
     subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
     price_agorot: int | None = Field(default=None, ge=0, le=MAX_PRICE_AGOROT)
+    shelf_part: int | None = Field(default=None, ge=0, le=SHELF_PART_MAX)
 
 
 class ProductChanges(Model):
@@ -173,6 +180,8 @@ class ProductChanges(Model):
     department: str | None = Field(default=None, min_length=1, max_length=64)
     subcategory: str | None = Field(default=None, max_length=MAX_ITEM_NAME)
     price_agorot: int | None = Field(default=None, ge=0, le=MAX_PRICE_AGOROT)
+    # Moving it to another shelf without saying where on it clears this.
+    shelf_part: int | None = Field(default=None, ge=0, le=SHELF_PART_MAX)
 
 
 class PriceLine(Model):

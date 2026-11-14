@@ -285,7 +285,9 @@ function SearchResults({ term, hits, failed, isSearching, cartIds, onPick }: Sea
                 <span className="min-w-0 flex-1">
                   <span className="line-clamp-2 text-[clamp(1.3rem,2.7vh,1.7rem)] leading-tight font-semibold">{hit.matched_text}</span>
                   <span className="block truncate text-[clamp(1rem,2vh,1.2rem)] text-muted">
-                    {name} · {where(hit.category_id, hit.aisle_no, hit.side)}
+                    {/* A product's or an area's name is already the line above. */}
+                    {name === hit.matched_text ? "" : `${name} · `}
+                    {where(hit.category_id, hit.aisle_no, hit.side)}
                   </span>
                 </span>
                 {hit.price_agorot !== null && hit.price_agorot !== undefined && (

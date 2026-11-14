@@ -12,6 +12,8 @@ interface KioskMapProps {
   route: Route | null;
   /** A drawn shelf to light up, such as where the first search result is. */
   highlight: string | null;
+  /** The quarter of it the result stands in, when known. */
+  highlightPart?: number | null;
   badges: ReadonlyMap<string, { code: string; tone: number }>;
   /** What the map is showing. In landscape the header carries it, and the map gets the row. */
   caption: string;
@@ -22,7 +24,7 @@ interface KioskMapProps {
  * department is, while typing it lights up the shelf the first result is on, and
  * with items picked it draws the whole walk from the entrance to the tills.
  */
-export function KioskMap({ layout, route, highlight, badges, caption }: KioskMapProps) {
+export function KioskMap({ layout, route, highlight, highlightPart = null, badges, caption }: KioskMapProps) {
   const { t } = useLanguage();
 
   return (
@@ -49,6 +51,7 @@ export function KioskMap({ layout, route, highlight, badges, caption }: KioskMap
             found={NOTHING_FOUND}
             zoneBadges={badges}
             highlight={highlight}
+            highlightPart={highlightPart}
             // A screen at the door: the whole store and the whole walk, markers sized to be read from a step back.
             focus="overview"
             emphasis="all"

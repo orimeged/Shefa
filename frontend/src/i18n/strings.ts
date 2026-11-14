@@ -147,6 +147,12 @@ export interface Strings {
   adminSignIn: string;
   adminTokenLabel: string;
   adminSignInHint: string;
+  /** Where on its shelf a product stands: a strip laid out like the shelf on the map. */
+  shelfPartTitle: string;
+  shelfPartHint: string;
+  shelfPart: (quarter: number) => string;
+  shelfPartUnknown: string;
+  shelfPartSaved: (name: string) => string;
   adminWrongToken: string;
   adminLocked: string;
   adminSignInFailed: string;
@@ -555,6 +561,11 @@ const baseStrings: Record<"he" | "en", Strings> = {
     adminSignIn: "כניסה",
     adminTokenLabel: "קוד גישה",
     adminSignInHint: "מקלידים את קוד הגישה של הסניף.",
+    shelfPartTitle: "איפה על המדף?",
+    shelfPartHint: "הפס מסודר כמו המדף במפה. לוחצים על החלק שבו המוצר עומד, והמסלול יוביל לשם.",
+    shelfPart: (quarter) => `רבע ${quarter} של המדף`,
+    shelfPartUnknown: "לא ידוע",
+    shelfPartSaved: (name) => `נשמר איפה ${name} עומד על המדף`,
     adminWrongToken: "קוד הגישה שגוי.",
     adminLocked: "הניהול נעול: לא הוגדר קוד גישה בשרת.",
     adminSignInFailed: "לא הצלחנו להתחבר לשרת.",
@@ -982,6 +993,11 @@ const baseStrings: Record<"he" | "en", Strings> = {
     adminSignIn: "Sign in",
     adminTokenLabel: "Access code",
     adminSignInHint: "Enter the store's access code.",
+    shelfPartTitle: "Where on the shelf?",
+    shelfPartHint: "The strip is laid out like the shelf on the map. Tap the part the product stands in, and routes go there.",
+    shelfPart: (quarter) => `Quarter ${quarter} of the shelf`,
+    shelfPartUnknown: "Not known",
+    shelfPartSaved: (name) => `Saved where ${name} stands on the shelf`,
     adminWrongToken: "That access code is wrong.",
     adminLocked: "Management is locked: the server has no access code set.",
     adminSignInFailed: "We couldn't reach the server.",

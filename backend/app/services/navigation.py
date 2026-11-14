@@ -4,6 +4,7 @@ import re
 from collections.abc import Sequence
 from itertools import pairwise
 
+from app.domain.areas import term_areas
 from app.domain.classifier import ClassifiedItem, ItemClassifier
 from app.domain.dictionary import FoodDictionary
 from app.domain.graph import StoreGraph
@@ -22,6 +23,7 @@ from app.domain.models import (
 )
 from app.domain.routing import order_stops
 from app.domain.search import CategorySearch, SearchMatch
+from app.domain.search_text import normalize
 
 # Below the dictionary's exact matches, so a search result never claims more than it knows.
 _CLASSIFIER_SCORE = 0.7
@@ -40,11 +42,17 @@ class NavigationService:
         dictionary: FoodDictionary | None = None,
         classifier: ItemClassifier | None = None,
     ) -> None:
+        known_ids = {category.id for category in store.categories}
+        self._dictionary = (dictionary or FoodDictionary({})).limited_to(known_ids)
+        # Words like "מים" whose products stand in one known place become places of their own.
+        areas = term_areas(store, ((term, category_id) for term, category_id, _ in self._dictionary.terms()))
+        if areas:
+            store = store.model_copy(update={"product_stops": (*store.product_stops, *areas)})
+        # The department a word would otherwise find, which the area stands in for.
+        self._area_words = {(area.department_id, normalize(area.name)) for area in areas}
         self._store = store
         self._map = StoreMap(**{field: getattr(store, field) for field in StoreMap.model_fields})
         self._graph = StoreGraph.from_store(store)
-        known_ids = {category.id for category in store.categories}
-        self._dictionary = (dictionary or FoodDictionary({})).limited_to(known_ids)
         self._search = CategorySearch(store, self._dictionary)
         self._classifier = classifier
         self._nodes = {node.id: node for node in store.nodes}
@@ -81,7 +89,12 @@ class NavigationService:
         return 0 <= x <= self._map.width_m and 0 <= y <= self._map.height_m
 
     def search(self, query: str, limit: int) -> list[SearchHit]:
-        return [self._hit(match) for match in self._search.search(query, limit)]
+        # "מים" finds the water's area; the whole department under the same word would only repeat it, worse.
+        return [
+            self._hit(match)
+            for match in self._search.search(query, limit)
+            if (match.category_id, normalize(match.matched_text)) not in self._area_words
+        ]
 
     def resolve_list(self, lines: Sequence[str]) -> list[ResolvedItem]:
         """Match a whole shopping list in one call, one or more items per line.

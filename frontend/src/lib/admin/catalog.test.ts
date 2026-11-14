@@ -24,6 +24,7 @@ function product(fields: Partial<CatalogProduct>): CatalogProduct {
     shelf: null,
     price_agorot: null,
     price_updated_at: null,
+    shelf_part: null,
     ...fields,
   };
 }

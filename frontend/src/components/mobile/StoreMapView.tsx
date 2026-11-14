@@ -11,6 +11,7 @@ import type { Insets, ViewBox } from "../../lib/mapCamera";
 import { boundsOf, NO_INSETS, parseViewBox, toScreen, unitsPerPixel } from "../../lib/mapCamera";
 import type { MapLayout, Point, Rect } from "../../lib/mapGeometry";
 import { polylinePoints, stopPins } from "../../lib/mapGeometry";
+import { middleOf, shelfPartRects } from "../../lib/shelfParts";
 import type { ScreenBox } from "../../lib/mapLabels";
 import { BADGE_HEIGHT_PX, badgeWidth, COMPACT_BADGE_PX, placeBadges } from "../../lib/mapLabels";
 import type { FoundSet, Trail } from "../../lib/routeProgress";
@@ -93,6 +94,8 @@ interface StoreMapViewProps {
   interactive?: boolean;
   /** A drawn shelf to pick out while no station is next, such as a search's first hit. */
   highlight?: string | null;
+  /** The quarter of that shelf the hit stands in, when it's known. */
+  highlightPart?: number | null;
   /**
    * Screen pixels the camera keeps free under the store, so the entrance's name
    * fits below its door when a wide screen leaves no height to spare.
@@ -120,6 +123,7 @@ export function StoreMapView({
   markerScale = 1,
   interactive = true,
   highlight = null,
+  highlightPart = null,
   footRoom = 0,
   className = "block h-full w-full",
 }: StoreMapViewProps) {
@@ -496,7 +500,9 @@ export function StoreMapView({
         />
       ))}
 
-      {highlight && !next && <SearchSpot layout={layout} shelf={highlight} scale={markerScale} />}
+      {highlight && !next && (
+        <SearchSpot layout={layout} shelf={highlight} part={highlightPart} scale={markerScale} />
+      )}
 
       <EndpointBadge
         at={layout.entrance}
@@ -570,18 +576,27 @@ export function StoreMapView({
  * filled in orange with a pin pulsing on it, so the answer is seen from a step back
  * before anything is picked.
  */
-function SearchSpot({ layout, shelf, scale }: { layout: MapLayout; shelf: string; scale: number }) {
-  const rects = layout.shelves.filter((rect) => rect.label === shelf);
-  if (rects.length === 0) {
+function SearchSpot({
+  layout,
+  shelf,
+  part,
+  scale,
+}: {
+  layout: MapLayout;
+  shelf: string;
+  part: number | null;
+  scale: number;
+}) {
+  const whole = layout.shelves.filter((rect) => rect.label === shelf);
+  if (whole.length === 0) {
     return null;
   }
-  // The pin stands on the shelf's middle: the centre of all its blocks.
-  const middle = {
-    x: rects.reduce((sum, rect) => sum + rect.x + rect.width / 2, 0) / rects.length,
-    y: rects.reduce((sum, rect) => sum + rect.y + rect.height / 2, 0) / rects.length - BLOCK_LIFT.shelf,
-  };
+  // Just its quarter, when the hit says where on the shelf it stands; the pin on that.
+  const rects = part === null ? whole : shelfPartRects(whole, part);
+  const centre = middleOf(rects);
+  const middle = { x: centre.x, y: centre.y - BLOCK_LIFT.shelf };
   return (
-    <g data-search-spot={shelf} className="pointer-events-none">
+    <g data-search-spot={shelf} data-part={part ?? undefined} className="pointer-events-none">
       {rects.map((rect) => (
         <rect
           key={`${rect.x},${rect.y}`}

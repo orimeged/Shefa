@@ -68,6 +68,8 @@ class Category(Model):
     subcategory: str | None = None
     # A placed product's shelf price. A department has none.
     price_agorot: int | None = None
+    # Which stretch of its shelf a placed product stands in, 0 to 3 along it; None when nobody said.
+    shelf_part: int | None = Field(default=None, ge=0, le=3)
 
 
 class Product(Model):

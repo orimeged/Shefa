@@ -24,6 +24,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.domain.areas import department_of_area
 from app.domain.events import RESTOCKED, ReportRecord
 from app.domain.inventory import PricedProduct, product_id_of_stop
 from app.domain.search_text import normalize
@@ -72,7 +73,8 @@ class PriceBook:
         if product is not None and product.price_agorot is not None:
             return PriceEstimate(agorot=product.price_agorot, basis="product")
 
-        department = self._by_department.get(category_id or "", [])
+        # An area, "where the water is", is priced as its department's products of that name.
+        department = self._by_department.get(department_of_area(category_id or "") or category_id or "", [])
         similar = [
             candidate.price_agorot
             for candidate in department

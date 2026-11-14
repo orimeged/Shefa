@@ -1,7 +1,7 @@
 """Inventory in the database: zones, what stands in them, and what shoppers see of it."""
 
 from collections import defaultdict
-from collections.abc import Collection, Iterable, Iterator, Sequence
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
@@ -10,6 +10,7 @@ from sqlalchemy import Engine, delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.domain import models
+from app.domain.areas import department_of_area
 from app.domain.inventory import (
     CatalogProduct,
     PriceImport,
@@ -175,6 +176,16 @@ class SqlInventoryRepository:
             for category in layout.categories
         )
 
+    def set_shelf_parts(self, store_id: str, parts: Mapping[str, int | None]) -> int:
+        """Where on its shelf each product stands, by barcode, in one go; returns how many it set."""
+        with self._writing(store_id) as session:
+            products = session.scalars(
+                select(Product).where(Product.store_id == store_id, Product.barcode.in_(list(parts)))
+            ).all()
+            for product in products:
+                product.shelf_part = parts[product.barcode or ""]
+            return len(products)
+
     def version(self, store_id: str) -> int | None:
         with self._engine.connect() as connection:
             return connection.scalar(select(StoreRecord.version).where(StoreRecord.id == store_id))
@@ -232,6 +243,7 @@ class SqlInventoryRepository:
                         department_id=department,
                         subcategory=product.subcategory or None,
                         price_agorot=product.price_agorot,
+                        shelf_part=product.shelf_part,
                     )
                 )
             elif department in located:
@@ -353,6 +365,12 @@ class SqlInventoryRepository:
         by_target |= {
             product_stop_id(product_id): by_id[category_id]
             for product_id, category_id in departments.items()
+        }
+        # An area, "where the water is", belongs to the department its id names.
+        by_target |= {
+            target_id: by_target[slug]
+            for target_id in ids
+            if (slug := department_of_area(target_id)) is not None and slug in by_target
         }
         return {
             target_id: CatalogCategory(
@@ -522,6 +540,8 @@ class SqlInventoryRepository:
                 product.barcode = row.barcode
                 product.brand = row.brand
                 product.size = row.size
+                if product.subcategory != row.subcategory:
+                    product.shelf_part = None
                 product.subcategory = row.subcategory
                 product.source = _POS_SOURCE
                 product.category_id = categories[row.department].id
@@ -798,6 +818,7 @@ class CatalogEditing:
                 subcategory=_clean(draft.subcategory),
                 price_agorot=draft.price_agorot,
                 price_updated_at=datetime.now(UTC) if draft.price_agorot is not None else None,
+                shelf_part=draft.shelf_part,
             )
             session.add(product)
             session.flush()
@@ -811,6 +832,7 @@ class CatalogEditing:
             )
             if product is None:
                 raise InventoryError(f"Unknown product: {product_id}")
+            shelf_before = (product.category_id, product.subcategory)
             if "department" in changes:
                 if changes["department"] is None:
                     raise InvalidItemError("A product needs a department")
@@ -828,6 +850,11 @@ class CatalogEditing:
             for field in ("brand", "size", "subcategory"):
                 if field in changes:
                     setattr(product, field, _clean(changes[field]))
+            if "shelf_part" in changes:
+                product.shelf_part = changes["shelf_part"]
+            elif (product.category_id, product.subcategory) != shelf_before:
+                # Another shelf, and nobody said where on it: the old quarter would send shoppers astray.
+                product.shelf_part = None
             if "price_agorot" in changes and changes["price_agorot"] != product.price_agorot:
                 product.price_agorot = changes["price_agorot"]
                 product.price_updated_at = datetime.now(UTC) if product.price_agorot is not None else None
@@ -957,6 +984,7 @@ class CatalogEditing:
             source=product.source,
             zones=zones,
             price_agorot=product.price_agorot,
+            shelf_part=product.shelf_part,
             # SQLite hands timestamps back without their zone; they were written in UTC.
             price_updated_at=(
                 product.price_updated_at.replace(tzinfo=UTC)

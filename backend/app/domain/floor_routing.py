@@ -25,11 +25,18 @@ from app.domain.routing import order_stops
 from app.domain.search_text import normalize
 
 CELL_PREFIX = "cell:"
+# A shelf is cut into this many stretches along its length; a product may say which it stands in.
+SHELF_PARTS = 4
+# A shelf at least this many times longer than it is deep is a gondola: shoppers take from its
+# long sides, and its short end faces another aisle, where a route mustn't stop.
+_GONDOLA_RATIO = 2
+_ALL_SIDES = ((-1, 0), (1, 0), (0, -1), (0, 1))
 _START = "@start"
 _END = "@end"
 _STOP_PREFIX = "department:"
-# Floods from shoppers' own positions, kept for re-plans; departments are kept for good.
-_MAX_KEPT_STARTS = 64
+# Floods from shoppers' own positions and from stretches of shelves, kept for re-plans;
+# whole departments are kept for good.
+_MAX_KEPT_STARTS = 128
 
 
 class FloorPlanProblem(StrEnum):
@@ -107,6 +114,8 @@ class GridRoute(Model):
 
 # Joins the places a split department may use into one stop's key; no label holds it.
 _GROUP = "\u241f"
+# Joins a shelf's label to the stretch of it a stop is for.
+_PART = "\u241e"
 
 
 @dataclass(frozen=True)
@@ -118,6 +127,13 @@ class _Department:
     stop: Cell | None
     # One such tile on each side of the shelf a shopper can reach; `stop` is among them.
     sides: tuple[Cell, ...] = ()
+    # Set for one stretch of a shelf, which a product standing there is routed to.
+    part: int | None = None
+
+    @property
+    def route_key(self) -> str:
+        """What a route groups its stops by: one stop per shelf, or per stretch of one."""
+        return self.label if self.part is None else f"{self.label}{_PART}{self.part}"
 
 
 class GridRouter:
@@ -153,6 +169,7 @@ class GridRouter:
         self._departments = self._find_departments()
         self._by_key = {department.key: department for department in self._departments}
         self._department_stops = {d.stop for d in self._departments if d.stop is not None}
+        self._parts: dict[tuple[str, int], _Department] = {}
         self._floods: dict[Cell, dict[Cell, float]] = {}
         self._start_floods: dict[Cell, dict[Cell, float]] = {}
 
@@ -243,7 +260,10 @@ class GridRouter:
             if not areas:
                 unplaced.append(category_id)
                 continue
-            key = areas[0].label if len(areas) == 1 else _GROUP.join(area.label for area in areas)
+            if category is not None and category.shelf_part is not None and len(areas) == 1:
+                # The stretch of the shelf it stands in, so the walk ends beside it, not at the middle.
+                areas = (self._part_of(areas[0], category.shelf_part),)
+            key = areas[0].route_key if len(areas) == 1 else _GROUP.join(area.label for area in areas)
             areas_of[key] = areas
             stops_by_label.setdefault(key, []).append(category)
 
@@ -308,10 +328,38 @@ class GridRouter:
             unplaced_category_ids=tuple(unplaced),
         )
 
-    def stop_for(self, label: str) -> Cell | None:
-        """Where a shopper stands for the shelf drawn as `label`, or None: not drawn, or walled off."""
+    def stop_for(self, label: str, part: int | None = None) -> Cell | None:
+        """Where a shopper stands for the shelf drawn as `label`, or a stretch of it; None: not drawn, or walled off."""
         area = self._by_key.get(normalize(label))
-        return area.stop if area is not None else None
+        if area is None:
+            return None
+        return (self._part_of(area, part) if part is not None else area).stop
+
+    def _part_of(self, area: _Department, part: int) -> _Department:
+        """One stretch of a shelf, numbered along its length from its top or left end.
+
+        A shelf too short for every stretch gives a missing one its nearest; a stretch
+        no shopper can reach falls back to the whole shelf.
+        """
+        kept = self._parts.get((area.key, part))
+        if kept is not None:
+            return kept
+        tiles = shelf_part_tiles(area.shelf_tiles, part)
+        stop = self._stop_beside(tiles)
+        found = (
+            _Department(
+                label=area.label,
+                key=area.key,
+                shelf_tiles=tiles,
+                stop=stop,
+                sides=self._sides_of(tiles, _long_sides(area.shelf_tiles)),
+                part=part,
+            )
+            if stop is not None
+            else area
+        )
+        self._parts[(area.key, part)] = found
+        return found
 
     def distance_to_checkout(self, cell: Cell) -> float:
         return self._to_checkout[cell]
@@ -427,18 +475,20 @@ class GridRouter:
                 key=key,
                 shelf_tiles=tuple(sorted(tiles_by_key[key])),
                 stop=self._stop_beside(tiles_by_key[key]),
-                sides=self._sides_of(tiles_by_key[key]),
+                sides=self._sides_of(tiles_by_key[key], _long_sides(tiles_by_key[key])),
             )
             for key, labels in labels_by_key.items()
         )
         return tuple(sorted(departments, key=lambda department: department.label))
 
-    def _sides_of(self, shelf_tiles: Sequence[Cell]) -> tuple[Cell, ...]:
-        """For each of the four sides, the reachable open tile there nearest the shelf's middle."""
+    def _sides_of(
+        self, shelf_tiles: Sequence[Cell], directions: Sequence[tuple[int, int]] = _ALL_SIDES
+    ) -> tuple[Cell, ...]:
+        """For each side in `directions`, the reachable open tile there nearest the shelf's middle."""
         middle_row = sum(row for row, _ in shelf_tiles) / len(shelf_tiles)
         middle_col = sum(col for _, col in shelf_tiles) / len(shelf_tiles)
         found: list[Cell] = []
-        for d_row, d_col in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        for d_row, d_col in directions:
             beside = {
                 (row + d_row, col + d_col)
                 for row, col in shelf_tiles
@@ -495,6 +545,41 @@ class _Distances:
 
     def distance(self, from_node: str, to_node: str) -> float:
         return self._table[(from_node, to_node)]
+
+
+def _long_sides(shelf_tiles: Sequence[Cell]) -> tuple[tuple[int, int], ...]:
+    """The sides a shopper takes from: a gondola's two long ones, or all four of a squarer block."""
+    rows = [row for row, _ in shelf_tiles]
+    cols = [col for _, col in shelf_tiles]
+    height = max(rows) - min(rows) + 1
+    width = max(cols) - min(cols) + 1
+    if height >= _GONDOLA_RATIO * width:
+        return ((0, -1), (0, 1))
+    if width >= _GONDOLA_RATIO * height:
+        return ((-1, 0), (1, 0))
+    return _ALL_SIDES
+
+
+def shelf_part_tiles(shelf_tiles: Sequence[Cell], part: int) -> tuple[Cell, ...]:
+    """The tiles of one of a shelf's `SHELF_PARTS` stretches along its longer side.
+
+    Counted from the top for a shelf that runs down the plan, from the left for one
+    that runs across: the dashboard cuts the drawn shelf the same way.
+    """
+    if not 0 <= part < SHELF_PARTS:
+        raise ValueError(f"a shelf has parts 0 to {SHELF_PARTS - 1}, not {part}")
+    rows = [row for row, _ in shelf_tiles]
+    cols = [col for _, col in shelf_tiles]
+    axis = 0 if max(rows) - min(rows) >= max(cols) - min(cols) else 1
+    low = min(rows) if axis == 0 else min(cols)
+    length = (max(rows) if axis == 0 else max(cols)) - low + 1
+
+    def part_of(tile: Cell) -> int:
+        return min(SHELF_PARTS - 1, (tile[axis] - low) * SHELF_PARTS // length)
+
+    # On a shelf shorter than the parts some stretch is empty: the nearest one stands in.
+    nearest = min({part_of(tile) for tile in shelf_tiles}, key=lambda found: (abs(found - part), found))
+    return tuple(tile for tile in shelf_tiles if part_of(tile) == nearest)
 
 
 def cell_id(row: int, col: int) -> str:

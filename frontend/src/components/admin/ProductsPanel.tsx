@@ -8,6 +8,8 @@ import type { ShelfOption } from "../../lib/admin/catalog";
 import { draftOf, filterCatalog } from "../../lib/admin/catalog";
 import { formatShekels } from "../../lib/money";
 import type { FloorMap } from "../../lib/floorPlanMap";
+import type { Rect } from "../../lib/mapGeometry";
+import { middleOf, SHELF_PARTS, shelfAxis, shelfPartRects } from "../../lib/shelfParts";
 import { BLOCK_LIFT, MapEndpoint, MapFloor } from "../MapFloor";
 import { Notice } from "../Notice";
 import { CARD, CARD_TITLE, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./cards";
@@ -306,9 +308,22 @@ export function ProductsPanel({ catalog, categories, shelves, floor }: ProductsP
               <MapFloor layout={floor.layout} highlight={lit?.shelf ?? null} />
               <MapEndpoint point={floor.layout.entrance} label={t.entrance} />
               <MapEndpoint point={floor.layout.checkout} label={t.checkout} />
-              {lit?.shelf && <ShelfMarker key={lit.shelf} floor={floor} shelf={lit.shelf} />}
+              {lit?.shelf && (
+                <ShelfMarker key={lit.shelf} floor={floor} shelf={lit.shelf} part={lit.shelf_part} />
+              )}
             </svg>
           </div>
+        )}
+        {floor && selected?.shelf && (
+          <ShelfPartPicker
+            key={selected.id}
+            rects={floor.layout.shelves.filter((rect) => rect.label === selected.shelf)}
+            part={selected.shelf_part}
+            onPick={async (part) => {
+              const result = await catalog.update(selected.id, { shelf_part: part });
+              setMessage(result.ok ? { ok: true, text: t.shelfPartSaved(selected.name) } : { ok: false, text: t.saveFailed });
+            }}
+          />
         )}
         {selected && (
           <button type="button" onClick={() => setEditing(selected)} className={SECONDARY_BUTTON}>
@@ -355,34 +370,106 @@ export function ProductsPanel({ catalog, categories, shelves, floor }: ProductsP
   );
 }
 
-/** The product's shelf, filled in green, with a pin on it that pulses: findable at a glance on a whole-store map. */
-function ShelfMarker({ floor, shelf }: { floor: FloorMap; shelf: string }) {
-  const rects = floor.layout.shelves.filter((rect) => rect.label === shelf);
-  if (rects.length === 0) return null;
-  // The pin stands on the shelf's middle block: the one nearest the centre of them all.
-  const middle = {
-    x: rects.reduce((sum, rect) => sum + rect.x + rect.width / 2, 0) / rects.length,
-    y: rects.reduce((sum, rect) => sum + rect.y + rect.height / 2, 0) / rects.length,
-  };
+/**
+ * The product's shelf, filled in green, with a pin on it that pulses: findable at a
+ * glance on a whole-store map. With its quarter known, that quarter is filled solid
+ * and the pin stands on it.
+ */
+function ShelfMarker({ floor, shelf, part }: { floor: FloorMap; shelf: string; part: number | null }) {
+  const whole = floor.layout.shelves.filter((rect) => rect.label === shelf);
+  if (whole.length === 0) return null;
+  const rects = part === null ? whole : shelfPartRects(whole, part);
+  const middle = middleOf(rects);
+  const block = (rect: Rect, opacity: number) => (
+    <rect
+      key={`${rect.x},${rect.y},${opacity}`}
+      x={rect.x - 0.25}
+      y={rect.y - BLOCK_LIFT.shelf - 0.25}
+      width={rect.width + 0.5}
+      height={rect.height + BLOCK_LIFT.shelf + 0.5}
+      rx={0.4}
+      fill="var(--color-brand)"
+      fillOpacity={opacity}
+      stroke="var(--color-brand-strong)"
+      strokeWidth={0.3}
+    />
+  );
   return (
-    <g data-where-shelf={shelf} className="pointer-events-none">
-      {rects.map((rect) => (
-        <rect
-          key={`${rect.x},${rect.y}`}
-          x={rect.x - 0.25}
-          y={rect.y - BLOCK_LIFT.shelf - 0.25}
-          width={rect.width + 0.5}
-          height={rect.height + BLOCK_LIFT.shelf + 0.5}
-          rx={0.4}
-          fill="var(--color-brand)"
-          fillOpacity={0.55}
-          stroke="var(--color-brand-strong)"
-          strokeWidth={0.3}
-        />
-      ))}
+    <g data-where-shelf={shelf} data-where-part={part ?? undefined} className="pointer-events-none">
+      {part !== null && whole.map((rect) => block(rect, 0.18))}
+      {rects.map((rect) => block(rect, part === null ? 0.55 : 0.8))}
       <circle cx={middle.x} cy={middle.y} r={2.2} fill="var(--color-brand)" opacity={0.35} className="pulse-ring" />
       <circle cx={middle.x} cy={middle.y} r={1.1} fill="var(--color-brand-strong)" stroke="white" strokeWidth={0.35} />
     </g>
+  );
+}
+
+/**
+ * Where on its shelf a product stands: four boxes laid out the way the shelf runs on
+ * the map, down or across, so the one to press is the one that looks like the spot.
+ * The map uses the same left-to-right in every language.
+ */
+function ShelfPartPicker({
+  rects,
+  part,
+  onPick,
+}: {
+  rects: readonly Rect[];
+  part: number | null;
+  onPick: (part: number | null) => Promise<void>;
+}) {
+  const { t } = useLanguage();
+  const [isSaving, setIsSaving] = useState(false);
+  const isDown = shelfAxis(rects) === "down";
+  const pick = async (next: number | null) => {
+    setIsSaving(true);
+    await onPick(next);
+    setIsSaving(false);
+  };
+
+  return (
+    <div role="group" aria-labelledby="shelf-part-title" data-shelf-parts className="flex items-start gap-4 rounded-2xl bg-paper p-4 ring-1 ring-line">
+      <div
+        dir="ltr"
+        className={`grid shrink-0 gap-1.5 ${isDown ? "w-14 grid-rows-4" : "w-44 grid-cols-4"}`}
+      >
+        {Array.from({ length: SHELF_PARTS }, (_, quarter) => {
+          const isOn = part === quarter;
+          return (
+            <button
+              key={quarter}
+              type="button"
+              disabled={isSaving}
+              aria-pressed={isOn}
+              aria-label={t.shelfPart(quarter + 1)}
+              data-shelf-part={quarter}
+              onClick={() => void pick(quarter)}
+              className={`grid place-items-center rounded-lg text-sm font-bold ring-1 transition disabled:opacity-60 ${
+                isDown ? "h-11" : "h-12"
+              } ${isOn ? "bg-brand text-white ring-brand-strong" : "bg-surface text-muted ring-line hover:bg-brand-soft hover:text-brand-strong"}`}
+            >
+              {isOn ? <MapPin aria-hidden className="size-4" /> : quarter + 1}
+            </button>
+          );
+        })}
+      </div>
+      <div className="min-w-0">
+        <p id="shelf-part-title" className="font-semibold text-ink">
+          {t.shelfPartTitle}
+        </p>
+        <p className="text-sm text-muted">{t.shelfPartHint}</p>
+        {part !== null && (
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => void pick(null)}
+            className="mt-2 text-sm font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
+          >
+            {t.shelfPartUnknown}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -396,6 +483,11 @@ function ShelfChip({ product, hasPlan }: { product: CatalogProduct; hasPlan: boo
       >
         <MapPin aria-hidden className="size-3.5 shrink-0" />
         <span className="truncate">{product.shelf}</span>
+        {product.shelf_part !== null && (
+          <span data-part-of={product.name} className="shrink-0 font-normal opacity-80">
+            · {product.shelf_part + 1}/{SHELF_PARTS}
+          </span>
+        )}
       </span>
     );
   }

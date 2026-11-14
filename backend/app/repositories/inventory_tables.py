@@ -88,6 +88,8 @@ class Product(Base):
     # The shelf price in agorot, so sums of reported losses stay exact; None when unknown.
     price_agorot: Mapped[int | None] = mapped_column(default=None)
     price_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Which quarter of its shelf it stands in, 0 to 3 along the shelf; None when nobody said.
+    shelf_part: Mapped[int | None] = mapped_column(default=None)
 
 
 class NodeAssignment(Base):
