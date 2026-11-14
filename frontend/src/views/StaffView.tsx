@@ -121,11 +121,14 @@ function StaffApp({ api, onSignOut }: { api: StaffApi; onSignOut: () => void }) 
   const placing = usePlacingData(api, hasOpenedPlace);
   const dismissToast = useCallback(() => setToast(null), []);
 
-  // A tapped notification brings the app forward: show the newest alerts straight away.
+  // A tapped notification brings the app forward, and a push lands while it's open: show the newest alerts straight away.
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type === "alert-opened") {
         setTab("alerts");
+        alerts.retry();
+      } else if (event.data?.type === "alert-pushed") {
+        // A push while the app is open: show it now rather than at the next refresh.
         alerts.retry();
       }
     };

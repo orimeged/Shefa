@@ -13,6 +13,7 @@ import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 # An alert an hour old is stale: by then someone walked past the shelf.
 _TTL_SECONDS = 3600
+# A new report this long after the item's last open one rings again: still empty.
+REMIND_AFTER = timedelta(minutes=30)
 _TIMEOUT_SECONDS = 10
 _GONE = (404, 410)
 
@@ -113,12 +116,16 @@ class AlertNotifier:
         return sent
 
 
-def should_alert(open_reports: int, source: Source) -> bool:
-    """The first report of an item opens an alert; the third says it's real. Pickers always count.
+def should_alert(open_reports: int, source: Source, since_previous: timedelta | None = None) -> bool:
+    """When a report rings the floor staff's phones.
 
-    Only those two moments, so a busy shelf doesn't ring a phone with every shopper.
+    The first report of an item opens an alert, and the third says it's real. A report
+    after a lull of `REMIND_AFTER` since the item's previous open one is a reminder:
+    the shelf is still empty. Two shoppers a minute apart ring once. Pickers always ring.
     """
-    return source == "picker" or open_reports in (1, ALERT_THRESHOLD)
+    if source == "picker" or open_reports in (1, ALERT_THRESHOLD):
+        return True
+    return since_previous is not None and since_previous >= REMIND_AFTER
 
 
 def alert_message(
@@ -128,10 +135,13 @@ def alert_message(
     shelf: str | None,
     department: str | None,
     source: Source,
+    reminder: bool = False,
 ) -> dict[str, Any]:
     """What the phone shows. In Hebrew: the floor staff's language in the pilot."""
     if source == "picker":
         title = "מלקט: חסר במדף"
+    elif reminder:
+        title = f"עדיין חסר במדף · {open_reports} דיווחים"
     elif open_reports >= ALERT_THRESHOLD:
         title = f"{open_reports} דיווחים: כנראה מדף ריק"
     else:

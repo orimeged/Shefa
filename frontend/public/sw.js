@@ -5,6 +5,11 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
+async function tellPages(message) {
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  windows.forEach((client) => client.postMessage(message));
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -13,17 +18,26 @@ self.addEventListener("push", (event) => {
     data = { title: event.data ? event.data.text() : "" };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "התראה חדשה", {
-      body: data.body || "",
-      // A newer alert for the same item replaces the one before, and rings again.
-      tag: data.tag,
-      renotify: Boolean(data.tag),
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      dir: "rtl",
-      lang: "he",
-      data: { url: data.url || "/staff" },
-    }),
+    (async () => {
+      // An open staff app shows the new alert at once, without waiting for its next refresh.
+      await tellPages({ type: "alert-pushed", tag: data.tag ?? null });
+      try {
+        await self.registration.showNotification(data.title || "התראה חדשה", {
+          body: data.body || "",
+          // A newer alert for the same item replaces the one before, and rings again.
+          tag: data.tag,
+          renotify: Boolean(data.tag),
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-192.png",
+          dir: "rtl",
+          lang: "he",
+          data: { url: data.url || "/staff" },
+        });
+        await tellPages({ type: "alert-shown", tag: data.tag ?? null });
+      } catch (error) {
+        await tellPages({ type: "alert-not-shown", message: String(error) });
+      }
+    })(),
   );
 });
 

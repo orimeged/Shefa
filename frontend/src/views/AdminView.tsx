@@ -220,17 +220,6 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
           </button>
         </header>
 
-        <KpiRow
-          counts={counts.data}
-          lostSales={lostSales.data}
-          failed={counts.failed || lostSales.failed}
-          onRetry={() => {
-            counts.retry();
-            lostSales.retry();
-          }}
-          onOpenAlerts={() => openTab("alerts")}
-        />
-
         <div role="tablist" aria-label={t.adminTitle} className="flex flex-wrap gap-1">
           <TabButton isSelected={tab === "dashboard"} onSelect={() => openTab("dashboard")}>
             {t.adminTabDashboard}
@@ -255,7 +244,18 @@ function Dashboard({ api, onSignOut }: { api: AdminApi; onSignOut: () => void })
         </div>
 
         {/* Stays mounted while hidden, so going to the alerts and back keeps the zoom. */}
-        <div role="tabpanel" hidden={tab !== "dashboard"} aria-label={t.adminTabDashboard}>
+        <div role="tabpanel" hidden={tab !== "dashboard"} aria-label={t.adminTabDashboard} className="flex flex-col gap-5">
+          {/* The week's figures head the dashboard; the editor and the catalog need the room. */}
+          <KpiRow
+            counts={counts.data}
+            lostSales={lostSales.data}
+            failed={counts.failed || lostSales.failed}
+            onRetry={() => {
+              counts.retry();
+              lostSales.retry();
+            }}
+            onOpenAlerts={() => openTab("alerts")}
+          />
           <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <div ref={mapSection} className="scroll-mt-4">
               {mapFailed && <Notice message={t.loadFailed} onRetry={retryMap} />}

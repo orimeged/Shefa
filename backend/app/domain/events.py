@@ -131,3 +131,9 @@ class EventStore(Protocol):
     def open_reports(self, store_id: str, item_query: str, category_id: str | None, since: datetime) -> int:
         """An item's reports still open since `since`."""
         ...
+
+    def previous_open_report(
+        self, store_id: str, item_query: str, category_id: str | None, since: datetime, before: datetime
+    ) -> datetime | None:
+        """The latest open report of an item made before `before`."""
+        ...

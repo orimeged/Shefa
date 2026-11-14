@@ -56,7 +56,7 @@ def departments(dictionary: FoodDictionary) -> dict[str, Department]:
 
 @pytest.fixture()
 def settings(tmp_path: Path) -> Settings:
-    """No paid services, and throwaway databases."""
+    """No paid services, no push, and throwaway databases."""
     return replace(
         Settings.from_env(),
         llm_enabled=False,
@@ -65,6 +65,11 @@ def settings(tmp_path: Path) -> Settings:
         events_db=tmp_path / "events.sqlite3",
         database_url=f"sqlite:///{(tmp_path / 'inventory.sqlite3').as_posix()}",
         admin_token=ADMIN_TOKEN,
+        # Whatever a developer's .env holds, tests push nowhere and know no staff token.
+        staff_token=None,
+        vapid_public_key=None,
+        vapid_private_key=None,
+        vapid_subject=None,
     )
 
 

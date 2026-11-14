@@ -11,6 +11,7 @@ import os
 import sqlite3
 from collections.abc import Iterator
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -318,3 +319,83 @@ def test_a_floor_plan_is_kept_as_jsonb_and_routes(pg_client: TestClient, databas
     walked = sum(len(leg["cells"]) - 1 for leg in route.json()["legs"])
     assert 0 < len(steps) <= walked
     assert all(edge["from_node"].startswith("cell:") for edge in steps)
+
+
+# ---- Lost sales, staff and picking, on PostgreSQL
+
+
+def test_who_reported_never_changes_and_a_reason_closes_once(pg_client: TestClient, database_url: str) -> None:
+    report(pg_client)
+    with pytest.raises(DBAPIError, match="append-only"):
+        sql(database_url, "UPDATE not_found_events SET source = 'picker'")
+
+    body = {"store_id": "demo", "item_query": "קטשופ", "category_id": "sauces", "resolution": "on_shelf"}
+    assert pg_client.post(f"{REPORTS}/resolve", json=body, headers=AUTH).json() == {"resolved": 1}
+    with pytest.raises(DBAPIError, match="append-only"):
+        sql(database_url, "UPDATE not_found_events SET resolution = 'restocked'")
+
+
+def test_the_lost_sales_report_prices_reports_on_postgres(pg_client: TestClient) -> None:
+    created = pg_client.post(
+        f"/api/v1/admin/stores/demo/products",
+        json={"name": "קטשופ היינץ 750 גרם", "department": "sauces", "barcode": "7290000000558", "price_agorot": 1390},
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    for _ in range(2):
+        report(pg_client, "קטשופ היינץ 750 גרם")
+
+    lost = admin(pg_client, f"{ANALYTICS}/lost-sales")
+
+    assert (lost["reports"], lost["value_agorot"], lost["exact_reports"]) == (2, 2780, 2)
+    assert lost["items"][0]["state"] == "open"
+
+
+def test_a_price_file_and_a_upc_scan_match_on_postgres(pg_client: TestClient) -> None:
+    pg_client.post(
+        "/api/v1/admin/stores/demo/products",
+        json={"name": "דגני בדיקה", "department": "cereals", "barcode": "0012345678905"},
+        headers=AUTH,
+    )
+    xml = b"<Root><Items><Item><ItemCode>12345678905</ItemCode><ItemPrice>9.90</ItemPrice></Item></Items></Root>"
+    imported = pg_client.post("/api/v1/admin/stores/demo/prices", content=xml, headers=AUTH).json()
+    assert (imported["matched"], imported["updated"]) == (1, 1)
+
+    [found] = pg_client.get("/api/v1/staff/products", params={"store_id": "demo", "barcode": "012345678905"}, headers=AUTH).json()
+    assert (found["name"], found["price_agorot"]) == ("דגני בדיקה", 990)
+
+
+def test_picks_and_push_subscriptions_are_kept_on_postgres(pg_client: TestClient) -> None:
+    finished = datetime.now(UTC)
+    order = {
+        "id": str(uuid4()),
+        "store_id": "demo",
+        "started_at": (finished - timedelta(minutes=18)).isoformat(),
+        "finished_at": finished.isoformat(),
+        "lines": 12,
+        "missing": 1,
+    }
+    assert pg_client.post("/api/v1/staff/picks/finish", json=order, headers=AUTH).json()["recorded"] is True
+    assert pg_client.post("/api/v1/staff/picks/finish", json=order, headers=AUTH).json()["recorded"] is False
+    picking = admin(pg_client, f"{ANALYTICS}/picking")
+    assert (picking["current"]["orders"], picking["current"]["median_minutes"]) == (1, 18.0)
+
+    subscriptions = pg_client.app.state.push_subscriptions
+    from app.services.push import PushSubscription
+
+    subscriptions.save("demo", PushSubscription(endpoint="https://push.example/a", p256dh="k", auth="a"))
+    subscriptions.save("demo", PushSubscription(endpoint="https://push.example/a", p256dh="k2", auth="a2"))
+    assert [sub.p256dh for sub in subscriptions.for_store("demo")] == ["k2"]
+
+
+def test_an_alert_counts_its_open_reports_on_postgres(pg_client: TestClient) -> None:
+    report(pg_client)
+    report(pg_client, category_id=None, item_query="נרות")
+    events = pg_client.app.state.events
+    since = datetime.now(UTC) - timedelta(days=7)
+
+    assert events.open_reports("demo", "קטשופ", "sauces", since) == 1
+    assert events.open_reports("demo", "נרות", None, since) == 1
+    later = datetime.now(UTC) + timedelta(minutes=1)
+    assert events.previous_open_report("demo", "קטשופ", "sauces", since, later) is not None
+    assert events.previous_open_report("demo", "נרות", None, since, since) is None

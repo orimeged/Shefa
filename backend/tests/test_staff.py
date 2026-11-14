@@ -3,6 +3,7 @@
 import base64
 import os
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -59,19 +60,21 @@ def sender(staff: TestClient) -> FakeSender:
     return fake
 
 
-def report(client: TestClient, item: str = "חלב 3% תנובה 1 ליטר", category: str = "dairy") -> None:
-    response = client.post(
-        REPORTS,
-        json={
-            "event_id": str(uuid4()),
-            "store_id": "demo",
-            "session_id": "shopper",
-            "item_query": item,
-            "category_id": category,
-            "x_coord": 5.0,
-            "y_coord": 5.0,
-        },
-    )
+def report(
+    client: TestClient, item: str = "חלב 3% תנובה 1 ליטר", category: str = "dairy", ago: timedelta | None = None
+) -> None:
+    body = {
+        "event_id": str(uuid4()),
+        "store_id": "demo",
+        "session_id": "shopper",
+        "item_query": item,
+        "category_id": category,
+        "x_coord": 5.0,
+        "y_coord": 5.0,
+    }
+    if ago is not None:
+        body["timestamp"] = (datetime.now(UTC) - ago).isoformat()
+    response = client.post(REPORTS, json=body)
     assert response.status_code == 201, response.text
 
 
@@ -358,3 +361,32 @@ def test_staff_add_a_product_the_catalog_lacked_without_a_price(staff: TestClien
 def test_staff_see_the_departments(staff: TestClient) -> None:
     categories = staff.get(f"{STAFF}/categories", params={"store_id": "demo"}).json()
     assert "dairy" in {category["slug"] for category in categories}
+
+
+def test_a_shelf_still_empty_after_a_lull_rings_again(staff: TestClient, sender: FakeSender) -> None:
+    """The demo store, and a real one by evening: an item reported hours ago is reported again."""
+    staff.post(f"{STAFF}/push/subscriptions", json={"store_id": "demo", **SUBSCRIPTION})
+    report(staff, ago=timedelta(hours=3))
+
+    report(staff)
+    report(staff)
+    report(staff)
+
+    titles = [payload["title"] for _, payload in sender.sent]
+    assert [payload["count"] for _, payload in sender.sent] == [1, 2, 3]
+    assert titles[1] == "עדיין חסר במדף · 2 דיווחים"
+    assert "כנראה מדף ריק" in titles[2]
+
+
+def test_two_shoppers_a_minute_apart_ring_once(staff: TestClient, sender: FakeSender) -> None:
+    staff.post(f"{STAFF}/push/subscriptions", json={"store_id": "demo", **SUBSCRIPTION})
+    report(staff, ago=timedelta(minutes=1))
+    report(staff)
+
+    assert [payload["count"] for _, payload in sender.sent] == [1]
+
+
+def test_the_reminder_rule() -> None:
+    assert should_alert(5, "shopper", timedelta(minutes=45))
+    assert not should_alert(5, "shopper", timedelta(minutes=10))
+    assert not should_alert(2, "shopper", None)

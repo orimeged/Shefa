@@ -133,6 +133,33 @@ class SqlEventStore:
                 {"store": store_id, "item": item_query, "category": category_id, "since": since.strftime(TIMESTAMP_FORMAT)},
             ).scalar_one()
 
+    def previous_open_report(
+        self, store_id: str, item_query: str, category_id: str | None, since: datetime, before: datetime
+    ) -> datetime | None:
+        """The latest open report of an item made before `before`: how long its shelf has waited."""
+        with self._engine.connect() as connection:
+            latest = connection.execute(
+                text(
+                    """
+                    SELECT MAX(timestamp) FROM not_found_events
+                    WHERE store_id = :store
+                        AND item_query = :item
+                        AND category_id IS NOT DISTINCT FROM :category
+                        AND timestamp >= :since
+                        AND timestamp < :before
+                        AND resolved_at IS NULL
+                    """
+                ),
+                {
+                    "store": store_id,
+                    "item": item_query,
+                    "category": category_id,
+                    "since": since.strftime(TIMESTAMP_FORMAT),
+                    "before": before.astimezone(UTC).strftime(TIMESTAMP_FORMAT),
+                },
+            ).scalar_one()
+        return datetime.fromisoformat(latest) if latest else None
+
     def report_records(self, store_id: str, since: datetime) -> list[ReportRecord]:
         with self._engine.connect() as connection:
             rows = connection.execute(
