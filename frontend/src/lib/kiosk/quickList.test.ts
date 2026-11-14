@@ -5,7 +5,7 @@ import type { CartItem } from "../../components/kiosk/types";
 import { addQuickItem, inRouteOrder, MAX_QUICK_ITEMS } from "./quickList";
 
 function item(categoryId: string): CartItem {
-  return { categoryId, name: categoryId, nameEn: categoryId, aisleNo: 1, side: "left", tone: 0 };
+  return { categoryId, name: categoryId, nameEn: categoryId, aisleNo: 1, side: "left", priceAgorot: null, tone: 0 };
 }
 
 function routeThrough(...categoryIds: string[]): Route {

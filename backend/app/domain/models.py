@@ -66,6 +66,8 @@ class Category(Model):
     # A placed product's subcategory, such as "פירות" in produce: a drawn plan may
     # have a shelf for it, finer than the department's.
     subcategory: str | None = None
+    # A placed product's shelf price. A department has none.
+    price_agorot: int | None = None
 
 
 class Product(Model):
@@ -73,6 +75,7 @@ class Product(Model):
     name: str
     category_id: str
     subcategory: str | None = None
+    price_agorot: int | None = None
 
 
 class StoreMap(Model):
@@ -141,6 +144,8 @@ class SearchHit(Model):
     side: Side
     matched_text: str
     score: float
+    # The shelf price of the product matched; None for a department or an unpriced product.
+    price_agorot: int | None = None
 
 
 class ResolvedItem(Model):

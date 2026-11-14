@@ -2,7 +2,7 @@ import { Eye, LoaderCircle, MapPin, MapPinned, PackageCheck, TriangleAlert } fro
 
 import type { NotFoundReportRow } from "../../api/types";
 import { useLanguage } from "../../i18n/LanguageProvider";
-import { formatShekels } from "../../lib/admin/money";
+import { formatShekels } from "../../lib/money";
 import { needsAttention } from "../../lib/admin/stockAlerts";
 import { formatAgo } from "../../lib/staff/time";
 

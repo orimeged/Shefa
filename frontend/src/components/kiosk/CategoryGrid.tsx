@@ -28,6 +28,7 @@ export function CategoryGrid({ map, cartIds, onAdd }: CategoryGridProps) {
         nameEn: category.name_en,
         aisleNo: section.aisle_no,
         side: section.side,
+        priceAgorot: null,
       });
     }
   };

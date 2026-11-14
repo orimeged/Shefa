@@ -231,6 +231,7 @@ class SqlInventoryRepository:
                         other_section_ids=tuple(sections[1:]),
                         department_id=department,
                         subcategory=product.subcategory or None,
+                        price_agorot=product.price_agorot,
                     )
                 )
             elif department in located:
@@ -240,6 +241,7 @@ class SqlInventoryRepository:
                         name=product.name,
                         category_id=department,
                         subcategory=product.subcategory or None,
+                        price_agorot=product.price_agorot,
                     )
                 )
 

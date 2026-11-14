@@ -7,7 +7,7 @@ import type { CatalogProblem } from "../../hooks/useCatalog";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ShelfOption } from "../../lib/admin/catalog";
 import { barcodeProblem, shelvesOf } from "../../lib/admin/catalog";
-import { agorotToField, parseShekels } from "../../lib/admin/money";
+import { agorotToField, parseShekels } from "../../lib/money";
 
 interface ProductFormProps {
   title: string;

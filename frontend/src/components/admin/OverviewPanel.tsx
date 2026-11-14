@@ -27,7 +27,7 @@ import type {
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { Trend } from "../../lib/admin/analytics";
 import { trendOf } from "../../lib/admin/analytics";
-import { formatShekels } from "../../lib/admin/money";
+import { formatShekels } from "../../lib/money";
 import type { FloorMap } from "../../lib/floorPlanMap";
 import { buildMapLayout } from "../../lib/mapGeometry";
 import { Notice } from "../Notice";

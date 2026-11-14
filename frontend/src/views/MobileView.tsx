@@ -1,4 +1,4 @@
-import { CircleAlert, Navigation, Trash2, X } from "lucide-react";
+import { CircleAlert, MapPin, Navigation, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
@@ -28,6 +28,7 @@ import { useShopperStore } from "../hooks/useShopperStore";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { buzz, FOUND_BUZZ, LIST_DONE_BUZZ } from "../lib/haptics";
 import type { ListItem } from "../lib/list/shoppingItems";
+import { estimateBasket, priceOfItem, pricesOf } from "../lib/list/shoppingItems";
 import { cellId } from "../lib/floorPlanMap";
 import { completesList, currentPoint, distanceToNextStop, remainingDistance } from "../lib/routeProgress";
 import { parseCategoryIds } from "../lib/shareUrl";
@@ -240,6 +241,14 @@ export default function MobileView() {
   const foundCount = categoryIds.filter((id) => found.has(id)).length;
   const missingCount = list.items.filter((item) => item.missing).length;
 
+  const prices = useMemo(() => pricesOf(map), [map]);
+  const basket = useMemo(() => estimateBasket(list.items, prices), [list.items, prices]);
+  // The next station's price: its product's, or the one item's taken there.
+  const nextItems = nextStop ? (groups.get(nextStop.category_id)?.items ?? []) : [];
+  const nextPrice = nextStop
+    ? (prices.get(nextStop.category_id) ?? (nextItems.length === 1 ? priceOfItem(nextItems[0]!, prices) : null))
+    : null;
+
   // The stations behind the shopper, ticked or given up, wherever later routes go.
   const reached = useMemo(
     () => categoryIds.flatMap((id) => (found.has(id) ? (knownStops.get(id) ?? []) : [])),
@@ -394,6 +403,9 @@ export default function MobileView() {
                 distanceM={distanceM}
                 then={pending[1]}
                 missingCount={missingCount}
+                priceAgorot={nextPrice}
+                foundCount={basket.items}
+                basketAgorot={basket.priced > 0 ? basket.agorot : null}
                 waiting={list.unmatchedItems.map((item) => item.text)}
                 onArrived={handleFound}
                 onNotFound={handleNotFound}
@@ -456,6 +468,13 @@ export default function MobileView() {
         >
           {isBuilding && list.isEmpty ? (
             <header className="pt-4">
+              {map && (
+                // The branch the list is for: aisles and prices are this store's.
+                <p data-store-name className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-strong">
+                  <MapPin aria-hidden className="size-4 shrink-0" />
+                  <span className="truncate">{map.name}</span>
+                </p>
+              )}
               <h1 className="text-3xl font-semibold tracking-tight">{t.smartTitle}</h1>
               <p className="mt-1 text-muted">{t.smartSubtitle}</p>
             </header>
@@ -463,7 +482,7 @@ export default function MobileView() {
             <h1 className="sr-only">{isBuilding ? t.smartTitle : t.routeTitle}</h1>
           )}
 
-          {isBuilding && placedCount > 0 && <ListDraft items={list.items} onRemove={list.removeItem} onClear={clearList} />}
+          {isBuilding && placedCount > 0 && <ListDraft items={list.items} prices={prices} onRemove={list.removeItem} onClear={clearList} />}
 
           <UnmatchedItems
             map={map}

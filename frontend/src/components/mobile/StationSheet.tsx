@@ -1,10 +1,11 @@
-import { Check, ChevronUp, CircleAlert, PartyPopper, SearchX, ShoppingBasket } from "lucide-react";
+import { Check, ChevronUp, CircleAlert, CircleCheck, Megaphone, PartyPopper, SearchX, ShoppingBasket, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 import { forwardRef, useRef, useState } from "react";
 
 import type { RouteStop } from "../../api/types";
 import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
+import { formatShekels } from "../../lib/money";
 import { CategoryIcon } from "../CategoryIcon";
 import { FoundBurst } from "./FoundBurst";
 
@@ -23,6 +24,11 @@ interface StationSheetProps {
   /** The station after this one, named under the button. */
   then: RouteStop | undefined;
   missingCount: number;
+  /** The shelf price of what's taken at this station, when it's one priced product. */
+  priceAgorot: number | null;
+  /** Once every station is done: the items found, and what they come to, as far as prices are known. */
+  foundCount: number;
+  basketAgorot: number | null;
   /** What the store couldn't place: named on the sheet, so it isn't lost in the closed list. */
   waiting: readonly string[];
   onArrived: (categoryId: string) => void;
@@ -47,6 +53,9 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
     distanceM,
     then,
     missingCount,
+    priceAgorot,
+    foundCount,
+    basketAgorot,
     waiting,
     onArrived,
     onNotFound,
@@ -56,7 +65,7 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
   },
   ref,
 ) {
-  const { t, pick } = useLanguage();
+  const { t, pick, language } = useLanguage();
   const where = usePlace();
   const answeredAt = useRef(-Infinity);
   const [pops, setPops] = useState(0);
@@ -108,6 +117,14 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
                     <span className="font-semibold text-brand-strong">{distance}</span>
                   </>
                 )}
+                {priceAgorot !== null && (
+                  <>
+                    <span aria-hidden className="mx-1.5 text-line">●</span>
+                    <span data-station-price className="font-semibold text-ink tabular-nums">
+                      {formatShekels(priceAgorot, language)}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -127,16 +144,37 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
           )}
         </div>
       ) : (
-        <div aria-live="polite" className="station-in flex items-center gap-3.5 px-4">
-          <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/30">
-            <PartyPopper aria-hidden className="size-8" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl leading-tight font-bold">
-              {missingCount > 0 ? t.routeFinished(missingCount) : t.allFound}
-            </h2>
-            {distanceM !== null && <p className="text-sm font-medium text-muted">{t.allFoundHint(distanceM)}</p>}
+        <div aria-live="polite" className="station-in px-4">
+          <div className="flex items-center gap-3.5">
+            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/30">
+              <PartyPopper aria-hidden className="size-8" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl leading-tight font-bold">
+                {missingCount > 0 ? t.routeFinished(missingCount) : t.allFound}
+              </h2>
+              {distanceM !== null && <p className="text-sm font-medium text-muted">{t.allFoundHint(distanceM)}</p>}
+            </div>
           </div>
+          {/* The trip in a line: what's in the trolley, what the staff now know is missing, and roughly what it costs. */}
+          <ul data-trip-summary className="mt-3 flex flex-wrap gap-1.5">
+            <li className="flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-sm font-semibold text-brand-strong">
+              <CircleCheck aria-hidden className="size-4" />
+              {t.tripFound(foundCount)}
+            </li>
+            {missingCount > 0 && (
+              <li className="flex items-center gap-1.5 rounded-full bg-next-soft px-3 py-1 text-sm font-semibold text-ink">
+                <Megaphone aria-hidden className="size-4 text-[#b26a00]" />
+                {t.tripReported(missingCount)}
+              </li>
+            )}
+            {basketAgorot !== null && (
+              <li data-trip-basket className="flex items-center gap-1.5 rounded-full bg-paper px-3 py-1 text-sm font-semibold text-ink ring-1 ring-line">
+                <Wallet aria-hidden className="size-4 text-muted" />
+                {t.basketAtCheckout(formatShekels(basketAgorot, language))}
+              </li>
+            )}
+          </ul>
         </div>
       )}
 

@@ -6,10 +6,13 @@ import {
   appendItems,
   applyResolved,
   categoryIdsOf,
+  estimateBasket,
   groupByCategory,
   itemsFromCategories,
   matchedItem,
   pendingItem,
+  placementOfHit,
+  pricesOf,
   withoutPlacement,
 } from "./shoppingItems";
 
@@ -157,5 +160,33 @@ describe("trips and managers' changes", () => {
 
     expect(gone).toMatchObject({ status: "unmatched", placement: null, text: "חלב" });
     expect(kept).toBe(other);
+  });
+});
+
+describe("the basket's estimate", () => {
+  const section = { id: "s1", node_id: "n1", aisle_no: 3, side: "left" as const };
+  const bamba: Category = { id: "product-7", name: "במבה", name_en: "במבה", section_id: "s1", aliases: [], price_agorot: 590 };
+  const map = { categories: [], product_stops: [bamba], sections: [section] } as unknown as StoreMap;
+
+  it("adds up what has a price and says how many items that is", () => {
+    const [snack] = itemsFromCategories(["product-7"], map);
+    const tahini = matchedItem("טחינה", placementOfHit({ ...hit("sauces"), price_agorot: 1290 }));
+    const bread = matchedItem("לחם", { ...dairy, categoryId: "bakery" });
+
+    expect(estimateBasket([snack!, tahini, bread], pricesOf(map))).toEqual({ agorot: 1880, priced: 2, items: 3 });
+  });
+
+  it("uses today's price for a placed product, over the one it was added with", () => {
+    const [snack] = itemsFromCategories(["product-7"], map);
+    const today = pricesOf({ ...map, product_stops: [{ ...bamba, price_agorot: 650 }] });
+
+    expect(estimateBasket([snack!], today).agorot).toBe(650);
+  });
+
+  it("leaves out what was given up as not on the shelf, and a list saved before prices", () => {
+    const [snack] = itemsFromCategories(["product-7"], map);
+    const old = matchedItem("חלב", dairy);
+
+    expect(estimateBasket([{ ...snack!, missing: true }, old], pricesOf(map))).toEqual({ agorot: 0, priced: 0, items: 1 });
   });
 });

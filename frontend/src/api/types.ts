@@ -33,6 +33,8 @@ export interface Category {
   department_id?: string | null;
   /** A placed product's subcategory, which a drawn plan may give a shelf of its own. */
   subcategory?: string | null;
+  /** A placed product's shelf price in agorot; a department has none. */
+  price_agorot?: number | null;
 }
 
 export interface StoreMap {
@@ -56,6 +58,8 @@ export interface SearchHit {
   side: Side;
   matched_text: string;
   score: number;
+  /** The matched product's shelf price in agorot; null for a department or an unpriced product. */
+  price_agorot?: number | null;
 }
 
 /** One item from a list line. `hit` is null when the store has no match. */

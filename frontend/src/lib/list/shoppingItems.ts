@@ -9,6 +9,8 @@ export interface ItemPlacement {
   nameEn: string;
   aisleNo: number;
   side: Side;
+  /** The product's shelf price in agorot when it was added; lists saved before prices lack it. */
+  priceAgorot?: number | null;
 }
 
 export interface ListItem {
@@ -44,6 +46,7 @@ export function placementOfHit(hit: SearchHit): ItemPlacement {
     nameEn: hit.category_name_en,
     aisleNo: hit.aisle_no,
     side: hit.side,
+    priceAgorot: hit.price_agorot ?? null,
   };
 }
 
@@ -56,8 +59,40 @@ export function placementOfCategory(category: Category, map: StoreMap): ItemPlac
         nameEn: category.name_en,
         aisleNo: section.aisle_no,
         side: section.side,
+        priceAgorot: category.price_agorot ?? null,
       }
     : null;
+}
+
+/** Each placed product's current shelf price, by its stop's id: fresher than a saved list's. */
+export function pricesOf(map: StoreMap | null): ReadonlyMap<string, number> {
+  return new Map(
+    (map?.product_stops ?? []).flatMap((stop) =>
+      stop.price_agorot === null || stop.price_agorot === undefined ? [] : [[stop.id, stop.price_agorot] as const],
+    ),
+  );
+}
+
+/** An item's price: today's for a placed product, else what it was added with. Null when unknown. */
+export function priceOfItem(item: ListItem, prices: ReadonlyMap<string, number>): number | null {
+  if (!item.placement) {
+    return null;
+  }
+  return prices.get(item.placement.categoryId) ?? item.placement.priceAgorot ?? null;
+}
+
+export interface BasketEstimate {
+  agorot: number;
+  /** Items counted, and items on the list: a department or an unpriced product has no price. */
+  priced: number;
+  items: number;
+}
+
+/** What the placed items still wanted come to, from the prices known. */
+export function estimateBasket(items: readonly ListItem[], prices: ReadonlyMap<string, number>): BasketEstimate {
+  const wanted = items.filter((item) => item.placement && !item.missing);
+  const known = wanted.map((item) => priceOfItem(item, prices)).filter((price): price is number => price !== null);
+  return { agorot: known.reduce((sum, price) => sum + price, 0), priced: known.length, items: wanted.length };
 }
 
 export function pendingItem({ text, query }: ParsedItem): ListItem {

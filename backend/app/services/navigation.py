@@ -52,6 +52,12 @@ class NavigationService:
         self._categories = {
             category.id: category for category in (*store.categories, *store.product_stops)
         }
+        # A product shelved with its department is found under the department's id, by its name.
+        self._shelved_prices = {
+            (product.category_id, product.name): product.price_agorot
+            for product in store.products
+            if product.price_agorot is not None
+        }
         self._entrance = self._node_of_type(NodeType.ENTRANCE)
         self._checkout = self._node_of_type(NodeType.CHECKOUT)
 
@@ -146,6 +152,9 @@ class NavigationService:
             side=section.side,
             matched_text=match.matched_text,
             score=match.score,
+            price_agorot=category.price_agorot
+            if category.price_agorot is not None
+            else self._shelved_prices.get((category.id, match.matched_text)),
         )
 
     def plan_route(self, category_ids: Sequence[str], start_node_id: str | None = None) -> Route:

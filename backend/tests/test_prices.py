@@ -193,3 +193,43 @@ def test_a_file_that_isnt_a_price_file_is_a_422(admin: TestClient) -> None:
     response = admin.post(f"{ADMIN}/prices", content=b"barcode,price\n1,2\n")
     assert response.status_code == 422
     assert response.json()["detail"]
+
+
+# ---- Prices for shoppers
+
+SHOPPER = "/api/v1/stores/demo"
+
+
+def hit_for(client: TestClient, query: str) -> dict[str, Any]:
+    return client.get(f"{SHOPPER}/search", params={"q": query}).json()[0]
+
+
+def test_a_shopper_finds_a_product_with_its_shelf_price(admin: TestClient) -> None:
+    # On no shelf of its own, it stands with its department and is found under it, by name.
+    product = add(admin, name="תפוחי עץ גאלה", price_agorot=1290)
+    hit = hit_for(admin, "תפוחי עץ גאלה")
+    assert (hit["category_id"], hit["price_agorot"]) == ("produce", 1290)
+
+    # On a shelf of its own it is a stop of its own, and the map carries its price too.
+    zone = next(entry for entry in admin.get(f"{ADMIN}/nodes").json() if entry["section_id"] == "a1-s1-r")
+    placed = admin.post(
+        f"{ADMIN}/nodes/{zone['id']}/assignments",
+        json={"entity_type": "product", "entity_id": product["id"]},
+    )
+    assert placed.status_code in (200, 201), placed.text
+    hit = hit_for(admin, "תפוחי עץ גאלה")
+    assert (hit["category_id"], hit["price_agorot"]) == (f"product-{product['id']}", 1290)
+    stops = admin.get(f"{SHOPPER}/map").json()["product_stops"]
+    assert next(stop for stop in stops if stop["id"] == hit["category_id"])["price_agorot"] == 1290
+
+    # A changed price reaches the shopper at once.
+    admin.patch(f"{ADMIN}/products/{product['id']}", json={"price_agorot": 1190})
+    assert hit_for(admin, "תפוחי עץ גאלה")["price_agorot"] == 1190
+
+
+def test_a_department_or_an_unpriced_product_has_no_price(admin: TestClient) -> None:
+    add(admin, name="מלפפון בייבי")
+    assert hit_for(admin, "מלפפון בייבי")["price_agorot"] is None
+    department = hit_for(admin, "ירקות")
+    assert not department["category_id"].startswith("product-")
+    assert department["price_agorot"] is None

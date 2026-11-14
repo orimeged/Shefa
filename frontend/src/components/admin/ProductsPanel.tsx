@@ -6,7 +6,7 @@ import type { Catalog } from "../../hooks/useCatalog";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ShelfOption } from "../../lib/admin/catalog";
 import { draftOf, filterCatalog } from "../../lib/admin/catalog";
-import { formatShekels } from "../../lib/admin/money";
+import { formatShekels } from "../../lib/money";
 import type { FloorMap } from "../../lib/floorPlanMap";
 import { BLOCK_LIFT, MapEndpoint, MapFloor } from "../MapFloor";
 import { Notice } from "../Notice";

@@ -1,6 +1,6 @@
-/** Shekel amounts on the dashboard. The API sends agorot, so sums stay exact. */
+/** Shekel amounts, on the dashboard and on the shoppers' screens. The API sends agorot, so sums stay exact. */
 
-import type { Language } from "../../i18n/strings";
+import type { Language } from "../i18n/strings";
 
 // Arabic in Israel writes Western digits, as shop prices do.
 const LOCALES: Record<Language, string> = { he: "he-IL", en: "en-IL", ar: "ar-IL-u-nu-latn", ru: "ru-IL" };

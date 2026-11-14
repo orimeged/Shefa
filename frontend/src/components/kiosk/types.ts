@@ -6,6 +6,8 @@ export interface CartItem {
   nameEn: string;
   aisleNo: number;
   side: Side;
+  /** A product's shelf price in agorot; a department has none. */
+  priceAgorot: number | null;
   /** Which badge colour the item wears for as long as it's on the list. */
   tone: number;
 }

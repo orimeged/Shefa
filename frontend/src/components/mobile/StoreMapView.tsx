@@ -496,6 +496,8 @@ export function StoreMapView({
         />
       ))}
 
+      {highlight && !next && <SearchSpot layout={layout} shelf={highlight} scale={markerScale} />}
+
       <EndpointBadge
         at={layout.entrance}
         dropPx={ENDPOINT_DROP_PX}
@@ -563,6 +565,43 @@ export function StoreMapView({
 }
 
 /** Where two boxes overlap, or null. */
+/**
+ * Where a search's first hit stands, while the shopper is still typing: its shelf
+ * filled in orange with a pin pulsing on it, so the answer is seen from a step back
+ * before anything is picked.
+ */
+function SearchSpot({ layout, shelf, scale }: { layout: MapLayout; shelf: string; scale: number }) {
+  const rects = layout.shelves.filter((rect) => rect.label === shelf);
+  if (rects.length === 0) {
+    return null;
+  }
+  // The pin stands on the shelf's middle: the centre of all its blocks.
+  const middle = {
+    x: rects.reduce((sum, rect) => sum + rect.x + rect.width / 2, 0) / rects.length,
+    y: rects.reduce((sum, rect) => sum + rect.y + rect.height / 2, 0) / rects.length - BLOCK_LIFT.shelf,
+  };
+  return (
+    <g data-search-spot={shelf} className="pointer-events-none">
+      {rects.map((rect) => (
+        <rect
+          key={`${rect.x},${rect.y}`}
+          x={rect.x - 0.2}
+          y={rect.y - BLOCK_LIFT.shelf - 0.2}
+          width={rect.width + 0.4}
+          height={rect.height + 0.4}
+          rx={0.35}
+          fill="var(--color-next)"
+          fillOpacity={0.6}
+          stroke="var(--color-next)"
+          strokeWidth={0.25}
+        />
+      ))}
+      <circle cx={middle.x} cy={middle.y} r={2.4 * scale} fill="var(--color-next)" opacity={0.4} className="pulse-ring" />
+      <circle cx={middle.x} cy={middle.y} r={1.1 * scale} fill="var(--color-next)" stroke="white" strokeWidth={0.35 * scale} />
+    </g>
+  );
+}
+
 function overlap(a: Rect, b: Rect): Rect | null {
   const x = Math.max(a.x, b.x);
   const y = Math.max(a.y, b.y);

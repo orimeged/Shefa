@@ -5,6 +5,7 @@ import type { Route, SearchHit, StoreMap } from "../../api/types";
 import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { inRouteOrder, MAX_QUICK_ITEMS } from "../../lib/kiosk/quickList";
+import { formatShekels } from "../../lib/money";
 import { CategoryIcon } from "../CategoryIcon";
 import { Notice } from "../Notice";
 import { ZoneBadge } from "../ZoneBadge";
@@ -36,6 +37,7 @@ function toCartItem(hit: SearchHit): NewCartItem {
     nameEn: hit.category_name_en,
     aisleNo: hit.aisle_no,
     side: hit.side,
+    priceAgorot: hit.price_agorot ?? null,
   };
 }
 
@@ -65,7 +67,7 @@ export function KioskPanel({
   onAdd,
   onRemove,
 }: KioskPanelProps) {
-  const { t, pick } = useLanguage();
+  const { t, pick, language } = useLanguage();
   const where = usePlace();
   const inputRef = useRef<HTMLInputElement>(null);
   const cartIds = useMemo(() => new Set(items.map((item) => item.categoryId)), [items]);
@@ -125,7 +127,7 @@ export function KioskPanel({
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          className="h-[clamp(5.5rem,10vh,6.75rem)] w-full rounded-[1.75rem] bg-surface ps-[clamp(4.25rem,8vh,5.5rem)] pe-20 text-[clamp(1.5rem,3.2vh,2.25rem)] shadow-lg shadow-ink/5 ring-2 ring-line transition-shadow outline-none placeholder:text-muted focus:ring-[3px] focus:ring-brand disabled:bg-paper disabled:text-xl disabled:placeholder:text-ink"
+          className="h-[clamp(5.5rem,10vh,6.75rem)] w-full rounded-[1.75rem] bg-surface ps-[clamp(4.25rem,8vh,5.5rem)] pe-20 text-[clamp(1.5rem,3.2vh,2.25rem)] shadow-lg shadow-ink/5 ring-2 ring-line transition-shadow outline-none placeholder:text-muted focus:ring-[3px] focus:ring-brand disabled:bg-paper disabled:pe-6 disabled:text-lg disabled:placeholder:text-ink"
         />
         {term && (
           <button
@@ -187,6 +189,14 @@ export function KioskPanel({
                         {shelf ? t.onShelf(shelf) : where(item.categoryId, item.aisleNo, item.side, true)}
                       </span>
                     </span>
+                    {item.priceAgorot !== null && item.priceAgorot !== undefined && (
+                      <span
+                        data-price
+                        className="shrink-0 text-[clamp(1.25rem,2.6vh,1.6rem)] font-bold tabular-nums portrait:hidden"
+                      >
+                        {formatShekels(item.priceAgorot, language)}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => onRemove(item.categoryId)}
@@ -239,7 +249,7 @@ interface SearchResultsProps {
 }
 
 function SearchResults({ term, hits, failed, isSearching, cartIds, onPick }: SearchResultsProps) {
-  const { t, pick } = useLanguage();
+  const { t, pick, language } = useLanguage();
   const where = usePlace();
 
   return (
@@ -273,11 +283,16 @@ function SearchResults({ term, hits, failed, isSearching, cartIds, onPick }: Sea
                   <CategoryIcon categoryId={hit.category_id} className="size-8" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[clamp(1.3rem,2.7vh,1.7rem)] font-semibold">{hit.matched_text}</span>
+                  <span className="line-clamp-2 text-[clamp(1.3rem,2.7vh,1.7rem)] leading-tight font-semibold">{hit.matched_text}</span>
                   <span className="block truncate text-[clamp(1rem,2vh,1.2rem)] text-muted">
                     {name} · {where(hit.category_id, hit.aisle_no, hit.side)}
                   </span>
                 </span>
+                {hit.price_agorot !== null && hit.price_agorot !== undefined && (
+                  <span data-price className="shrink-0 text-[clamp(1.3rem,2.7vh,1.7rem)] font-bold tabular-nums">
+                    {formatShekels(hit.price_agorot, language)}
+                  </span>
+                )}
                 <span
                   aria-hidden
                   className={`grid size-12 shrink-0 place-items-center rounded-full ${added ? "bg-brand-soft text-brand" : "bg-brand text-white"}`}

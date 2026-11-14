@@ -110,6 +110,14 @@ export interface Strings {
   resolveFailed: string;
   clearList: string;
   draftTitle: (count: number) => string;
+  /** The list's estimated total, from shelf prices. */
+  basketLabel: string;
+  /** Under the total when some items have no price, such as a whole department. */
+  basketPartial: (priced: number, items: number) => string;
+  basketAtCheckout: (money: string) => string;
+  /** The end of a trip: what was found, and what went to the staff as missing. */
+  tripFound: (count: number) => string;
+  tripReported: (count: number) => string;
   calculateRoute: (count: number) => string;
   clearConfirm: string;
   addedOne: (text: string, aisle: string) => string;
@@ -510,6 +518,11 @@ const baseStrings: Record<"he" | "en", Strings> = {
     resolveFailed: "לא הצלחנו לזהות את הפריטים.",
     clearList: "ניקוי הרשימה",
     draftTitle: (count) => (count === 1 ? "פריט אחד ברשימה" : `${count} פריטים ברשימה`),
+    basketLabel: "סה״כ משוער",
+    basketPartial: (priced, items) => `לפי ${priced} מתוך ${items} פריטים שיש להם מחיר`,
+    basketAtCheckout: (money) => `כ־${money} בקופה`,
+    tripFound: (count) => (count === 1 ? "פריט אחד נמצא" : `${count} פריטים נמצאו`),
+    tripReported: (count) => (count === 1 ? "פריט אחד דווח לצוות" : `${count} פריטים דווחו לצוות`),
     calculateRoute: (count) =>
       count === 1 ? "חישוב מסלול · פריט אחד" : `חישוב מסלול · ${count} פריטים`,
     clearConfirm: "למחוק את כל הרשימה?",
@@ -932,6 +945,11 @@ const baseStrings: Record<"he" | "en", Strings> = {
     resolveFailed: "We couldn't match your items.",
     clearList: "Clear list",
     draftTitle: (count) => (count === 1 ? "1 item on your list" : `${count} items on your list`),
+    basketLabel: "Estimated total",
+    basketPartial: (priced, items) => `From the ${priced} of ${items} items with a price`,
+    basketAtCheckout: (money) => `About ${money} at checkout`,
+    tripFound: (count) => (count === 1 ? "1 item found" : `${count} items found`),
+    tripReported: (count) => (count === 1 ? "1 item reported to staff" : `${count} items reported to staff`),
     calculateRoute: (count) =>
       count === 1 ? "Calculate Route · 1 item" : `Calculate Route · ${count} items`,
     clearConfirm: "Delete the whole list?",
@@ -942,7 +960,7 @@ const baseStrings: Record<"he" | "en", Strings> = {
 
     kioskScanTitle: "Scan for your full shopping list & route - No App Needed!",
     kioskScanItems: "The items you picked come along to your phone.",
-    quickFull: "That's 3 items. For more, scan the code",
+    quickFull: "That's 3. For more, scan the code",
     quickClear: "Start over",
     kioskWelcome: "What are you looking for today?",
     kioskWelcomeHint: "Type a product and see exactly where it is on the map.",
