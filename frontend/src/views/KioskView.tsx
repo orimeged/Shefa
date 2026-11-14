@@ -123,7 +123,7 @@ function KioskVisit({ map, floor, layout, planRoute, screenCanStayOn }: KioskVis
       />
       {warnings.length > 0 && (
         // For whoever sets the tablet up. A live store never shows these.
-        <div dir={t.direction} className="flex flex-wrap gap-2 px-[2.2vh] pb-[1.4vh]">
+        <div dir={t.direction} className="flex flex-wrap gap-2 px-[2.2vh] pt-[1.4vh]">
           {warnings.map((message) => (
             <p
               key={message}
@@ -138,7 +138,7 @@ function KioskVisit({ map, floor, layout, planRoute, screenCanStayOn }: KioskVis
       )}
       <main
         dir={t.direction}
-        className="grid min-h-0 flex-1 gap-[2.2vh] px-[2.2vh] pb-[2.2vh] landscape:grid-cols-[minmax(25rem,5fr)_minmax(0,7fr)] portrait:grid-rows-[auto_minmax(0,1fr)]"
+        className="grid min-h-0 flex-1 gap-[2.2vh] px-[2.2vh] pt-[2.2vh] pb-[2.2vh] landscape:grid-cols-[minmax(25rem,5fr)_minmax(0,7fr)] portrait:grid-cols-[minmax(0,1fr)] portrait:grid-rows-[auto_minmax(0,1fr)]"
       >
         <KioskPanel
           map={map}

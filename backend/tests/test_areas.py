@@ -54,6 +54,22 @@ def test_a_dictionary_word_whose_products_stand_together_is_an_area(shop: Store)
     assert areas[area_id("beverages", "מיץ")].shelf_part == 2
 
 
+def test_an_area_costs_about_what_its_products_do(shop: Store) -> None:
+    priced = shop.model_copy(
+        update={
+            "product_stops": tuple(
+                product.model_copy(update={"price_agorot": price})
+                for product, price in zip(PRODUCTS, (500, 700, 900, 1000, 300), strict=True)
+            )
+        }
+    )
+    [water] = term_areas(priced, [("מים", "beverages")])
+    # Two waters, 500 and 700: the lower middle, as a generic word means the everyday one.
+    assert water.price_agorot == 500
+    [unpriced] = term_areas(shop, [("מים", "beverages")])
+    assert unpriced.price_agorot is None
+
+
 def test_no_area_without_a_known_quarter_or_a_product_by_that_name(shop: Store) -> None:
     unknown = shop.model_copy(update={"product_stops": tuple(p.model_copy(update={"shelf_part": None}) for p in PRODUCTS)})
     assert term_areas(unknown, [("מים", "beverages")]) == ()
@@ -80,6 +96,15 @@ def test_a_list_line_with_the_word_goes_to_the_area(navigation: NavigationServic
     assert water.hit is not None and water.hit.category_id == area_id("beverages", "מים")
     # A word with no placed products of that name stays its department.
     assert bread.hit is not None and bread.hit.category_id == "bakery"
+
+
+def test_a_departments_own_alias_makes_an_area_too(store: Store) -> None:
+    bakery = next(category for category in store.categories if category.id == "bakery")
+    assert "לחם" in bakery.aliases
+    bread = placed("product-9", "לחם אחיד פרוס 750 גרם", "לחם ופיתות", 2, department="bakery")
+    navigation = NavigationService(store.model_copy(update={"product_stops": (bread,)}), FoodDictionary({}))
+    [hit] = navigation.search("לחם", 1)
+    assert hit.category_id == area_id("bakery", "לחם")
 
 
 def test_the_map_carries_areas_for_the_apps(navigation: NavigationService) -> None:

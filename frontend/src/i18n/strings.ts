@@ -106,12 +106,16 @@ export interface Strings {
   unmatchedHeading: string;
   pickDepartment: string;
   removeItemShort: (name: string) => string;
+  /** The visible word beside a list row's remove icon. */
+  removeShort: string;
   matchingItems: (count: number) => string;
   resolveFailed: string;
   clearList: string;
   draftTitle: (count: number) => string;
   /** The list's estimated total, from shelf prices. */
   basketLabel: string;
+  /** An area's price, "מים": the median of its products, so about that much. */
+  approxPrice: (money: string) => string;
   /** Under the total when some items have no price, such as a whole department. */
   basketPartial: (priced: number, items: number) => string;
   basketAtCheckout: (money: string) => string;
@@ -520,11 +524,13 @@ const baseStrings: Record<"he" | "en", Strings> = {
     unmatchedHeading: "לא מצאנו בסניף",
     pickDepartment: "בחירת מחלקה",
     removeItemShort: (name) => `הסרת ${name}`,
+    removeShort: "הסרה",
     matchingItems: (count) => `מזהים ${count} פריטים`,
     resolveFailed: "לא הצלחנו לזהות את הפריטים.",
     clearList: "ניקוי הרשימה",
     draftTitle: (count) => (count === 1 ? "פריט אחד ברשימה" : `${count} פריטים ברשימה`),
     basketLabel: "סה״כ משוער",
+    approxPrice: (money) => `כ־${money}`,
     basketPartial: (priced, items) => `לפי ${priced} מתוך ${items} פריטים שיש להם מחיר`,
     basketAtCheckout: (money) => `כ־${money} בקופה`,
     tripFound: (count) => (count === 1 ? "פריט אחד נמצא" : `${count} פריטים נמצאו`),
@@ -952,11 +958,13 @@ const baseStrings: Record<"he" | "en", Strings> = {
     unmatchedHeading: "Not found in this store",
     pickDepartment: "Pick a department",
     removeItemShort: (name) => `Remove ${name}`,
+    removeShort: "Remove",
     matchingItems: (count) => `Matching ${count} items`,
     resolveFailed: "We couldn't match your items.",
     clearList: "Clear list",
     draftTitle: (count) => (count === 1 ? "1 item on your list" : `${count} items on your list`),
     basketLabel: "Estimated total",
+    approxPrice: (money) => `~${money}`,
     basketPartial: (priced, items) => `From the ${priced} of ${items} items with a price`,
     basketAtCheckout: (money) => `About ${money} at checkout`,
     tripFound: (count) => (count === 1 ? "1 item found" : `${count} items found`),

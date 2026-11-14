@@ -5,7 +5,8 @@ import { forwardRef, useRef, useState } from "react";
 import type { RouteStop } from "../../api/types";
 import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
-import { formatShekels } from "../../lib/money";
+import { isArea } from "../../lib/areas";
+import { formatShekels, shopperPrice } from "../../lib/money";
 import { CategoryIcon } from "../CategoryIcon";
 import { FoundBurst } from "./FoundBurst";
 
@@ -121,7 +122,7 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
                   <>
                     <span aria-hidden className="mx-1.5 text-line">●</span>
                     <span data-station-price className="font-semibold text-ink tabular-nums">
-                      {formatShekels(priceAgorot, language)}
+                      {shopperPrice(priceAgorot, language, isArea(stop.category_id), t.approxPrice)}
                     </span>
                   </>
                 )}

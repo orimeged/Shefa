@@ -7,6 +7,8 @@ import { useCategorySearch } from "../../hooks/useCategorySearch";
 import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { readClipboard } from "../../lib/list/clipboard";
+import { isArea } from "../../lib/areas";
+import { shopperPrice } from "../../lib/money";
 import { CategoryIcon } from "../CategoryIcon";
 import { LanguagePicker } from "../LanguagePicker";
 
@@ -23,6 +25,8 @@ interface MobileSearchBarProps {
   onAddText: (text: string) => void;
   /** Shown when the empty field gets focus. Null while the page shows it anyway. */
   quickAddPanel: ReactNode;
+  /** The language button beside the field; off where the band above carries it. */
+  showLanguage?: boolean;
 }
 
 /**
@@ -39,8 +43,9 @@ export function MobileSearchBar({
   onAddHit,
   onAddText,
   quickAddPanel,
+  showLanguage = true,
 }: MobileSearchBarProps) {
-  const { t, pick } = useLanguage();
+  const { t, pick, language } = useLanguage();
   const where = usePlace();
   const [term, setTerm] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -124,7 +129,8 @@ export function MobileSearchBar({
         />
       )}
 
-      <div className="relative z-20">
+      {/* Its own ink: on the dark band the field and its results stay dark on light. */}
+      <div className="relative z-20 text-ink">
         <form onSubmit={submit} role="search" className="flex items-center gap-1.5 px-3 py-2">
           <div className="relative min-w-0 flex-1">
             <Search
@@ -147,7 +153,7 @@ export function MobileSearchBar({
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              className="h-13 w-full rounded-full bg-surface ps-11 pe-12 text-lg shadow-sm ring-1 ring-line placeholder:text-muted"
+              className="h-13 w-full rounded-2xl bg-surface ps-11 pe-12 text-lg shadow-sm ring-1 ring-line outline-none placeholder:text-muted focus:ring-2 focus:ring-brand"
             />
             {term ? (
               <button
@@ -169,7 +175,7 @@ export function MobileSearchBar({
               </button>
             )}
           </div>
-          <LanguagePicker compact className="size-11 shrink-0 text-sm" />
+          {showLanguage && <LanguagePicker compact className="size-11 shrink-0 text-sm" />}
         </form>
 
         {hint && (
@@ -208,11 +214,17 @@ export function MobileSearchBar({
                           {name === hit.matched_text ? "" : ` · ${name}`}
                         </span>
                       </span>
-                      {added ? (
-                        <Check aria-hidden className="size-6 shrink-0 text-brand" />
-                      ) : (
-                        <Plus aria-hidden className="size-6 shrink-0 text-brand" />
+                      {hit.price_agorot !== null && hit.price_agorot !== undefined && (
+                        <span data-price className="shrink-0 font-semibold tabular-nums">
+                          {shopperPrice(hit.price_agorot, language, isArea(hit.category_id), t.approxPrice)}
+                        </span>
                       )}
+                      <span
+                        aria-hidden
+                        className={`grid size-9 shrink-0 place-items-center rounded-full ${added ? "bg-brand-soft text-brand" : "bg-brand text-white"}`}
+                      >
+                        {added ? <Check className="size-5" /> : <Plus className="size-5" />}
+                      </span>
                     </button>
                   </li>
                 );

@@ -23,7 +23,7 @@ export const TripHeader = forwardRef<HTMLElement, TripHeaderProps>(function Trip
   ref,
 ) {
   const { t } = useLanguage();
-  const round = "pointer-events-auto grid size-12 shrink-0 place-items-center rounded-2xl bg-surface/90 text-ink shadow-lg ring-1 ring-black/5 backdrop-blur-md transition active:scale-95";
+  const round = "pointer-events-auto grid size-12 shrink-0 place-items-center rounded-2xl bg-slate-900/95 text-white shadow-lg ring-1 ring-white/10 backdrop-blur-md transition active:scale-95";
 
   return (
     <header
@@ -31,13 +31,13 @@ export const TripHeader = forwardRef<HTMLElement, TripHeaderProps>(function Trip
       className="pointer-events-none absolute inset-x-0 top-0 z-20 mx-auto max-w-xl px-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]"
     >
       <div className="flex items-stretch gap-2">
-        <div className="pointer-events-auto min-w-0 flex-1 rounded-2xl bg-surface/90 px-3.5 py-2.5 shadow-lg ring-1 ring-black/5 backdrop-blur-md">
+        <div className="pointer-events-auto min-w-0 flex-1 rounded-2xl bg-slate-900/95 px-3.5 py-2.5 text-white shadow-lg ring-1 ring-white/10 backdrop-blur-md">
           <div className="flex items-baseline justify-between gap-2">
             <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-bold">
-              {isUpdating && <LoaderCircle aria-label={t.updatingRoute} className="size-3.5 shrink-0 animate-spin text-brand" />}
+              {isUpdating && <LoaderCircle aria-label={t.updatingRoute} className="size-3.5 shrink-0 animate-spin text-emerald-300" />}
               {t.routeTitle}
             </p>
-            <p className="shrink-0 text-xs font-semibold text-muted">
+            <p className="shrink-0 text-xs font-semibold text-white/70">
               {t.progress(foundCount, total)}
               {remainingM !== null && ` · ${t.metersLeft(remainingM)}`}
             </p>
@@ -55,14 +55,14 @@ export const TripHeader = forwardRef<HTMLElement, TripHeaderProps>(function Trip
                 <span
                   key={index}
                   className={`h-full flex-1 rounded-full transition-colors duration-500 ${
-                    index < foundCount ? "bg-brand" : index === foundCount ? "segment-now bg-next" : "bg-line"
+                    index < foundCount ? "bg-emerald-400" : index === foundCount ? "segment-now bg-next" : "bg-white/20"
                   }`}
                 />
               ))
             ) : (
-              <span className="h-full flex-1 overflow-hidden rounded-full bg-line">
+              <span className="h-full flex-1 overflow-hidden rounded-full bg-white/20">
                 <span
-                  className="block h-full rounded-full bg-brand transition-[width] duration-500"
+                  className="block h-full rounded-full bg-emerald-400 transition-[width] duration-500"
                   style={{ width: `${(foundCount / Math.max(1, total)) * 100}%` }}
                 />
               </span>

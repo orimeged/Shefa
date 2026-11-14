@@ -4,7 +4,8 @@ import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import type { ListItem } from "../../lib/list/shoppingItems";
 import { estimateBasket, priceOfItem } from "../../lib/list/shoppingItems";
-import { formatShekels } from "../../lib/money";
+import { isArea } from "../../lib/areas";
+import { formatShekels, shopperPrice } from "../../lib/money";
 import { CategoryIcon } from "../CategoryIcon";
 
 interface ListDraftProps {
@@ -23,9 +24,9 @@ export function ListDraft({ items, prices, onRemove, onClear }: ListDraftProps) 
   const basket = estimateBasket(items, prices);
 
   return (
-    <section aria-label={t.draftTitle(placed.length)}>
+    <section aria-label={t.draftTitle(placed.length)} className="rounded-3xl bg-surface p-4 shadow-sm ring-1 ring-line">
       <div className="flex items-center justify-between gap-2 px-1">
-        <h2 className="font-semibold">{t.draftTitle(placed.length)}</h2>
+        <h2 className="text-lg font-semibold">{t.draftTitle(placed.length)}</h2>
         <button
           type="button"
           onClick={onClear}
@@ -44,7 +45,9 @@ export function ListDraft({ items, prices, onRemove, onClear }: ListDraftProps) 
           const price = priceOfItem(item, prices);
           return (
             <li key={id} data-list-item={text} className="flex items-center gap-3 py-2 ps-1">
-              <CategoryIcon categoryId={categoryId} className="size-6 shrink-0 text-muted" />
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+                <CategoryIcon categoryId={categoryId} className="size-5" />
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="line-clamp-2 leading-snug font-medium">{text}</span>
                 <span className="block truncate text-sm text-muted">
@@ -55,7 +58,7 @@ export function ListDraft({ items, prices, onRemove, onClear }: ListDraftProps) 
               </span>
               {price !== null && (
                 <span data-price className="shrink-0 font-semibold text-ink tabular-nums">
-                  {formatShekels(price, language)}
+                  {shopperPrice(price, language, isArea(categoryId), t.approxPrice)}
                 </span>
               )}
               <button

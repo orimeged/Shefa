@@ -9,13 +9,17 @@ interface LanguagePickerProps {
   className?: string;
   /** Takes less room, for the phone's search row. */
   compact?: boolean;
+  /** On the dark band at the top of the shoppers' screens, as on the staff app's. */
+  tone?: "light" | "dark";
+  /** Just the icon below this width, where the band needs the room. */
+  nameFrom?: "always" | "xl";
 }
 
 /**
  * The shoppers' language: Hebrew, Arabic, Russian or English, each named in itself
  * so someone who reads only one of them can still find it.
  */
-export function LanguagePicker({ className = "", compact = false }: LanguagePickerProps) {
+export function LanguagePicker({ className = "", compact = false, tone = "light", nameFrom = "always" }: LanguagePickerProps) {
   const { language, setLanguage } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -47,12 +51,16 @@ export function LanguagePicker({ className = "", compact = false }: LanguagePick
         aria-expanded={isOpen}
         aria-label="שפה · اللغة · Язык · Language"
         onClick={() => setIsOpen((open) => !open)}
-        className={`inline-flex items-center gap-2 rounded-full font-medium transition-colors ${
-          compact ? "justify-center text-muted" : "bg-surface px-4 ring-1 ring-line hover:bg-brand-soft"
+        className={`inline-flex items-center justify-center gap-2 rounded-full font-medium transition-colors ${
+          tone === "dark"
+            ? `bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 ${compact ? "" : "px-4"}`
+            : compact
+              ? "text-muted"
+              : "bg-surface px-4 ring-1 ring-line hover:bg-brand-soft"
         } ${className}`}
       >
-        <Languages aria-hidden className="size-[1.1em] text-muted" />
-        {!compact && LANGUAGE_NAMES[language]}
+        <Languages aria-hidden className={`size-[1.1em] ${tone === "dark" ? "text-white/80" : "text-muted"}`} />
+        {!compact && <span className={nameFrom === "xl" ? "hidden xl:inline" : undefined}>{LANGUAGE_NAMES[language]}</span>}
       </button>
       {isOpen && (
         <ul

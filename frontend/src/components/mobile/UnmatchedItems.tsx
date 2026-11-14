@@ -48,14 +48,14 @@ export function UnmatchedItems({
           <h2 className="mb-2 px-1 text-sm font-medium text-muted">{t.unmatchedHeading}</h2>
           <ul className="flex flex-col gap-2">
             {unmatched.map((item) => (
-              <li key={item.id} className="rounded-2xl bg-next-soft px-3 py-2">
+              <li key={item.id} className="rounded-2xl bg-next-soft px-3 py-2 ring-1 ring-next/60">
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-lg font-medium">{item.text}</span>
                   <button
                     type="button"
                     onClick={() => setAssigningId(assigningId === item.id ? null : item.id)}
                     aria-expanded={assigningId === item.id}
-                    className="h-11 shrink-0 rounded-xl bg-surface px-3 text-sm font-semibold"
+                    className="h-11 shrink-0 rounded-xl bg-surface px-3 text-sm font-semibold ring-1 ring-line"
                   >
                     {t.pickDepartment}
                   </button>

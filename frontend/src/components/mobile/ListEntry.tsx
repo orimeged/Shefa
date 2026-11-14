@@ -8,7 +8,8 @@ import { readClipboard } from "../../lib/list/clipboard";
 import { parseShoppingText } from "../../lib/list/parseList";
 
 const CHOICE =
-  "flex h-16 min-w-0 items-center justify-center gap-2.5 rounded-2xl bg-surface px-2 font-semibold shadow-sm";
+  "flex h-[4.5rem] min-w-0 items-center justify-center gap-3 rounded-3xl bg-surface px-3 font-semibold shadow-sm ring-1 ring-line active:bg-paper";
+const CHOICE_ICON = "grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-soft text-brand";
 const QUIET =
   "flex h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-muted disabled:opacity-50";
 
@@ -83,11 +84,15 @@ export function ListEntry({ onAddText }: ListEntryProps) {
     <>
       <div className="grid grid-cols-2 gap-3">
         <button type="button" onClick={() => setIsOpen(true)} className={CHOICE}>
-          <PenLine aria-hidden className="size-5 shrink-0 text-brand-strong" />
+          <span className={CHOICE_ICON}>
+            <PenLine aria-hidden className="size-5" />
+          </span>
           {t.listEntryWrite}
         </button>
         <button type="button" onClick={() => pickerRef.current?.click()} className={CHOICE}>
-          <Camera aria-hidden className="size-5 shrink-0 text-brand-strong" />
+          <span className={CHOICE_ICON}>
+            <Camera aria-hidden className="size-5" />
+          </span>
           {t.listEntryPhoto}
         </button>
       </div>

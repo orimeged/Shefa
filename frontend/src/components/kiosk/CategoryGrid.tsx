@@ -34,12 +34,14 @@ export function CategoryGrid({ map, cartIds, onAdd }: CategoryGridProps) {
   };
 
   return (
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-[1.1vh]">
+    // In portrait one row that swipes sideways: the map below needs the height, and a grid
+    // cut off halfway down its third row looks broken.
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-[1.1vh] portrait:flex portrait:snap-x portrait:overflow-x-auto portrait:pb-1">
       {map.categories.map((category) => {
         const added = cartIds.has(category.id);
         const name = pick(category.name, category.name_en);
         return (
-          <li key={category.id}>
+          <li key={category.id} className="portrait:w-44 portrait:shrink-0 portrait:snap-start">
             <button
               type="button"
               disabled={added}

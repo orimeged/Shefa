@@ -1,10 +1,11 @@
-import { CircleAlert, MapPin, Navigation, Trash2, X } from "lucide-react";
+import { CircleAlert, MapPinned, Navigation, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { getShelfSpot } from "../api/client";
 import type { RouteStop, SearchHit } from "../api/types";
 import { ProductDepartmentsProvider } from "../components/CategoryIcon";
+import { LanguagePicker } from "../components/LanguagePicker";
 import { AddedToast } from "../components/mobile/AddedToast";
 import { FoundBurst } from "../components/mobile/FoundBurst";
 import { ListDraft } from "../components/mobile/ListDraft";
@@ -216,6 +217,15 @@ export default function MobileView() {
       <QuickCategoryChips map={map} selectedIds={categoryIds} onSelect={list.toggleCategory} />
     </section>
   );
+  // On the page, a card of big tiles; in the trip's search panel, the chips above.
+  const departmentTiles = map && (
+    <section aria-labelledby="departments-title" className="rounded-3xl bg-surface p-4 shadow-sm ring-1 ring-line">
+      <h2 id="departments-title" className="mb-3 px-1 text-lg font-semibold">
+        {t.departments}
+      </h2>
+      <QuickCategoryChips map={map} selectedIds={categoryIds} onSelect={list.toggleCategory} variant="tiles" />
+    </section>
+  );
 
   const listedQueries = useMemo(() => new Set(list.items.map((item) => item.query)), [list.items]);
   const isListed = useCallback(
@@ -330,6 +340,7 @@ export default function MobileView() {
       onAddHit={list.addHit}
       onAddText={addText}
       quickAddPanel={isBuilding ? null : departments}
+      showLanguage={!isBuilding}
     />
   );
 
@@ -456,26 +467,38 @@ export default function MobileView() {
     <PlacementsProvider placements={floor?.placements ?? null}>
       <ProductDepartmentsProvider productStops={map?.product_stops} departments={map?.categories}>
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
-        <div ref={stickyTop} className="sticky top-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
-          {searchBar}
-          {mapFailed && <Notice message={t.loadFailed} onRetry={retryMap} className="mx-4 mb-2" />}
+        {/* The dark band the staff app and the dashboard wear, with the search in it. */}
+        <div
+          ref={stickyTop}
+          className="sticky top-0 z-20 bg-slate-900 pt-[env(safe-area-inset-top)] text-white shadow-lg shadow-ink/10 sm:rounded-b-3xl"
+        >
+          <div className="flex items-center gap-3 px-4 pt-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-white">
+              <MapPinned aria-hidden className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-lg leading-tight font-semibold">{t.appName}</p>
+              {map && (
+                // The branch the list is for: aisles and prices are this store's.
+                <p data-store-name className="truncate text-sm text-white/60">
+                  {map.name}
+                </p>
+              )}
+            </div>
+            <LanguagePicker tone="dark" compact className="size-11 text-base" />
+          </div>
+          <div className="pb-1">{searchBar}</div>
+          {mapFailed && <Notice message={t.loadFailed} onRetry={retryMap} className="mx-4 mb-3" />}
         </div>
 
         <main
-          className={`flex flex-1 flex-col gap-8 px-4 pt-2 ${
+          className={`flex flex-1 flex-col gap-5 px-4 pt-5 ${
             canStart ? "pb-[calc(7rem+env(safe-area-inset-bottom))]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]"
           }`}
         >
           {isBuilding && list.isEmpty ? (
-            <header className="pt-4">
-              {map && (
-                // The branch the list is for: aisles and prices are this store's.
-                <p data-store-name className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-strong">
-                  <MapPin aria-hidden className="size-4 shrink-0" />
-                  <span className="truncate">{map.name}</span>
-                </p>
-              )}
-              <h1 className="text-3xl font-semibold tracking-tight">{t.smartTitle}</h1>
+            <header className="px-1 pt-1">
+              <h1 className="text-3xl font-bold tracking-tight">{t.smartTitle}</h1>
               <p className="mt-1 text-muted">{t.smartSubtitle}</p>
             </header>
           ) : (
@@ -495,7 +518,7 @@ export default function MobileView() {
           />
 
           {isBuilding && <ListEntry onAddText={addText} />}
-          {isBuilding && departments}
+          {isBuilding && departmentTiles}
 
           {failed && !route && (
             <p className="flex items-center gap-2 text-muted">
@@ -510,7 +533,7 @@ export default function MobileView() {
             <button
               type="button"
               onClick={list.startShopping}
-              className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-brand text-xl font-semibold text-white shadow-xl"
+              className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-brand text-xl font-semibold text-white shadow-xl shadow-brand/30 active:scale-[0.99]"
             >
               <Navigation aria-hidden className="size-6" />
               {t.calculateRoute(placedCount)}

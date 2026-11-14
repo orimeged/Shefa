@@ -5,7 +5,8 @@ import type { Route, SearchHit, StoreMap } from "../../api/types";
 import { usePlace } from "../../hooks/usePlace";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { inRouteOrder, MAX_QUICK_ITEMS } from "../../lib/kiosk/quickList";
-import { formatShekels } from "../../lib/money";
+import { isArea } from "../../lib/areas";
+import { shopperPrice } from "../../lib/money";
 import { CategoryIcon } from "../CategoryIcon";
 import { Notice } from "../Notice";
 import { ZoneBadge } from "../ZoneBadge";
@@ -92,7 +93,7 @@ export function KioskPanel({
       : null;
 
   return (
-    <section aria-labelledby="kiosk-title" className="flex min-h-0 flex-col gap-[1.8vh]">
+    <section aria-labelledby="kiosk-title" className="flex min-h-0 min-w-0 flex-col gap-[1.8vh]">
       <div className="shrink-0">
         <h1
           id="kiosk-title"
@@ -145,7 +146,7 @@ export function KioskPanel({
       </label>
 
       {/* The padding keeps the scroll area from cutting off the cards' outlines and shadows. */}
-      <div className="-m-1.5 min-h-0 flex-1 overflow-y-auto p-1.5 portrait:max-h-[20vh]">
+      <div className="-m-1.5 min-h-0 flex-1 overflow-y-auto p-1.5 portrait:max-h-[24vh] portrait:flex-none">
         {typed ? (
           <SearchResults
             term={typed}
@@ -194,7 +195,7 @@ export function KioskPanel({
                         data-price
                         className="shrink-0 text-[clamp(1.25rem,2.6vh,1.6rem)] font-bold tabular-nums portrait:hidden"
                       >
-                        {formatShekels(item.priceAgorot, language)}
+                        {shopperPrice(item.priceAgorot, language, isArea(item.categoryId), t.approxPrice)}
                       </span>
                     )}
                     <button
@@ -292,7 +293,7 @@ function SearchResults({ term, hits, failed, isSearching, cartIds, onPick }: Sea
                 </span>
                 {hit.price_agorot !== null && hit.price_agorot !== undefined && (
                   <span data-price className="shrink-0 text-[clamp(1.3rem,2.7vh,1.7rem)] font-bold tabular-nums">
-                    {formatShekels(hit.price_agorot, language)}
+                    {shopperPrice(hit.price_agorot, language, isArea(hit.category_id), t.approxPrice)}
                   </span>
                 )}
                 <span

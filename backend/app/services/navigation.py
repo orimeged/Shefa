@@ -44,8 +44,13 @@ class NavigationService:
     ) -> None:
         known_ids = {category.id for category in store.categories}
         self._dictionary = (dictionary or FoodDictionary({})).limited_to(known_ids)
-        # Words like "מים" whose products stand in one known place become places of their own.
-        areas = term_areas(store, ((term, category_id) for term, category_id, _ in self._dictionary.terms()))
+        # Words like "מים" or "לחם", from a department's own aliases or the dictionary, whose
+        # products stand in one known place become places of their own.
+        words = [
+            *((alias, category.id) for category in store.categories for alias in category.aliases),
+            *((term, category_id) for term, category_id, _ in self._dictionary.terms()),
+        ]
+        areas = term_areas(store, words)
         if areas:
             store = store.model_copy(update={"product_stops": (*store.product_stops, *areas)})
         # The department a word would otherwise find, which the area stands in for.

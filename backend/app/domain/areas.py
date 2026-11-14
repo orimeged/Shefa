@@ -11,6 +11,7 @@ moves the area with it.
 
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from statistics import median_low
 
 from app.domain.models import Category, Store
 from app.domain.search_text import normalize
@@ -35,7 +36,9 @@ def term_areas(store: Store, terms: Iterable[tuple[str, str]]) -> tuple[Category
 
     A product counts when its name starts with the word, whole words only ("מים" is
     "מים מינרליים" but not "מימיה"), it is placed on a subcategory's shelf and someone
-    said which quarter. The area goes where most of them stand, the lower quarter on a tie.
+    said which quarter. The area goes where most of them stand, the lower quarter on a tie,
+    and is priced at their median, the lower one of an even count, for a basket's estimate:
+    "במבה" is about a bag of Bamba, not halfway to the family pack.
     """
     departments = {category.id: category for category in store.categories}
     located: dict[str, list[tuple[tuple[str, ...], Category]]] = defaultdict(list)
@@ -50,13 +53,11 @@ def term_areas(store: Store, terms: Iterable[tuple[str, str]]) -> tuple[Category
         # A comma would split the area's id in a shared link.
         if not words or department is None or "," in term:
             continue
-        spots = Counter(
-            (product.subcategory, product.shelf_part)
-            for name, product in located[department_id]
-            if name[: len(words)] == words
-        )
+        matching = [product for name, product in located[department_id] if name[: len(words)] == words]
+        spots = Counter((product.subcategory, product.shelf_part) for product in matching)
         if not spots:
             continue
+        prices = [product.price_agorot for product in matching if product.price_agorot is not None]
         (subcategory, part), _ = min(spots.items(), key=lambda spot: (-spot[1], spot[0][1] or 0, spot[0][0] or ""))
         found = area_id(department_id, term)
         areas.setdefault(
@@ -70,6 +71,7 @@ def term_areas(store: Store, terms: Iterable[tuple[str, str]]) -> tuple[Category
                 department_id=department_id,
                 subcategory=subcategory,
                 shelf_part=part,
+                price_agorot=median_low(prices) if prices else None,
             ),
         )
     return tuple(areas.values())

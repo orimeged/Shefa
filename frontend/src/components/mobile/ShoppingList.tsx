@@ -135,11 +135,11 @@ function ListRow({ group, place, order, checked, onToggle, onRemove, onNotFound 
 
   return (
     <li
-      className={`flex items-stretch rounded-2xl ring-1 ring-line transition-colors ${
+      className={`flex items-center gap-1 rounded-2xl pe-2 ring-1 ring-line transition-colors ${
         checked ? "bg-transparent" : "bg-surface"
       }`}
     >
-      <label className="flex min-h-18 min-w-0 flex-1 items-center gap-3 py-2 ps-3">
+      <div className="flex min-h-18 min-w-0 flex-1 items-center gap-3 py-2.5 ps-3">
         <span
           className={`grid size-10 shrink-0 place-items-center rounded-full ${
             checked ? "text-muted" : "bg-brand-soft text-brand-strong"
@@ -168,43 +168,45 @@ function ListRow({ group, place, order, checked, onToggle, onRemove, onNotFound 
               {group.itemTexts.join(" · ")}
             </span>
           )}
-        </span>
-
-        <span className="flex w-13 shrink-0 flex-col items-center gap-1 text-xs font-medium text-muted">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={() => onToggle(group.categoryId)}
-            aria-label={`${t.foundIt}: ${name}`}
-            className="peer sr-only"
-          />
-          <span className="grid size-8 place-items-center rounded-lg bg-surface ring-2 ring-shelf transition-colors peer-checked:bg-line peer-checked:ring-line peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand">
-            {checked && <Check aria-hidden className="size-5 text-muted" strokeWidth={3} />}
+          {/* The two rarer answers, quiet under the name, so the name keeps the row's width. */}
+          <span className="mt-1 flex items-center gap-1">
+            {onNotFound && (
+              <button
+                type="button"
+                onClick={onNotFound}
+                aria-label={t.notFoundItem(name)}
+                className="-ms-1.5 flex h-9 items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-danger"
+              >
+                <SearchX aria-hidden className="size-4" />
+                {t.notFoundShort}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onRemove(group.categoryId)}
+              aria-label={t.removeItemShort(name)}
+              className={`flex h-9 items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-muted ${onNotFound ? "" : "-ms-1.5"}`}
+            >
+              <X aria-hidden className="size-4" />
+              {t.removeShort}
+            </button>
           </span>
-          {t.foundIt}
         </span>
+      </div>
+
+      <label className="flex shrink-0 flex-col items-center gap-1 text-xs font-semibold text-muted">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onToggle(group.categoryId)}
+          aria-label={`${t.foundIt}: ${name}`}
+          className="peer sr-only"
+        />
+        <span className="grid size-12 place-items-center rounded-2xl bg-surface ring-2 ring-brand/50 transition-colors peer-checked:bg-brand peer-checked:ring-brand peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand">
+          {checked && <Check aria-hidden className="size-6 text-white" strokeWidth={3} />}
+        </span>
+        {t.foundIt}
       </label>
-
-      {onNotFound && (
-        <button
-          type="button"
-          onClick={onNotFound}
-          aria-label={t.notFoundItem(name)}
-          className="flex w-13 shrink-0 flex-col items-center justify-center gap-1 text-xs font-medium text-muted"
-        >
-          <SearchX aria-hidden className="size-5" />
-          {t.notFoundShort}
-        </button>
-      )}
-
-      <button
-        type="button"
-        onClick={() => onRemove(group.categoryId)}
-        aria-label={t.removeItemShort(name)}
-        className="grid w-11 shrink-0 place-items-center text-muted"
-      >
-        <X aria-hidden className="size-4" />
-      </button>
     </li>
   );
 }

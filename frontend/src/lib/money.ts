@@ -19,6 +19,17 @@ export function formatShekels(agorot: number, language: Language, whole = false)
   }).format(agorot / AGOROT_PER_SHEKEL);
 }
 
+/** A shopper's price: exact for a product, "about" for an area such as "מים". */
+export function shopperPrice(
+  agorot: number,
+  language: Language,
+  approximate: boolean,
+  approx: (money: string) => string,
+): string {
+  const money = formatShekels(agorot, language);
+  return approximate ? approx(money) : money;
+}
+
 /** What a manager types, "7.1" or "₪7.10", to agorot; null for an empty field, NaN for nonsense. */
 export function parseShekels(text: string): number | null {
   const cleaned = text.replace(/[₪,\s]/g, "");
