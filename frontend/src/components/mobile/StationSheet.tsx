@@ -1,4 +1,15 @@
-import { Check, ChevronUp, CircleAlert, CircleCheck, Megaphone, PartyPopper, SearchX, ShoppingBasket, Wallet } from "lucide-react";
+import {
+  Check,
+  ChevronUp,
+  CircleAlert,
+  CircleCheck,
+  Megaphone,
+  PartyPopper,
+  RotateCcw,
+  SearchX,
+  ShoppingBasket,
+  Wallet,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { forwardRef, useRef, useState } from "react";
 
@@ -34,6 +45,8 @@ interface StationSheetProps {
   waiting: readonly string[];
   onArrived: (categoryId: string) => void;
   onNotFound: (stop: RouteStop) => void;
+  /** Once every station is done: back to an empty list for the next shop. */
+  onNewList: () => void;
   expanded: boolean;
   onToggleExpanded: () => void;
   /** The whole list, shown when the sheet is pulled up. */
@@ -60,6 +73,7 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
     waiting,
     onArrived,
     onNotFound,
+    onNewList,
     expanded,
     onToggleExpanded,
     children,
@@ -176,6 +190,14 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
               </li>
             )}
           </ul>
+          <button
+            type="button"
+            onClick={onNewList}
+            className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-surface font-semibold text-ink ring-1 ring-line active:bg-paper"
+          >
+            <RotateCcw aria-hidden className="size-4" />
+            {t.newList}
+          </button>
         </div>
       )}
 
@@ -205,6 +227,12 @@ export const StationSheet = forwardRef<HTMLElement, StationSheetProps>(function 
             {t.notFoundHere}
           </button>
         </div>
+      )}
+      {stop && number === 1 && (
+        // The first time only: what the two buttons do, and that "not found" reaches the staff.
+        <p data-first-tip className="-mt-1 px-4 pb-3 text-center text-xs leading-snug text-muted">
+          {t.firstStationHint}
+        </p>
       )}
 
       {waiting.length > 0 && !expanded && (

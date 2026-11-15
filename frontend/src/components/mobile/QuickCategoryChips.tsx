@@ -31,7 +31,7 @@ export function QuickCategoryChips({ map, selectedIds = [], onSelect, variant = 
                 }`}
               >
                 <span
-                  className={`grid size-9 shrink-0 place-items-center rounded-xl ${selected ? "bg-brand text-white" : "bg-brand-soft text-brand"}`}
+                  className={`grid size-9 shrink-0 place-items-center rounded-xl ${selected ? "bg-surface text-brand ring-1 ring-brand/40" : "bg-brand-soft text-brand"}`}
                 >
                   {selected ? (
                     <Check aria-hidden className="size-5" strokeWidth={3} />

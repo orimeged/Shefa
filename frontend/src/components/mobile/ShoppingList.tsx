@@ -169,13 +169,13 @@ function ListRow({ group, place, order, checked, onToggle, onRemove, onNotFound 
             </span>
           )}
           {/* The two rarer answers, quiet under the name, so the name keeps the row's width. */}
-          <span className="mt-1 flex items-center gap-1">
+          <span className="-mb-2 flex items-center gap-1">
             {onNotFound && (
               <button
                 type="button"
                 onClick={onNotFound}
                 aria-label={t.notFoundItem(name)}
-                className="-ms-1.5 flex h-9 items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-danger"
+                className="-ms-1.5 flex h-11 items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-danger"
               >
                 <SearchX aria-hidden className="size-4" />
                 {t.notFoundShort}
@@ -185,7 +185,7 @@ function ListRow({ group, place, order, checked, onToggle, onRemove, onNotFound 
               type="button"
               onClick={() => onRemove(group.categoryId)}
               aria-label={t.removeItemShort(name)}
-              className={`flex h-9 items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-muted ${onNotFound ? "" : "-ms-1.5"}`}
+              className={`flex h-11 items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-muted ${onNotFound ? "" : "-ms-1.5"}`}
             >
               <X aria-hidden className="size-4" />
               {t.removeShort}

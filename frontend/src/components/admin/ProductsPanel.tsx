@@ -274,7 +274,9 @@ export function ProductsPanel({ catalog, categories, shelves, floor }: ProductsP
         aria-labelledby="where-title"
         data-where={lit?.name}
         // On a phone the map card comes first, and only once there's a product to show on it.
-        className={`order-first flex-col gap-3 rounded-3xl bg-surface p-5 shadow-sm ring-1 ring-line lg:sticky lg:top-24 lg:order-none ${
+        // Beside the list it stays in view and scrolls on its own: taller than the screen, its
+        // bottom would otherwise wait for the whole list to scroll past.
+        className={`order-first flex-col gap-3 rounded-3xl bg-surface p-5 shadow-sm ring-1 ring-line lg:sticky lg:top-24 lg:order-none lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:overscroll-contain ${
           lit ? "flex" : "hidden lg:flex"
         }`}
       >
@@ -297,7 +299,7 @@ export function ProductsPanel({ catalog, categories, shelves, floor }: ProductsP
           </p>
         </div>
         {floor && (
-          <div className="overflow-hidden rounded-2xl bg-paper ring-1 ring-line">
+          <div className="shrink-0 overflow-hidden rounded-2xl bg-paper ring-1 ring-line">
             <svg
               viewBox={floor.layout.viewBox}
               role="img"
@@ -326,7 +328,7 @@ export function ProductsPanel({ catalog, categories, shelves, floor }: ProductsP
           />
         )}
         {selected && (
-          <button type="button" onClick={() => setEditing(selected)} className={SECONDARY_BUTTON}>
+          <button type="button" onClick={() => setEditing(selected)} className={`${SECONDARY_BUTTON} shrink-0`}>
             <Pencil aria-hidden className="size-4" />
             {t.catalogEdit(selected.name)}
           </button>
@@ -428,7 +430,7 @@ function ShelfPartPicker({
   };
 
   return (
-    <div role="group" aria-labelledby="shelf-part-title" data-shelf-parts className="flex items-start gap-4 rounded-2xl bg-paper p-4 ring-1 ring-line">
+    <div role="group" aria-labelledby="shelf-part-title" data-shelf-parts className="flex shrink-0 items-start gap-4 rounded-2xl bg-paper p-3 ring-1 ring-line">
       <div
         dir="ltr"
         className={`grid shrink-0 gap-1.5 ${isDown ? "w-14 grid-rows-4" : "w-44 grid-cols-4"}`}
@@ -445,7 +447,7 @@ function ShelfPartPicker({
               data-shelf-part={quarter}
               onClick={() => void pick(quarter)}
               className={`grid place-items-center rounded-lg text-sm font-bold ring-1 transition disabled:opacity-60 ${
-                isDown ? "h-11" : "h-12"
+                isDown ? "h-9" : "h-11"
               } ${isOn ? "bg-brand text-white ring-brand-strong" : "bg-surface text-muted ring-line hover:bg-brand-soft hover:text-brand-strong"}`}
             >
               {isOn ? <MapPin aria-hidden className="size-4" /> : quarter + 1}

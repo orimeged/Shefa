@@ -8,6 +8,7 @@ import { ProductDepartmentsProvider } from "../components/CategoryIcon";
 import { LanguagePicker } from "../components/LanguagePicker";
 import { AddedToast } from "../components/mobile/AddedToast";
 import { FoundBurst } from "../components/mobile/FoundBurst";
+import { HowItWorks } from "../components/mobile/HowItWorks";
 import { ListDraft } from "../components/mobile/ListDraft";
 import { ListEntry } from "../components/mobile/ListEntry";
 import { MobileSearchBar } from "../components/mobile/MobileSearchBar";
@@ -221,7 +222,7 @@ export default function MobileView() {
   const departmentTiles = map && (
     <section aria-labelledby="departments-title" className="rounded-3xl bg-surface p-4 shadow-sm ring-1 ring-line">
       <h2 id="departments-title" className="mb-3 px-1 text-lg font-semibold">
-        {t.departments}
+        {t.browseCategories}
       </h2>
       <QuickCategoryChips map={map} selectedIds={categoryIds} onSelect={list.toggleCategory} variant="tiles" />
     </section>
@@ -420,6 +421,7 @@ export default function MobileView() {
                 waiting={list.unmatchedItems.map((item) => item.text)}
                 onArrived={handleFound}
                 onNotFound={handleNotFound}
+                onNewList={list.clear}
                 expanded={isListOpen}
                 onToggleExpanded={() => setIsListOpen((open) => !open)}
               >
@@ -470,6 +472,7 @@ export default function MobileView() {
         {/* The dark band the staff app and the dashboard wear, with the search in it. */}
         <div
           ref={stickyTop}
+          data-chrome
           className="sticky top-0 z-20 bg-slate-900 pt-[env(safe-area-inset-top)] text-white shadow-lg shadow-ink/10 sm:rounded-b-3xl"
         >
           <div className="flex items-center gap-3 px-4 pt-3">
@@ -518,6 +521,7 @@ export default function MobileView() {
           />
 
           {isBuilding && <ListEntry onAddText={addText} />}
+          {isBuilding && list.isEmpty && <HowItWorks />}
           {isBuilding && departmentTiles}
 
           {failed && !route && (

@@ -108,9 +108,32 @@ export interface Strings {
   removeItemShort: (name: string) => string;
   /** The visible word beside a list row's remove icon. */
   removeShort: string;
+  /** The product on one page, for a meeting with a chain: Hebrew and English only. */
+  home: {
+    pageTitle: string;
+    brand: string;
+    tagline: string;
+    title: string;
+    lead: string;
+    values: readonly { title: string; text: string }[];
+    screensTitle: string;
+    screens: Record<"kiosk" | "mobile" | "staff" | "admin", { title: string; who: string; text: string }>;
+    tryTitle: string;
+    tryText: string;
+    pilotKicker: string;
+    pilotTitle: string;
+    pilotText: string;
+  };
   matchingItems: (count: number) => string;
   resolveFailed: string;
   clearList: string;
+  /** Three steps on the empty phone screen, for someone who just scanned the code. */
+  howTitle: string;
+  howSteps: readonly { title: string; hint: string }[];
+  /** Under the first station's buttons: what each one does. */
+  firstStationHint: string;
+  /** Starting over once every station is done. */
+  newList: string;
   draftTitle: (count: number) => string;
   /** The list's estimated total, from shelf prices. */
   basketLabel: string;
@@ -465,8 +488,8 @@ const baseStrings: Record<"he" | "en", Strings> = {
     foundIt: "נמצא",
     notFoundHere: "לא מצאתי כאן",
     stationOf: (number, total) => `תחנה ${number} מתוך ${total}`,
-    arrivedNext: "הגעתי · הבא",
-    arrivedLast: "הגעתי · לקופות",
+    arrivedNext: "מצאתי · הבא",
+    arrivedLast: "מצאתי · לקופות",
     thenStation: (name) => `ואחריה: ${name}`,
     metersLeft: (meters) => `עוד ${meters} מ׳`,
     stationSheet: "התחנה הנוכחית",
@@ -525,9 +548,57 @@ const baseStrings: Record<"he" | "en", Strings> = {
     pickDepartment: "בחירת מחלקה",
     removeItemShort: (name) => `הסרת ${name}`,
     removeShort: "הסרה",
+    home: {
+      pageTitle: "שפע · מה הלקוחות מחפשים ולא מוצאים",
+      brand: "שפע",
+      tagline: "מה הלקוחות מחפשים ולא מוצאים",
+      title: "כל מוצר שלקוח לא מצא הוא מכירה שהלכה.",
+      lead: "שפע שולח כל לקוח ישר למדף, מתריע לצוות ברגע שמשהו חסר, ומראה לכם בשקלים כמה זה עולה. בלי אפליקציה ובלי חיבור לקופה.",
+      values: [
+        { title: "מוצאים כל מוצר", text: "מסך בכניסה וטלפון בלי הורדה: מסלול מדף אחרי מדף, עד רבע המדף." },
+        { title: "הצוות יודע מיד", text: "כל ״לא מצאתי כאן״ מצלצל בטלפון של מנהל המשמרת." },
+        { title: "רואים את הכסף", text: "דוח מכירות אבודות בשקלים: מדף ריק, מוצר במקום אחר, ומה שלא מחזיקים." },
+      ],
+      screensTitle: "המערכת",
+      screens: {
+        kiosk: {
+          title: "מסך הכניסה",
+          who: "ללקוחות בכניסה",
+          text: "מקלידים מוצר ורואים על המפה איפה הוא. רשימה ארוכה עוברת לטלפון בסריקה.",
+        },
+        mobile: {
+          title: "הטלפון של הלקוח",
+          who: "סורקים קוד, בלי הורדה",
+          text: "רשימה כתובה, מודבקת או מצולמת הופכת למסלול בסניף, עם מחירים וסה״כ משוער.",
+        },
+        staff: {
+          title: "צוות הסניף",
+          who: "לטלפון של מנהל המשמרת",
+          text: "התראות על מדפים ריקים, מיקום מוצר בסריקת ברקוד, וליקוט הזמנות לפי סדר המדפים.",
+        },
+        admin: {
+          title: "ניהול הסניף",
+          who: "למנהל הסניף ולהנהלה",
+          text: "מכירות אבודות בשקלים, מפת חום של מה שלא נמצא, מוצרים ומחירים, ומפת הסניף.",
+        },
+      },
+      tryTitle: "נסו עכשיו בטלפון",
+      tryText: "סורקים את הקוד במצלמה וכותבים רשימת קניות קצרה.",
+      pilotKicker: "פיילוט בסניף אחד",
+      pilotTitle: "8 שבועות, בלי עלות, עם ספי הצלחה שנחתמים מראש",
+      pilotText: "אנחנו מביאים את המסך, ממפים את הסניף ומתחזקים. אין חיבור למערכות שלכם, ומפרקים בתוך שעה.",
+    },
     matchingItems: (count) => `מזהים ${count} פריטים`,
     resolveFailed: "לא הצלחנו לזהות את הפריטים.",
     clearList: "ניקוי הרשימה",
+    howTitle: "איך זה עובד",
+    howSteps: [
+      { title: "רשימה", hint: "כותבים, מדביקים או מצלמים" },
+      { title: "מסלול", hint: "מדף אחרי מדף, בדרך הקצרה" },
+      { title: "מצאתי", hint: "לוחצים, והמסלול ממשיך" },
+    ],
+    firstStationHint: "לקחתם מהמדף? ״מצאתי״. לא מצאתם? ״לא מצאתי כאן״ מודיע לצוות הסניף.",
+    newList: "רשימה חדשה",
     draftTitle: (count) => (count === 1 ? "פריט אחד ברשימה" : `${count} פריטים ברשימה`),
     basketLabel: "סה״כ משוער",
     approxPrice: (money) => `כ־${money}`,
@@ -903,8 +974,8 @@ const baseStrings: Record<"he" | "en", Strings> = {
     foundIt: "Found it",
     notFoundHere: "Not found here",
     stationOf: (number, total) => `Station ${number} of ${total}`,
-    arrivedNext: "I'm here · Next",
-    arrivedLast: "I'm here · Checkout",
+    arrivedNext: "Found it · Next",
+    arrivedLast: "Found it · Checkout",
     thenStation: (name) => `Then: ${name}`,
     metersLeft: (meters) => `${meters} m to go`,
     stationSheet: "Current station",
@@ -959,9 +1030,57 @@ const baseStrings: Record<"he" | "en", Strings> = {
     pickDepartment: "Pick a department",
     removeItemShort: (name) => `Remove ${name}`,
     removeShort: "Remove",
+    home: {
+      pageTitle: "Shefa · What shoppers look for and don't find",
+      brand: "Shefa",
+      tagline: "What shoppers look for and don't find",
+      title: "Every product a shopper couldn't find is a sale that walked out.",
+      lead: "Shefa sends every shopper straight to the shelf, alerts the staff the moment something is missing, and shows you in shekels what it costs. No app, no link to the tills.",
+      values: [
+        { title: "Every product found", text: "A screen at the door and a phone with nothing to install: shelf after shelf, to the quarter of a shelf." },
+        { title: "Staff know at once", text: "Every \u201cnot found here\u201d rings the shift manager's phone." },
+        { title: "See the money", text: "Lost sales in shekels: empty shelves, products in the wrong place, and what you don't carry." },
+      ],
+      screensTitle: "The system",
+      screens: {
+        kiosk: {
+          title: "Entrance screen",
+          who: "For shoppers at the door",
+          text: "Type a product and see on the map where it is. A long list moves to the phone with one scan.",
+        },
+        mobile: {
+          title: "The shopper's phone",
+          who: "Scan a code, nothing to install",
+          text: "A typed, pasted or photographed list becomes a route through the store, with prices and an estimated total.",
+        },
+        staff: {
+          title: "Store staff",
+          who: "On the shift manager's phone",
+          text: "Alerts about empty shelves, placing products by scanning a barcode, and picking orders in shelf order.",
+        },
+        admin: {
+          title: "Store management",
+          who: "For the store manager and head office",
+          text: "Lost sales in shekels, a heat map of what wasn't found, products and prices, and the store's map.",
+        },
+      },
+      tryTitle: "Try it on your phone",
+      tryText: "Point the camera at the code and write a short shopping list.",
+      pilotKicker: "A one-store pilot",
+      pilotTitle: "8 weeks, free, with success thresholds signed up front",
+      pilotText: "We bring the screen, map the store and look after it. Nothing connects to your systems, and it comes down in an hour.",
+    },
     matchingItems: (count) => `Matching ${count} items`,
     resolveFailed: "We couldn't match your items.",
     clearList: "Clear list",
+    howTitle: "How it works",
+    howSteps: [
+      { title: "List", hint: "Type, paste or snap it" },
+      { title: "Route", hint: "Shelf after shelf, the short way" },
+      { title: "Found it", hint: "Tap it, and the route goes on" },
+    ],
+    firstStationHint: "Took it? \u201cFound it\u201d. Not there? \u201cNot found here\u201d tells the store's staff.",
+    newList: "New list",
     draftTitle: (count) => (count === 1 ? "1 item on your list" : `${count} items on your list`),
     basketLabel: "Estimated total",
     approxPrice: (money) => `~${money}`,
