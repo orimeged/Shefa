@@ -5,6 +5,7 @@
  */
 
 import type { CatalogProduct, FloorPlanCheck, ProductDraft } from "../../api/types";
+import { isArea } from "../areas";
 
 export interface ShelfOption {
   /** The shelf's name on the plan. */
@@ -21,7 +22,8 @@ export function planShelves(check: FloorPlanCheck | null | undefined): ShelfOpti
     return [];
   }
   return check.departments.flatMap((department) =>
-    department.reachable && department.category_id && !department.category_id.startsWith("product-")
+    // A product's own shelf and a word's area ("מים") are places a route goes, not shelves to put a product on.
+    department.reachable && department.category_id && !department.category_id.startsWith("product-") && !isArea(department.category_id)
       ? [{ label: department.label, department: department.category_id, subcategory: department.subcategory ?? null }]
       : [],
   );

@@ -425,14 +425,25 @@ export interface Strings {
   placeNoReader: string;
   placeLookupFailed: string;
   placeNoPlan: string;
-  placeNow: (shelf: string) => string;
-  placeWhichShelf: string;
+  /** A product's place, as the staff app says it: its department, then the area within it. */
+  placeDepartment: string;
+  placeArea: string;
+  placeAreasIn: (department: string) => string;
+  placeNotOnMap: string;
   placeHereNow: string;
-  placeOtherShelves: string;
-  placeFilterShelves: string;
+  placeConfirm: string;
+  placeMove: string;
+  placeWhere: string;
+  placeWhichDepartment: string;
+  placeWhichArea: string;
+  placePickArea: string;
+  placeNoAreas: string;
+  placeMoveTo: (area: string) => string;
+  placeSaveIn: (area: string) => string;
   placeUnknown: (barcode: string) => string;
   placeNameFirst: string;
-  placeSaved: (name: string, shelf: string) => string;
+  placeSaved: (name: string, department: string, area: string) => string;
+  placeKept: (name: string, area: string) => string;
   placeAlertClosed: string;
   placeScanAnother: string;
   placeRelocating: (item: string) => string;
@@ -638,11 +649,11 @@ const baseStrings: Record<"he" | "en", Strings> = {
     adminSignIn: "כניסה",
     adminTokenLabel: "קוד גישה",
     adminSignInHint: "מקלידים את קוד הגישה של הסניף.",
-    shelfPartTitle: "איפה על המדף?",
-    shelfPartHint: "הפס מסודר כמו המדף במפה. לוחצים על החלק שבו המוצר עומד, והמסלול יוביל לשם.",
-    shelfPart: (quarter) => `רבע ${quarter} של המדף`,
+    shelfPartTitle: "איפה בתוך האזור? (לא חובה)",
+    shelfPartHint: "הפס מסודר כמו האזור במפה. לוחצים על החלק שבו המוצר עומד, והמסלול יוביל לשם.",
+    shelfPart: (quarter) => `חלק ${quarter} מתוך 4`,
     shelfPartUnknown: "לא ידוע",
-    shelfPartSaved: (name) => `נשמר איפה ${name} עומד על המדף`,
+    shelfPartSaved: (name) => `נשמר איפה ${name} עומד באזור`,
     adminWrongToken: "קוד הגישה שגוי.",
     adminLocked: "הניהול נעול: לא הוגדר קוד גישה בשרת.",
     adminSignInFailed: "לא הצלחנו להתחבר לשרת.",
@@ -697,7 +708,7 @@ const baseStrings: Record<"he" | "en", Strings> = {
     catalogOffMapOnly: "רק מה שלא על המפה",
     catalogAdd: "הוספת מוצר",
     catalogEmpty: "אין מוצרים שמתאימים לחיפוש.",
-    catalogColumns: { name: "מוצר", barcode: "ברקוד", department: "מחלקה", shelf: "מדף במפה", actions: "פעולות" },
+    catalogColumns: { name: "מוצר", barcode: "ברקוד", department: "מחלקה", shelf: "אזור במפה", actions: "פעולות" },
     catalogNotOnMap: "לא על המפה",
     catalogNoPlan: "אין עדיין מפה מצוירת: מוצרים ינותבו לפי אזורי המדף הישנים.",
     catalogEdit: (name) => `עריכת ${name}`,
@@ -705,9 +716,9 @@ const baseStrings: Record<"he" | "en", Strings> = {
     catalogDeleteConfirm: (name) => `למחוק את "${name}" מהקטלוג? קונים לא ימצאו אותו יותר.`,
     productNew: "מוצר חדש",
     productEdit: "עריכת מוצר",
-    productFields: { name: "שם המוצר", barcode: "ברקוד", brand: "מותג", size: "גודל", department: "מחלקה", shelf: "מדף במפה", subcategory: "תת־קטגוריה", price: "מחיר מדף (₪)" },
-    productShelfHint: "המדף שאליו הקונים יגיעו. אלה המדפים שצוירו במפה למחלקה הזאת.",
-    productWholeDepartment: "מדף המחלקה, בלי מדף מדויק",
+    productFields: { name: "שם המוצר", barcode: "ברקוד", brand: "מותג", size: "גודל", department: "מחלקה", shelf: "אזור במפה", subcategory: "תת־קטגוריה", price: "מחיר מדף (₪)" },
+    productShelfHint: "האזור שאליו הקונים יגיעו. אלה האזורים שצוירו במפה למחלקה הזאת.",
+    productWholeDepartment: "כל המחלקה, בלי אזור מדויק",
     productShelfNotDrawn: (name) => `${name} (לא מצויר במפה)`,
     productBarcodeInvalid: "ברקוד לא תקין: 8 עד 14 ספרות, וספרת ביקורת נכונה בברקוד של 13 ספרות.",
     productDuplicate: "כבר יש בקטלוג מוצר בשם הזה או עם הברקוד הזה.",
@@ -783,10 +794,10 @@ const baseStrings: Record<"he" | "en", Strings> = {
     overviewHeatHint: "כל כתם אדום הוא דיווחי \"לא מצאתי\" מ-7 הימים האחרונים, במקום שבו נשלחו.",
     overviewToMap: "לניהול המדפים",
     productsSearch: "איפה נמצא…? שם מוצר או ברקוד",
-    productsPickHint: "בוחרים מוצר ברשימה, והמדף שלו נצבע במפה.",
+    productsPickHint: "בוחרים מוצר ברשימה, והאזור שלו נצבע במפה.",
     productsWhereTitle: "איפה המוצר?",
-    productsOnShelf: (shelf) => `במדף ${shelf}`,
-    productsOffMap: "המוצר עוד לא על המפה. לוחצים על העיפרון ובוחרים לו מדף.",
+    productsOnShelf: (shelf) => `אזור ${shelf}`,
+    productsOffMap: "המוצר עוד לא על המפה. לוחצים על העיפרון ובוחרים לו אזור.",
     productsShow: (name) => `הצגת ${name} במפה`,
     productsMore: (shown, total) => `מוצגים ${shown} מתוך ${total}. חיפוש מצמצם את הרשימה.`,
     mapEdit: "עריכת מבנה המפה",
@@ -874,7 +885,7 @@ const baseStrings: Record<"he" | "en", Strings> = {
     staffEmpty: "אין התראות פתוחות",
     staffEmptyHint: "דיווח חדש של לקוח יופיע כאן, ויצלצל בטלפון כשההתראות פועלות.",
     staffAtRisk: (value) => `${value} בסיכון`,
-    staffShelf: (shelf) => `מדף ${shelf}`,
+    staffShelf: (shelf) => `אזור ${shelf}`,
     staffNewAlert: (item) => `התראה חדשה: ${item}`,
     staffClosed: (item) => `נסגר: ${item}. תודה!`,
     staffMisplacedClosed: (item) => `נסגר: ${item} היה במדף. נספר כ"לא במקום".`,
@@ -917,14 +928,24 @@ const baseStrings: Record<"he" | "en", Strings> = {
     placeNoReader: "קורא הברקודים לא נטען. אפשר להקליד את הברקוד.",
     placeLookupFailed: "החיפוש לא הצליח. בודקים את החיבור ומנסים שוב.",
     placeNoPlan: "לסניף עוד אין מפה מצוירת. מיקום מוצרים לפי ברקוד יעבוד אחרי שהמפה תצויר בלוח הבקרה.",
-    placeNow: (shelf) => `במפה עכשיו: מדף ${shelf}`,
-    placeWhichShelf: "באיזה מדף הוא עומד?",
-    placeHereNow: "כאן במפה",
-    placeOtherShelves: "מדף במחלקה אחרת",
-    placeFilterShelves: "חיפוש מדף",
+    placeDepartment: "מחלקה",
+    placeArea: "אזור",
+    placeAreasIn: (department) => `האזורים ב${department}`,
+    placeNotOnMap: "עוד לא במפה",
+    placeHereNow: "כאן עכשיו",
+    placeConfirm: "זה המקום הנכון",
+    placeMove: "להזיז",
+    placeWhere: "לאן להזיז?",
+    placeWhichDepartment: "באיזו מחלקה?",
+    placeWhichArea: "באיזה אזור?",
+    placePickArea: "בוחרים אזור",
+    placeNoAreas: "למחלקה הזאת אין עדיין אזור במפה.",
+    placeMoveTo: (area) => `העברה לאזור ${area}`,
+    placeSaveIn: (area) => `שמירה באזור ${area}`,
     placeUnknown: (barcode) => `הברקוד ${barcode} לא בקטלוג`,
-    placeNameFirst: "קודם שם המוצר, ואז המדף.",
-    placeSaved: (name, shelf) => `${name} נמצא עכשיו במדף ${shelf}.`,
+    placeNameFirst: "קודם שם המוצר, ואז האזור.",
+    placeSaved: (name, department, area) => `${name} נמצא עכשיו ב${department}, באזור ${area}.`,
+    placeKept: (name, area) => `${name} נשאר באזור ${area}. המפה נכונה.`,
     placeAlertClosed: "ההתראה נסגרה.",
     placeScanAnother: "סריקת מוצר נוסף",
     placeRelocating: (item) => `מחפשים את ${item}: סורקים את המוצר במקום שבו הוא עומד עכשיו.`,
@@ -1120,11 +1141,11 @@ const baseStrings: Record<"he" | "en", Strings> = {
     adminSignIn: "Sign in",
     adminTokenLabel: "Access code",
     adminSignInHint: "Enter the store's access code.",
-    shelfPartTitle: "Where on the shelf?",
-    shelfPartHint: "The strip is laid out like the shelf on the map. Tap the part the product stands in, and routes go there.",
-    shelfPart: (quarter) => `Quarter ${quarter} of the shelf`,
+    shelfPartTitle: "Where in the area? (optional)",
+    shelfPartHint: "The strip is laid out like the area on the map. Tap the part the product stands in, and routes go there.",
+    shelfPart: (quarter) => `Part ${quarter} of 4`,
     shelfPartUnknown: "Not known",
-    shelfPartSaved: (name) => `Saved where ${name} stands on the shelf`,
+    shelfPartSaved: (name) => `Saved where ${name} stands in the area`,
     adminWrongToken: "That access code is wrong.",
     adminLocked: "Management is locked: the server has no access code set.",
     adminSignInFailed: "We couldn't reach the server.",
@@ -1179,7 +1200,7 @@ const baseStrings: Record<"he" | "en", Strings> = {
     catalogOffMapOnly: "Only what's not on the map",
     catalogAdd: "Add a product",
     catalogEmpty: "No products match.",
-    catalogColumns: { name: "Product", barcode: "Barcode", department: "Department", shelf: "Shelf on the map", actions: "Actions" },
+    catalogColumns: { name: "Product", barcode: "Barcode", department: "Department", shelf: "Area on the map", actions: "Actions" },
     catalogNotOnMap: "Not on the map",
     catalogNoPlan: "No floor plan drawn yet: products are routed by the old shelf zones.",
     catalogEdit: (name) => `Edit ${name}`,
@@ -1187,9 +1208,9 @@ const baseStrings: Record<"he" | "en", Strings> = {
     catalogDeleteConfirm: (name) => `Delete "${name}" from the catalog? Shoppers won't find it any more.`,
     productNew: "New product",
     productEdit: "Edit product",
-    productFields: { name: "Product name", barcode: "Barcode", brand: "Brand", size: "Size", department: "Department", shelf: "Shelf on the map", subcategory: "Subcategory", price: "Shelf price (₪)" },
-    productShelfHint: "Where shoppers are sent: the shelves drawn on the map for this department.",
-    productWholeDepartment: "The department's shelf, no exact one",
+    productFields: { name: "Product name", barcode: "Barcode", brand: "Brand", size: "Size", department: "Department", shelf: "Area on the map", subcategory: "Subcategory", price: "Shelf price (₪)" },
+    productShelfHint: "Where shoppers are sent: the areas drawn on the map for this department.",
+    productWholeDepartment: "The whole department, no exact area",
     productShelfNotDrawn: (name) => `${name} (not drawn on the map)`,
     productBarcodeInvalid: "Not a barcode: 8 to 14 digits, with a correct check digit for 13.",
     productDuplicate: "The catalog already has a product with this name or barcode.",
@@ -1265,10 +1286,10 @@ const baseStrings: Record<"he" | "en", Strings> = {
     overviewHeatHint: "Each red patch is \"not found\" reports from the last 7 days, where they were sent from.",
     overviewToMap: "Manage shelves",
     productsSearch: "Where is…? Product name or barcode",
-    productsPickHint: "Pick a product in the list and its shelf lights up on the map.",
+    productsPickHint: "Pick a product in the list and its area lights up on the map.",
     productsWhereTitle: "Where is it?",
-    productsOnShelf: (shelf) => `On the ${shelf} shelf`,
-    productsOffMap: "This product isn't on the map yet. Tap the pencil and give it a shelf.",
+    productsOnShelf: (shelf) => `Area: ${shelf}`,
+    productsOffMap: "This product isn't on the map yet. Tap the pencil and give it an area.",
     productsShow: (name) => `Show ${name} on the map`,
     productsMore: (shown, total) => `Showing ${shown} of ${total}. A search narrows the list.`,
     mapEdit: "Edit the floor plan",
@@ -1356,7 +1377,7 @@ const baseStrings: Record<"he" | "en", Strings> = {
     staffEmpty: "No open alerts",
     staffEmptyHint: "A shopper's new report shows here, and rings the phone when alerts are on.",
     staffAtRisk: (value) => `${value} at risk`,
-    staffShelf: (shelf) => `${shelf} shelf`,
+    staffShelf: (shelf) => `Area: ${shelf}`,
     staffNewAlert: (item) => `New alert: ${item}`,
     staffClosed: (item) => `Closed: ${item}. Thanks!`,
     staffMisplacedClosed: (item) => `Closed: ${item} was on the shelf. It counts as misplaced.`,
@@ -1399,14 +1420,24 @@ const baseStrings: Record<"he" | "en", Strings> = {
     placeNoReader: "The barcode reader didn't load. Type the barcode instead.",
     placeLookupFailed: "That lookup failed. Check the connection and try again.",
     placeNoPlan: "This store has no drawn map yet. Placing products by barcode works once the map is drawn in the dashboard.",
-    placeNow: (shelf) => `On the map now: ${shelf} shelf`,
-    placeWhichShelf: "Which shelf is it on?",
-    placeHereNow: "Here on the map",
-    placeOtherShelves: "A shelf in another department",
-    placeFilterShelves: "Find a shelf",
+    placeDepartment: "Department",
+    placeArea: "Area",
+    placeAreasIn: (department) => `Areas in ${department}`,
+    placeNotOnMap: "Not on the map yet",
+    placeHereNow: "Here now",
+    placeConfirm: "This is the right place",
+    placeMove: "Move it",
+    placeWhere: "Move it where?",
+    placeWhichDepartment: "Which department?",
+    placeWhichArea: "Which area?",
+    placePickArea: "Pick an area",
+    placeNoAreas: "This department has no area on the map yet.",
+    placeMoveTo: (area) => `Move to ${area}`,
+    placeSaveIn: (area) => `Save in ${area}`,
     placeUnknown: (barcode) => `Barcode ${barcode} isn't in the catalog`,
-    placeNameFirst: "The product's name first, then its shelf.",
-    placeSaved: (name, shelf) => `${name} is now on the ${shelf} shelf.`,
+    placeNameFirst: "The product's name first, then its area.",
+    placeSaved: (name, department, area) => `${name} is now in ${department}, ${area}.`,
+    placeKept: (name, area) => `${name} stays in ${area}. The map is right.`,
     placeAlertClosed: "The alert is closed.",
     placeScanAnother: "Scan another product",
     placeRelocating: (item) => `Looking for ${item}: scan the product where it stands now.`,

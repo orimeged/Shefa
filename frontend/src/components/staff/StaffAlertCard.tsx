@@ -20,7 +20,9 @@ export function StaffAlertCard({ row, isResolving, onRestocked, onOnShelf, onEls
   const { t, pick, language } = useLanguage();
   const urgent = needsAttention(row);
   const department = row.category_name ? pick(row.category_name, row.category_name_en ?? row.category_name) : null;
-  const where = row.shelf ? t.staffShelf(row.shelf) : department;
+  const where = row.shelf
+    ? [department !== row.shelf ? department : null, t.staffShelf(row.shelf)].filter(Boolean).join(" · ")
+    : department;
 
   return (
     <li

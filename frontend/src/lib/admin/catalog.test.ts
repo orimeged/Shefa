@@ -51,6 +51,7 @@ describe("planShelves", () => {
         department("מחסן", null),
         department("מאפייה", "bakery", { reachable: false }),
         department("קוקה קולה", "product-7"),
+        department("מים", "area:beverages:מים", { subcategory: "מים ומיצים" }),
       ]),
     );
     expect(shelves).toEqual([]);
