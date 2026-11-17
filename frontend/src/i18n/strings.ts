@@ -302,6 +302,28 @@ export interface Strings {
   floorTileSize: string;
   floorTileSizeHint: (width: number, height: number) => string;
   floorTileSizeInvalid: (min: number, max: number) => string;
+  /** The editor's tools by what they do, and a line on each. */
+  floorToolNames: Record<"select" | "shelf" | "aisle" | "wall" | "checkout" | "entrance", string>;
+  floorToolHints: Record<"select" | "shelf" | "aisle" | "wall" | "checkout" | "entrance", string>;
+  floorMoreTools: string;
+  /** Under a shelf's name: whether the catalog knows it, so products will come to it. */
+  floorNameKnown: (department: string | null) => string;
+  floorNameUnknown: string;
+  floorNameEmpty: string;
+  floorSelectHint: string;
+  floorSelected: (name: string, tiles: number) => string;
+  floorUnnamed: string;
+  floorRotate: string;
+  floorRename: string;
+  floorRemove: string;
+  floorDeselect: string;
+  floorRenameLabel: string;
+  floorRenameSave: string;
+  floorRenameClose: string;
+  floorCantPlace: string;
+  floorCantRotate: string;
+  floorAdvanced: string;
+  floorUnlinkedGroup: string;
   metres: string;
   /** The dashboard's five sections, as its navigation names them. */
   adminNav: { overview: string; alerts: string; products: string; map: string; signs: string };
@@ -743,13 +765,13 @@ const baseStrings: Record<"he" | "en", Strings> = {
     shelvesListTitle: "המדפים במפה",
     shelfCurrently: (shelf) => `כרגע ב${shelf}`,
     floorEditorTitle: "עורך מפת הסניף",
-    floorEditorHint: "בוחרים כלי וצובעים משבצות. גרירה צובעת ברצף, ולחיצה ימנית מוחקת.",
+    floorEditorHint: "לוחצים על מדף כדי לבחור אותו, וגוררים אותו למקום חדש. המוצרים שלו זזים איתו. כדי להוסיף מדף: ״ציור מדף״, בוחרים שם וצובעים.",
     floorTools: "כלים",
     floorTiles: { aisle: "מעבר", shelf: "מדף", wall: "קיר", checkout: "קופה", entrance: "כניסה" },
     floorWalkable: "אפשר לעבור",
     floorBlocked: "חוסם מעבר",
-    floorShelfLabel: "המחלקה במדף",
-    floorShelfLabelPlaceholder: "למשל מוצרי חלב",
+    floorShelfLabel: "שם האזור",
+    floorShelfLabelPlaceholder: "למשל חטיפים מלוחים",
     floorSize: "גודל הרשת (שורות × עמודות)",
     floorUndo: "ביטול",
     floorClear: "ניקוי המפה",
@@ -757,15 +779,15 @@ const baseStrings: Record<"he" | "en", Strings> = {
     floorSaved: "המפה נשמרה",
     floorSaveFailed: "השמירה נכשלה. נסו שוב.",
     floorUnsaved: "יש שינויים שלא נשמרו",
-    floorDepartments: "מחלקות במפה",
-    floorNoDepartments: "עוד אין מדפים עם מחלקה.",
+    floorDepartments: "האזורים במפה",
+    floorNoDepartments: "עוד אין מדפים עם שם.",
     floorTileCount: (count) => (count === 1 ? "משבצת אחת" : `${count} משבצות`),
     floorUnlabelledShelves: (count) =>
-      count === 1 ? "משבצת מדף אחת בלי מחלקה" : `${count} משבצות מדף בלי מחלקה`,
+      count === 1 ? "משבצת מדף אחת בלי שם" : `${count} משבצות מדף בלי שם`,
     floorCell: (row, col) => `שורה ${row}, עמודה ${col}`,
-    floorGridLabel: "רשת המפה. החיצים מזיזים, רווח צובע ו-Delete מוחק.",
+    floorGridLabel: "רשת המפה. החיצים מזיזים, רווח צובע או בוחר, ו-Delete מוחק.",
     floorStats: (walkable, blocked) => `${walkable} משבצות מעבר · ${blocked} חוסמות`,
-    floorShortcuts: "1–5 בוחרים כלי · Ctrl+Z מבטל",
+    floorShortcuts: "1–6 בוחרים כלי · Ctrl+Z מבטל",
     floorSaving: "שומר…",
     floorLoadFailed: "לא הצלחנו לטעון את מפת הסניף.",
     floorCheckTitle: "בדיקת המפה השמורה",
@@ -783,6 +805,34 @@ const baseStrings: Record<"he" | "en", Strings> = {
     floorTileSizeHint: (width, height) =>
       `הסניף בציור: ${formatMetres(width, "he")} × ${formatMetres(height, "he")} מטרים`,
     floorTileSizeInvalid: (min, max) => `בין ${min} ל-${max} מטרים`,
+    floorToolNames: { select: "בחירה והזזה", shelf: "ציור מדף", aisle: "מחיקה", wall: "קיר", checkout: "קופה", entrance: "כניסה" },
+    floorToolHints: {
+      select: "לוחצים על מדף וגוררים אותו",
+      shelf: "צובעים מדף חדש עם שם",
+      aisle: "מחזירים למעבר פנוי",
+      wall: "חוסם מעבר",
+      checkout: "כאן המסלול נגמר",
+      entrance: "כאן המסלול מתחיל",
+    },
+    floorMoreTools: "קירות, קופות וכניסה",
+    floorNameKnown: (department) => (department ? `אזור במחלקת ${department}` : "מחלקה מהקטלוג"),
+    floorNameUnknown: "השם לא מוכר בקטלוג, ומוצרים לא יגיעו למדף הזה. בוחרים שם מהרשימה.",
+    floorNameEmpty: "בלי שם, המדף לא יקושר למוצרים. בוחרים שם מהרשימה.",
+    floorSelectHint: "לוחצים על מדף, קופה או כניסה כדי לבחור אותם.",
+    floorSelected: (name, tiles) =>
+      `נבחר: ${name} (${tiles === 1 ? "משבצת אחת" : `${tiles} משבצות`}). גוררים כדי להזיז, או חיצי המקלדת.`,
+    floorUnnamed: "מדף בלי שם",
+    floorRotate: "סיבוב",
+    floorRename: "שינוי שם",
+    floorRemove: "מחיקה",
+    floorDeselect: "סיום הבחירה",
+    floorRenameLabel: "השם החדש",
+    floorRenameSave: "שמירת השם",
+    floorRenameClose: "סגירה",
+    floorCantPlace: "אי אפשר להניח כאן: המקום תפוס או מחוץ למפה.",
+    floorCantRotate: "אין כאן מקום לסובב. מזיזים קודם למקום פנוי.",
+    floorAdvanced: "הגדרות מתקדמות",
+    floorUnlinkedGroup: "שמות שלא בקטלוג",
     metres: "מ׳",
     adminNav: { overview: "סקירה", alerts: "התראות", products: "מוצרים", map: "מפה", signs: "שלטים" },
     overviewLostTitle: "מכירות בסיכון · 7 ימים",
@@ -1235,13 +1285,13 @@ const baseStrings: Record<"he" | "en", Strings> = {
     shelvesListTitle: "Shelves on the map",
     shelfCurrently: (shelf) => `Now on ${shelf}`,
     floorEditorTitle: "Store layout editor",
-    floorEditorHint: "Pick a tool and paint tiles. Drag to paint a run; right-click erases.",
+    floorEditorHint: "Tap a shelf to select it, and drag it somewhere new; its products go with it. To add a shelf: “Draw a shelf”, pick a name, and paint.",
     floorTools: "Tools",
     floorTiles: { aisle: "Aisle", shelf: "Shelf", wall: "Wall", checkout: "Checkout", entrance: "Entrance" },
     floorWalkable: "Walkable",
     floorBlocked: "Blocks the way",
-    floorShelfLabel: "Department on the shelf",
-    floorShelfLabelPlaceholder: "e.g. Dairy",
+    floorShelfLabel: "Area name",
+    floorShelfLabelPlaceholder: "e.g. Salty snacks",
     floorSize: "Grid size (rows × columns)",
     floorUndo: "Undo",
     floorClear: "Clear map",
@@ -1249,15 +1299,15 @@ const baseStrings: Record<"he" | "en", Strings> = {
     floorSaved: "Map saved",
     floorSaveFailed: "Couldn't save. Try again.",
     floorUnsaved: "Unsaved changes",
-    floorDepartments: "Departments on the map",
-    floorNoDepartments: "No shelves with a department yet.",
+    floorDepartments: "Areas on the map",
+    floorNoDepartments: "No named shelves yet.",
     floorTileCount: (count) => (count === 1 ? "1 tile" : `${count} tiles`),
     floorUnlabelledShelves: (count) =>
-      count === 1 ? "1 shelf tile without a department" : `${count} shelf tiles without a department`,
+      count === 1 ? "1 shelf tile without a name" : `${count} shelf tiles without a name`,
     floorCell: (row, col) => `Row ${row}, column ${col}`,
-    floorGridLabel: "Map grid. Arrows move, Space paints, Delete erases.",
+    floorGridLabel: "Map grid. Arrows move, Space paints or selects, Delete erases.",
     floorStats: (walkable, blocked) => `${walkable} walkable tiles · ${blocked} blocked`,
-    floorShortcuts: "1–5 pick a tool · Ctrl+Z undoes",
+    floorShortcuts: "1–6 pick a tool · Ctrl+Z undoes",
     floorSaving: "Saving…",
     floorLoadFailed: "We couldn't load the store layout.",
     floorCheckTitle: "Saved map check",
@@ -1275,6 +1325,34 @@ const baseStrings: Record<"he" | "en", Strings> = {
     floorTileSizeHint: (width, height) =>
       `The drawing covers ${formatMetres(width, "en")} × ${formatMetres(height, "en")} metres`,
     floorTileSizeInvalid: (min, max) => `Between ${min} and ${max} metres`,
+    floorToolNames: { select: "Select and move", shelf: "Draw a shelf", aisle: "Erase", wall: "Wall", checkout: "Checkout", entrance: "Entrance" },
+    floorToolHints: {
+      select: "Tap a shelf and drag it",
+      shelf: "Paint a new, named shelf",
+      aisle: "Back to open floor",
+      wall: "Blocks the way",
+      checkout: "Where routes end",
+      entrance: "Where routes start",
+    },
+    floorMoreTools: "Walls, checkouts and the entrance",
+    floorNameKnown: (department) => (department ? `An area of ${department}` : "A department in the catalog"),
+    floorNameUnknown: "The catalog doesn't know this name, so no products will be sent here. Pick one from the list.",
+    floorNameEmpty: "Without a name, the shelf won't be linked to products. Pick one from the list.",
+    floorSelectHint: "Tap a shelf, a checkout or the entrance to select it.",
+    floorSelected: (name, tiles) =>
+      `Selected: ${name} (${tiles === 1 ? "1 tile" : `${tiles} tiles`}). Drag to move it, or use the arrow keys.`,
+    floorUnnamed: "Unnamed shelf",
+    floorRotate: "Turn",
+    floorRename: "Rename",
+    floorRemove: "Remove",
+    floorDeselect: "Done",
+    floorRenameLabel: "New name",
+    floorRenameSave: "Save the name",
+    floorRenameClose: "Close",
+    floorCantPlace: "It can't go there: the space is taken or off the map.",
+    floorCantRotate: "No room to turn it here. Move it somewhere open first.",
+    floorAdvanced: "Advanced settings",
+    floorUnlinkedGroup: "Names not in the catalog",
     metres: "m",
     adminNav: { overview: "Overview", alerts: "Alerts", products: "Products", map: "Map", signs: "Signs" },
     overviewLostTitle: "Sales at risk · 7 days",

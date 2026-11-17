@@ -2,16 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   AISLE,
+  blockAt,
   cellsBetween,
   countTiles,
   createGrid,
+  findBlocks,
   fromPayload,
   gridSize,
   makeTile,
+  moveBlock,
   paint,
   parseCellSize,
   readCellSize,
   resize,
+  rotateBlock,
   shelfLabels,
   toPayload,
   walkableMatrix,
@@ -189,5 +193,77 @@ describe("the tile's real size", () => {
     expect(parseCellSize("abc")).toBeNull();
     expect(parseCellSize("0.1")).toBeNull();
     expect(parseCellSize("6")).toBeNull();
+  });
+});
+
+describe("blocks", () => {
+  // A dairy shelf along row 2, columns 2 to 5, and a bakery shelf touching its end.
+  const BAKERY = makeTile("shelf", "מאפייה");
+  const grid = paint(
+    paint(createGrid(10, 10), [2, 3, 4, 5].map((col) => ({ row: 2, col })), DAIRY),
+    [{ row: 2, col: 6 }],
+    BAKERY,
+  );
+
+  it("are the touching tiles of one kind and one name", () => {
+    const dairy = blockAt(grid, { row: 2, col: 4 })!;
+    expect(dairy.cells).toHaveLength(4);
+    expect(dairy.tile).toEqual(DAIRY);
+    expect([dairy.top, dairy.left, dairy.bottom, dairy.right]).toEqual([2, 2, 2, 5]);
+    expect(blockAt(grid, { row: 2, col: 6 })!.cells).toHaveLength(1);
+  });
+
+  it("aren't open floor", () => {
+    expect(blockAt(grid, { row: 0, col: 0 })).toBeNull();
+  });
+
+  it("are all found, each once", () => {
+    expect(findBlocks(grid).map((block) => block.tile.label)).toEqual(["מוצרי חלב", "מאפייה"]);
+  });
+
+  it("move whole, leaving open floor behind", () => {
+    const moved = moveBlock(grid, blockAt(grid, { row: 2, col: 2 })!, 3, 1)!;
+    expect(moved.grid[2]?.[2]).toBe(AISLE);
+    expect([2, 3, 4, 5].every((col) => moved.grid[5]?.[col + 1] === DAIRY || moved.grid[5]?.[col + 1]?.label === "מוצרי חלב")).toBe(true);
+    expect(moved.block.cells).toHaveLength(4);
+    expect([moved.block.top, moved.block.left]).toEqual([5, 3]);
+    expect(moved.grid[2]?.[6]).toEqual(BAKERY);
+  });
+
+  it("can slide over where they stand already", () => {
+    const moved = moveBlock(grid, blockAt(grid, { row: 2, col: 2 })!, 0, -1)!;
+    expect(moved.grid[2]?.[1]?.label).toBe("מוצרי חלב");
+    expect(moved.grid[2]?.[5]).toBe(AISLE);
+  });
+
+  it("don't land on another shelf, or off the map", () => {
+    const dairy = blockAt(grid, { row: 2, col: 2 })!;
+    expect(moveBlock(grid, dairy, 0, 1)).toBeNull();
+    expect(moveBlock(grid, dairy, -3, 0)).toBeNull();
+  });
+
+  it("turn a quarter about their middle", () => {
+    const open = paint(createGrid(10, 10), [2, 3, 4, 5].map((col) => ({ row: 5, col })), DAIRY);
+    const turned = rotateBlock(open, blockAt(open, { row: 5, col: 2 })!)!;
+    expect(turned.block.right - turned.block.left).toBe(0);
+    expect(turned.block.bottom - turned.block.top).toBe(3);
+    expect(findBlocks(turned.grid)).toHaveLength(1);
+    expect(turned.grid.flat().filter((tile) => tile.label === "מוצרי חלב")).toHaveLength(4);
+  });
+
+  it("turn inside the map near its edge", () => {
+    const edge = paint(createGrid(10, 10), [2, 3, 4, 5].map((col) => ({ row: 0, col })), DAIRY);
+    const turned = rotateBlock(edge, blockAt(edge, { row: 0, col: 2 })!)!;
+    expect(turned.block.top).toBe(0);
+    expect(turned.block.bottom).toBe(3);
+  });
+
+  it("don't turn into another shelf", () => {
+    const boxed = paint(
+      paint(createGrid(5, 5), [1, 2, 3].map((col) => ({ row: 2, col })), DAIRY),
+      [0, 1, 3, 4].flatMap((row) => [0, 1, 2, 3, 4].map((col) => ({ row, col }))),
+      makeTile("wall"),
+    );
+    expect(rotateBlock(boxed, blockAt(boxed, { row: 2, col: 2 })!)).toBeNull();
   });
 });

@@ -179,6 +179,145 @@ export function shelfLabels(grid: FloorGrid): LabelCount[] {
     .sort((a, b) => b.tiles - a.tiles || a.label.localeCompare(b.label));
 }
 
+/**
+ * A piece of the plan someone thinks of as one thing: the touching tiles of one kind
+ * and one name, such as the "חטיפים מלוחים" shelf, or the row of checkouts. Moving,
+ * turning, renaming and removing work on a whole block.
+ */
+export interface Block {
+  readonly tile: Tile;
+  readonly cells: readonly Cell[];
+  readonly top: number;
+  readonly left: number;
+  readonly bottom: number;
+  readonly right: number;
+}
+
+const NEIGHBOURS: readonly (readonly [number, number])[] = [
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
+];
+
+function blockFrom(grid: FloorGrid, start: Cell, tile: Tile, seen: Set<string>): Block {
+  const cells: Cell[] = [];
+  const queue: Cell[] = [start];
+  seen.add(`${start.row},${start.col}`);
+  while (queue.length > 0) {
+    const cell = queue.pop()!;
+    cells.push(cell);
+    for (const [dRow, dCol] of NEIGHBOURS) {
+      const row = cell.row + dRow;
+      const col = cell.col + dCol;
+      const key = `${row},${col}`;
+      const next = grid[row]?.[col];
+      if (next && !seen.has(key) && sameTile(next, tile)) {
+        seen.add(key);
+        queue.push({ row, col });
+      }
+    }
+  }
+  return { tile, cells, ...bounds(cells) };
+}
+
+/** The block a cell belongs to; null on open floor, which isn't a thing anyone moves. */
+export function blockAt(grid: FloorGrid, cell: Cell): Block | null {
+  const tile = grid[cell.row]?.[cell.col];
+  return tile && tile.kind !== "aisle" ? blockFrom(grid, cell, tile, new Set()) : null;
+}
+
+/** Every block of the given kinds, row by row from the top left. */
+export function findBlocks(grid: FloorGrid, kinds: readonly TileKind[] = ["shelf"]): Block[] {
+  const seen = new Set<string>();
+  const blocks: Block[] = [];
+  grid.forEach((line, row) =>
+    line.forEach((tile, col) => {
+      if (kinds.includes(tile.kind) && !seen.has(`${row},${col}`)) {
+        blocks.push(blockFrom(grid, { row, col }, tile, seen));
+      }
+    }),
+  );
+  return blocks;
+}
+
+/** The smallest rectangle around some cells. */
+export function bounds(cells: readonly Cell[]): { top: number; left: number; bottom: number; right: number } {
+  let top = Infinity;
+  let left = Infinity;
+  let bottom = -Infinity;
+  let right = -Infinity;
+  for (const { row, col } of cells) {
+    top = Math.min(top, row);
+    bottom = Math.max(bottom, row);
+    left = Math.min(left, col);
+    right = Math.max(right, col);
+  }
+  return { top, left, bottom, right };
+}
+
+/** Whether a block may stand on these cells: inside the map, on open floor or where it stands already. */
+function fits(grid: FloorGrid, block: Block, target: readonly Cell[]): boolean {
+  const { rows, cols } = gridSize(grid);
+  const own = new Set(block.cells.map(({ row, col }) => `${row},${col}`));
+  return target.every(
+    ({ row, col }) =>
+      row >= 0 && row < rows && col >= 0 && col < cols && (grid[row]?.[col]?.kind === "aisle" || own.has(`${row},${col}`)),
+  );
+}
+
+function relocate(grid: FloorGrid, block: Block, target: readonly Cell[]): { grid: FloorGrid; block: Block } {
+  const next = paint(paint(grid, block.cells, AISLE), target, block.tile);
+  return { grid: next, block: { tile: block.tile, cells: target, ...bounds(target) } };
+}
+
+/**
+ * The block slid by whole tiles, or null where it would leave the map or land on
+ * anything but open floor. Its products go with it: they follow its name, not its tiles.
+ */
+export function moveBlock(
+  grid: FloorGrid,
+  block: Block,
+  dRow: number,
+  dCol: number,
+): { grid: FloorGrid; block: Block } | null {
+  const target = block.cells.map(({ row, col }) => ({ row: row + dRow, col: col + dCol }));
+  return fits(grid, block, target) ? relocate(grid, block, target) : null;
+}
+
+/**
+ * The block turned a quarter, clockwise on the plan: about its middle where there's
+ * room, else pushed back inside the map, else from its top left corner. Null when
+ * none of those fits.
+ */
+export function rotateBlock(grid: FloorGrid, block: Block): { grid: FloorGrid; block: Block } | null {
+  const { rows, cols } = gridSize(grid);
+  const height = block.bottom - block.top + 1;
+  const width = block.right - block.left + 1;
+  const centred = {
+    top: block.top + Math.floor((height - width) / 2),
+    left: block.left + Math.floor((width - height) / 2),
+  };
+  const anchors = [
+    centred,
+    {
+      top: Math.min(Math.max(centred.top, 0), rows - width),
+      left: Math.min(Math.max(centred.left, 0), cols - height),
+    },
+    { top: block.top, left: block.left },
+  ];
+  for (const { top, left } of anchors) {
+    const target = block.cells.map(({ row, col }) => ({
+      row: top + (col - block.left),
+      col: left + (height - 1 - (row - block.top)),
+    }));
+    if (fits(grid, block, target)) {
+      return relocate(grid, block, target);
+    }
+  }
+  return null;
+}
+
 export interface FloorGridPayload {
   version: typeof PAYLOAD_VERSION;
   rows: number;
